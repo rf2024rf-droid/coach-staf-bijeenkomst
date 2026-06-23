@@ -1,0 +1,34 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1782222401354,
+      "tag": "0000_conscious_valkyrie",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1782222592907,
+      "tag": "0001_rainy_rockslide",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1782223625912,
+      "tag": "0002_dashing_madame_hydra",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1782224769970,
+      "tag": "0003_normal_wrecker",
+      "breakpoints": true
+    }
+  ]
+}

@@ -1,0 +1,1 @@
+ALTER TABLE `presentations` ADD `screen_question_id` text;

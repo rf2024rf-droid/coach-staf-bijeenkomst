@@ -1,0 +1,1 @@
+ALTER TABLE `presentations` ADD `screen_view` text DEFAULT 'question' NOT NULL;

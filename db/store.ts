@@ -1,4 +1,4 @@
-import { env } from "cloudflare:workers";
+import postgres from "postgres";
 
 export type QuestionType = "open" | "multiple";
 export type QuestionStatus = "open" | "closed";
@@ -117,6 +117,8 @@ export class AppError extends Error {
   }
 }
 
+type Database = ReturnType<typeof postgres>;
+
 const schemaStatements = [
   `CREATE TABLE IF NOT EXISTS presentations (
     id TEXT PRIMARY KEY,
@@ -126,41 +128,38 @@ const schemaStatements = [
     active_question_id TEXT,
     screen_question_id TEXT,
     screen_view TEXT NOT NULL DEFAULT 'question',
-    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    created_at TEXT NOT NULL DEFAULT (now()::text),
+    updated_at TEXT NOT NULL DEFAULT (now()::text)
   )`,
   `CREATE TABLE IF NOT EXISTS questions (
     id TEXT PRIMARY KEY,
-    presentation_id TEXT NOT NULL,
+    presentation_id TEXT NOT NULL REFERENCES presentations(id) ON DELETE CASCADE,
     type TEXT NOT NULL,
     prompt TEXT NOT NULL,
     status TEXT NOT NULL DEFAULT 'closed',
     position INTEGER NOT NULL,
-    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (presentation_id) REFERENCES presentations(id)
+    created_at TEXT NOT NULL DEFAULT (now()::text),
+    updated_at TEXT NOT NULL DEFAULT (now()::text)
   )`,
   `CREATE TABLE IF NOT EXISTS question_options (
     id TEXT PRIMARY KEY,
-    question_id TEXT NOT NULL,
+    question_id TEXT NOT NULL REFERENCES questions(id) ON DELETE CASCADE,
     label TEXT NOT NULL,
-    position INTEGER NOT NULL,
-    FOREIGN KEY (question_id) REFERENCES questions(id)
+    position INTEGER NOT NULL
   )`,
   `CREATE TABLE IF NOT EXISTS responses (
     id TEXT PRIMARY KEY,
-    presentation_id TEXT NOT NULL,
-    question_id TEXT NOT NULL,
+    presentation_id TEXT NOT NULL REFERENCES presentations(id) ON DELETE CASCADE,
+    question_id TEXT NOT NULL REFERENCES questions(id) ON DELETE CASCADE,
     participant_id TEXT NOT NULL,
     participant_name TEXT NOT NULL,
-    option_id TEXT,
+    option_id TEXT REFERENCES question_options(id) ON DELETE SET NULL,
     text_answer TEXT,
-    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (presentation_id) REFERENCES presentations(id),
-    FOREIGN KEY (question_id) REFERENCES questions(id),
-    FOREIGN KEY (option_id) REFERENCES question_options(id)
+    created_at TEXT NOT NULL DEFAULT (now()::text),
+    updated_at TEXT NOT NULL DEFAULT (now()::text)
   )`,
+  "ALTER TABLE presentations ADD COLUMN IF NOT EXISTS screen_view TEXT NOT NULL DEFAULT 'question'",
+  "ALTER TABLE presentations ADD COLUMN IF NOT EXISTS screen_question_id TEXT",
   "CREATE UNIQUE INDEX IF NOT EXISTS presentations_code_idx ON presentations (code)",
   "CREATE INDEX IF NOT EXISTS questions_presentation_idx ON questions (presentation_id)",
   "CREATE INDEX IF NOT EXISTS options_question_idx ON question_options (question_id)",
@@ -169,40 +168,39 @@ const schemaStatements = [
   "CREATE UNIQUE INDEX IF NOT EXISTS responses_question_participant_idx ON responses (question_id, participant_id)",
 ];
 
+let client: Database | null = null;
 let schemaReady: Promise<void> | null = null;
 
-export function getD1() {
-  if (!env.DB) {
+function getDatabaseUrl() {
+  return process.env.SUPABASE_DATABASE_URL ?? process.env.DATABASE_URL ?? process.env.POSTGRES_URL ?? "";
+}
+
+function getSql() {
+  const databaseUrl = getDatabaseUrl();
+
+  if (!databaseUrl) {
     throw new AppError(
       500,
-      "D1 database binding `DB` is niet beschikbaar. Controleer .openai/hosting.json."
+      "Supabase database URL ontbreekt. Zet SUPABASE_DATABASE_URL, DATABASE_URL of POSTGRES_URL in je Vercel environment variables."
     );
   }
 
-  return env.DB;
+  client ??= postgres(databaseUrl, {
+    connect_timeout: 10,
+    idle_timeout: 20,
+    max: Number(process.env.POSTGRES_POOL_SIZE ?? 5),
+    prepare: false,
+  });
+
+  return client;
 }
 
 export async function ensureSchema() {
-  const db = getD1();
+  const sql = getSql();
 
   schemaReady ??= (async () => {
-    await db.batch(schemaStatements.map((statement) => db.prepare(statement)));
-
-    const columns = await db
-      .prepare("PRAGMA table_info(presentations)")
-      .all<{ name: string }>();
-    const columnNames = new Set((columns.results ?? []).map((column) => column.name));
-
-    if (!columnNames.has("screen_view")) {
-      await db
-        .prepare("ALTER TABLE presentations ADD COLUMN screen_view TEXT NOT NULL DEFAULT 'question'")
-        .run();
-    }
-
-    if (!columnNames.has("screen_question_id")) {
-      await db
-        .prepare("ALTER TABLE presentations ADD COLUMN screen_question_id TEXT")
-        .run();
+    for (const statement of schemaStatements) {
+      await sql.unsafe(statement);
     }
   })().catch((error) => {
     schemaReady = null;
@@ -210,6 +208,14 @@ export async function ensureSchema() {
   });
 
   await schemaReady;
+}
+
+function first<T>(rows: T[]) {
+  return rows[0] ?? null;
+}
+
+function numberFromDb(value: unknown) {
+  return Number(value ?? 0);
 }
 
 function makeId(prefix: string) {
@@ -302,55 +308,57 @@ function buildQuestions(
 }
 
 async function fetchPresentationById(id: string) {
-  const db = getD1();
-  return db
-    .prepare("SELECT * FROM presentations WHERE id = ?")
-    .bind(id)
-    .first<PresentationRow>();
+  const sql = getSql();
+  const rows = await sql<PresentationRow[]>`SELECT * FROM presentations WHERE id = ${id}`;
+  return first(rows);
 }
 
 async function fetchPresentationByCode(code: string) {
-  const db = getD1();
-  return db
-    .prepare("SELECT * FROM presentations WHERE code = ?")
-    .bind(normalizeCode(code))
-    .first<PresentationRow>();
+  const sql = getSql();
+  const rows = await sql<PresentationRow[]>`SELECT * FROM presentations WHERE code = ${normalizeCode(code)}`;
+  return first(rows);
 }
 
 async function fetchQuestion(questionId: string) {
-  const db = getD1();
-  return db
-    .prepare("SELECT * FROM questions WHERE id = ?")
-    .bind(questionId)
-    .first<QuestionRow>();
+  const sql = getSql();
+  const rows = await sql<QuestionRow[]>`SELECT * FROM questions WHERE id = ${questionId}`;
+  return first(rows);
 }
 
 async function getNextPosition(presentationId: string) {
-  const db = getD1();
-  const row = await db
-    .prepare("SELECT COALESCE(MAX(position), 0) + 1 AS next_position FROM questions WHERE presentation_id = ?")
-    .bind(presentationId)
-    .first<{ next_position: number }>();
+  const sql = getSql();
+  const rows = await sql<{ next_position: number }[]>`
+    SELECT COALESCE(MAX(position), 0) + 1 AS next_position
+    FROM questions
+    WHERE presentation_id = ${presentationId}
+  `;
 
-  return row?.next_position ?? 1;
+  return numberFromDb(first(rows)?.next_position) || 1;
 }
 
 async function normalizeQuestionPositions(presentationId: string) {
-  const db = getD1();
-  const rows = await db
-    .prepare("SELECT id FROM questions WHERE presentation_id = ? ORDER BY position ASC, created_at ASC")
-    .bind(presentationId)
-    .all<{ id: string }>();
+  const sql = getSql();
+  const rows = await sql<{ id: string }[]>`
+    SELECT id
+    FROM questions
+    WHERE presentation_id = ${presentationId}
+    ORDER BY position ASC, created_at ASC
+  `;
 
-  const updates = (rows.results ?? []).map((row, index) =>
-    db
-      .prepare("UPDATE questions SET position = ?, updated_at = ? WHERE id = ?")
-      .bind(index + 1, nowIso(), row.id)
-  );
-
-  if (updates.length) {
-    await db.batch(updates);
+  if (!rows.length) {
+    return;
   }
+
+  const timestamp = nowIso();
+  await sql.begin(async (tx) => {
+    for (const [index, row] of rows.entries()) {
+      await tx`
+        UPDATE questions
+        SET position = ${index + 1}, updated_at = ${timestamp}
+        WHERE id = ${row.id}
+      `;
+    }
+  });
 }
 
 async function assertPresenter(presentationId: string, presenterKey: string) {
@@ -375,35 +383,35 @@ async function insertQuestion(
   optionLabels: string[],
   openImmediately: boolean
 ) {
-  const db = getD1();
+  const sql = getSql();
   const id = makeId("q");
   const position = await getNextPosition(presentationId);
   const status: QuestionStatus = openImmediately ? "open" : "closed";
   const timestamp = nowIso();
 
-  await db
-    .prepare(
-      "INSERT INTO questions (id, presentation_id, type, prompt, status, position, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
-    )
-    .bind(id, presentationId, type, prompt, status, position, timestamp, timestamp)
-    .run();
+  await sql.begin(async (tx) => {
+    await tx`
+      INSERT INTO questions (id, presentation_id, type, prompt, status, position, created_at, updated_at)
+      VALUES (${id}, ${presentationId}, ${type}, ${prompt}, ${status}, ${position}, ${timestamp}, ${timestamp})
+    `;
 
-  if (type === "multiple") {
-    await db.batch(
-      optionLabels.map((label, index) =>
-        db
-          .prepare("INSERT INTO question_options (id, question_id, label, position) VALUES (?, ?, ?, ?)")
-          .bind(makeId("opt"), id, label, index + 1)
-      )
-    );
-  }
+    if (type === "multiple") {
+      for (const [index, label] of optionLabels.entries()) {
+        await tx`
+          INSERT INTO question_options (id, question_id, label, position)
+          VALUES (${makeId("opt")}, ${id}, ${label}, ${index + 1})
+        `;
+      }
+    }
 
-  if (openImmediately) {
-    await db
-      .prepare("UPDATE presentations SET active_question_id = ?, updated_at = ? WHERE id = ?")
-      .bind(id, timestamp, presentationId)
-      .run();
-  }
+    if (openImmediately) {
+      await tx`
+        UPDATE presentations
+        SET active_question_id = ${id}, screen_question_id = ${id}, screen_view = 'question', updated_at = ${timestamp}
+        WHERE id = ${presentationId}
+      `;
+    }
+  });
 
   return id;
 }
@@ -411,7 +419,7 @@ async function insertQuestion(
 export async function createPresentation(titleInput: unknown) {
   await ensureSchema();
 
-  const db = getD1();
+  const sql = getSql();
   const title = cleanText(titleInput, 90) || "Coach Staf Bijeenkomst";
   const id = makeId("prs");
   const presenterKey = makePresenterKey();
@@ -426,12 +434,10 @@ export async function createPresentation(titleInput: unknown) {
     code = makeCode();
   }
 
-  await db
-    .prepare(
-      "INSERT INTO presentations (id, title, code, presenter_key, active_question_id, screen_question_id, screen_view, created_at, updated_at) VALUES (?, ?, ?, ?, NULL, NULL, 'question', ?, ?)"
-    )
-    .bind(id, title, code, presenterKey, timestamp, timestamp)
-    .run();
+  await sql`
+    INSERT INTO presentations (id, title, code, presenter_key, active_question_id, screen_question_id, screen_view, created_at, updated_at)
+    VALUES (${id}, ${title}, ${code}, ${presenterKey}, NULL, NULL, 'question', ${timestamp}, ${timestamp})
+  `;
 
   await insertQuestion(id, "open", "Wat wil je vandaag zeker bespreken?", [], true);
   await insertQuestion(
@@ -447,36 +453,37 @@ export async function createPresentation(titleInput: unknown) {
 
 export async function getPresenterPayload(presentationId: string, presenterKey: string): Promise<PresenterPayload> {
   const presentation = await assertPresenter(presentationId, presenterKey);
-  const db = getD1();
+  const sql = getSql();
 
-  const [questionResult, optionResult, responseResult, participantResult] = await Promise.all([
-    db
-      .prepare("SELECT * FROM questions WHERE presentation_id = ? ORDER BY position ASC, created_at ASC")
-      .bind(presentationId)
-      .all<QuestionRow>(),
-    db
-      .prepare(
-        "SELECT question_options.* FROM question_options INNER JOIN questions ON questions.id = question_options.question_id WHERE questions.presentation_id = ? ORDER BY question_options.position ASC"
-      )
-      .bind(presentationId)
-      .all<OptionRow>(),
-    db
-      .prepare(
-        "SELECT responses.*, question_options.label AS option_label FROM responses LEFT JOIN question_options ON question_options.id = responses.option_id WHERE responses.presentation_id = ? ORDER BY responses.created_at DESC"
-      )
-      .bind(presentationId)
-      .all<ResponseRow>(),
-    db
-      .prepare("SELECT COUNT(DISTINCT participant_id) AS count FROM responses WHERE presentation_id = ?")
-      .bind(presentationId)
-      .first<{ count: number }>(),
+  const [questionRows, optionRows, responseRows, participantRows] = await Promise.all([
+    sql<QuestionRow[]>`
+      SELECT *
+      FROM questions
+      WHERE presentation_id = ${presentationId}
+      ORDER BY position ASC, created_at ASC
+    `,
+    sql<OptionRow[]>`
+      SELECT question_options.*
+      FROM question_options
+      INNER JOIN questions ON questions.id = question_options.question_id
+      WHERE questions.presentation_id = ${presentationId}
+      ORDER BY question_options.position ASC
+    `,
+    sql<ResponseRow[]>`
+      SELECT responses.*, question_options.label AS option_label
+      FROM responses
+      LEFT JOIN question_options ON question_options.id = responses.option_id
+      WHERE responses.presentation_id = ${presentationId}
+      ORDER BY responses.created_at DESC
+    `,
+    sql<{ count: number }[]>`
+      SELECT COUNT(DISTINCT participant_id)::int AS count
+      FROM responses
+      WHERE presentation_id = ${presentationId}
+    `,
   ]);
 
-  const questions = buildQuestions(
-    questionResult.results ?? [],
-    optionResult.results ?? [],
-    responseResult.results ?? []
-  );
+  const questions = buildQuestions(questionRows, optionRows, responseRows);
 
   return {
     presentation: mapPresentation(presentation),
@@ -486,8 +493,8 @@ export async function getPresenterPayload(presentationId: string, presenterKey: 
       null,
     totals: {
       questions: questions.length,
-      answers: responseResult.results?.length ?? 0,
-      participants: participantResult?.count ?? 0,
+      answers: responseRows.length,
+      participants: numberFromDb(first(participantRows)?.count),
     },
   };
 }
@@ -530,33 +537,35 @@ export async function deleteQuestion(
     throw new AppError(404, "Vraag niet gevonden in deze presentatie.");
   }
 
-  const db = getD1();
+  const sql = getSql();
   const timestamp = nowIso();
   const isActiveQuestion = presentation.active_question_id === questionId;
   const isScreenQuestion = presentation.screen_question_id === questionId;
-  const operations = [
-    db
-      .prepare("DELETE FROM responses WHERE presentation_id = ? AND question_id = ?")
-      .bind(presentationId, questionId),
-    db
-      .prepare("DELETE FROM question_options WHERE question_id = ?")
-      .bind(questionId),
-    db
-      .prepare("DELETE FROM questions WHERE id = ? AND presentation_id = ?")
-      .bind(questionId, presentationId),
-  ];
 
-  if (isActiveQuestion || isScreenQuestion) {
-    operations.push(
-      db
-        .prepare(
-          "UPDATE presentations SET active_question_id = CASE WHEN active_question_id = ? THEN NULL ELSE active_question_id END, screen_question_id = CASE WHEN screen_question_id = ? THEN NULL ELSE screen_question_id END, screen_view = CASE WHEN active_question_id = ? OR screen_question_id = ? THEN 'question' ELSE screen_view END, updated_at = ? WHERE id = ?"
-        )
-        .bind(questionId, questionId, questionId, questionId, timestamp, presentationId)
-    );
-  }
+  await sql.begin(async (tx) => {
+    await tx`
+      DELETE FROM responses
+      WHERE presentation_id = ${presentationId} AND question_id = ${questionId}
+    `;
+    await tx`DELETE FROM question_options WHERE question_id = ${questionId}`;
+    await tx`
+      DELETE FROM questions
+      WHERE id = ${questionId} AND presentation_id = ${presentationId}
+    `;
 
-  await db.batch(operations);
+    if (isActiveQuestion || isScreenQuestion) {
+      await tx`
+        UPDATE presentations
+        SET
+          active_question_id = CASE WHEN active_question_id = ${questionId} THEN NULL ELSE active_question_id END,
+          screen_question_id = CASE WHEN screen_question_id = ${questionId} THEN NULL ELSE screen_question_id END,
+          screen_view = CASE WHEN active_question_id = ${questionId} OR screen_question_id = ${questionId} THEN 'question' ELSE screen_view END,
+          updated_at = ${timestamp}
+        WHERE id = ${presentationId}
+      `;
+    }
+  });
+
   await normalizeQuestionPositions(presentationId);
   return getPresenterPayload(presentationId, presenterKey);
 }
@@ -588,49 +597,52 @@ export async function updateQuestion(
     throw new AppError(400, "Een multiple choice vraag heeft minimaal twee opties nodig.");
   }
 
-  const db = getD1();
+  const sql = getSql();
   const timestamp = nowIso();
-  const operations = [
-    db
-      .prepare("UPDATE questions SET prompt = ?, updated_at = ? WHERE id = ? AND presentation_id = ?")
-      .bind(prompt, timestamp, questionId, presentationId),
-  ];
+  const current =
+    question.type === "multiple"
+      ? await sql<OptionRow[]>`
+          SELECT *
+          FROM question_options
+          WHERE question_id = ${questionId}
+          ORDER BY position ASC
+        `
+      : [];
 
-  if (question.type === "multiple") {
-    const currentOptions = await db
-      .prepare("SELECT * FROM question_options WHERE question_id = ? ORDER BY position ASC")
-      .bind(questionId)
-      .all<OptionRow>();
-    const current = currentOptions.results ?? [];
+  await sql.begin(async (tx) => {
+    await tx`
+      UPDATE questions
+      SET prompt = ${prompt}, updated_at = ${timestamp}
+      WHERE id = ${questionId} AND presentation_id = ${presentationId}
+    `;
 
-    optionLabels.forEach((label, index) => {
-      const existing = current[index];
-      if (existing) {
-        operations.push(
-          db
-            .prepare("UPDATE question_options SET label = ?, position = ? WHERE id = ?")
-            .bind(label, index + 1, existing.id)
-        );
-      } else {
-        operations.push(
-          db
-            .prepare("INSERT INTO question_options (id, question_id, label, position) VALUES (?, ?, ?, ?)")
-            .bind(makeId("opt"), questionId, label, index + 1)
-        );
+    if (question.type === "multiple") {
+      for (const [index, label] of optionLabels.entries()) {
+        const existing = current[index];
+        if (existing) {
+          await tx`
+            UPDATE question_options
+            SET label = ${label}, position = ${index + 1}
+            WHERE id = ${existing.id}
+          `;
+        } else {
+          await tx`
+            INSERT INTO question_options (id, question_id, label, position)
+            VALUES (${makeId("opt")}, ${questionId}, ${label}, ${index + 1})
+          `;
+        }
       }
-    });
 
-    current.slice(optionLabels.length).forEach((removed) => {
-      operations.push(
-        db
-          .prepare("DELETE FROM responses WHERE question_id = ? AND option_id = ?")
-          .bind(questionId, removed.id),
-        db.prepare("DELETE FROM question_options WHERE id = ?").bind(removed.id)
-      );
-    });
-  }
+      for (const removed of current.slice(optionLabels.length)) {
+        await tx`
+          DELETE FROM responses
+          WHERE question_id = ${questionId} AND option_id = ${removed.id}
+        `;
+        await tx`DELETE FROM question_options WHERE id = ${removed.id}`;
+      }
+    }
+  });
 
-  await db.batch(operations);
   return getPresenterPayload(presentationId, presenterKey);
 }
 
@@ -647,35 +659,45 @@ export async function moveQuestion(
     throw new AppError(404, "Vraag niet gevonden in deze presentatie.");
   }
 
-  const db = getD1();
+  const sql = getSql();
   const target =
     direction === "up"
-      ? await db
-          .prepare(
-            "SELECT * FROM questions WHERE presentation_id = ? AND position < ? ORDER BY position DESC LIMIT 1"
-          )
-          .bind(presentationId, question.position)
-          .first<QuestionRow>()
-      : await db
-          .prepare(
-            "SELECT * FROM questions WHERE presentation_id = ? AND position > ? ORDER BY position ASC LIMIT 1"
-          )
-          .bind(presentationId, question.position)
-          .first<QuestionRow>();
+      ? first(
+          await sql<QuestionRow[]>`
+            SELECT *
+            FROM questions
+            WHERE presentation_id = ${presentationId} AND position < ${question.position}
+            ORDER BY position DESC
+            LIMIT 1
+          `
+        )
+      : first(
+          await sql<QuestionRow[]>`
+            SELECT *
+            FROM questions
+            WHERE presentation_id = ${presentationId} AND position > ${question.position}
+            ORDER BY position ASC
+            LIMIT 1
+          `
+        );
 
   if (!target) {
     return getPresenterPayload(presentationId, presenterKey);
   }
 
   const timestamp = nowIso();
-  await db.batch([
-    db
-      .prepare("UPDATE questions SET position = ?, updated_at = ? WHERE id = ?")
-      .bind(target.position, timestamp, question.id),
-    db
-      .prepare("UPDATE questions SET position = ?, updated_at = ? WHERE id = ?")
-      .bind(question.position, timestamp, target.id),
-  ]);
+  await sql.begin(async (tx) => {
+    await tx`
+      UPDATE questions
+      SET position = ${target.position}, updated_at = ${timestamp}
+      WHERE id = ${question.id}
+    `;
+    await tx`
+      UPDATE questions
+      SET position = ${question.position}, updated_at = ${timestamp}
+      WHERE id = ${target.id}
+    `;
+  });
 
   return getPresenterPayload(presentationId, presenterKey);
 }
@@ -686,18 +708,22 @@ export async function setActiveQuestion(
   questionId: string | null
 ) {
   await assertPresenter(presentationId, presenterKey);
-  const db = getD1();
+  const sql = getSql();
   const timestamp = nowIso();
 
   if (!questionId) {
-    await db.batch([
-      db
-        .prepare("UPDATE questions SET status = 'closed', updated_at = ? WHERE presentation_id = ?")
-        .bind(timestamp, presentationId),
-      db
-        .prepare("UPDATE presentations SET active_question_id = NULL, screen_question_id = NULL, screen_view = 'question', updated_at = ? WHERE id = ?")
-        .bind(timestamp, presentationId),
-    ]);
+    await sql.begin(async (tx) => {
+      await tx`
+        UPDATE questions
+        SET status = 'closed', updated_at = ${timestamp}
+        WHERE presentation_id = ${presentationId}
+      `;
+      await tx`
+        UPDATE presentations
+        SET active_question_id = NULL, screen_question_id = NULL, screen_view = 'question', updated_at = ${timestamp}
+        WHERE id = ${presentationId}
+      `;
+    });
 
     return getPresenterPayload(presentationId, presenterKey);
   }
@@ -707,17 +733,23 @@ export async function setActiveQuestion(
     throw new AppError(404, "Vraag niet gevonden in deze presentatie.");
   }
 
-  await db.batch([
-    db
-      .prepare("UPDATE questions SET status = 'closed', updated_at = ? WHERE presentation_id = ?")
-      .bind(timestamp, presentationId),
-    db
-      .prepare("UPDATE questions SET status = 'open', updated_at = ? WHERE id = ?")
-      .bind(timestamp, questionId),
-      db
-        .prepare("UPDATE presentations SET active_question_id = ?, screen_question_id = ?, screen_view = 'question', updated_at = ? WHERE id = ?")
-        .bind(questionId, questionId, timestamp, presentationId),
-  ]);
+  await sql.begin(async (tx) => {
+    await tx`
+      UPDATE questions
+      SET status = 'closed', updated_at = ${timestamp}
+      WHERE presentation_id = ${presentationId}
+    `;
+    await tx`
+      UPDATE questions
+      SET status = 'open', updated_at = ${timestamp}
+      WHERE id = ${questionId}
+    `;
+    await tx`
+      UPDATE presentations
+      SET active_question_id = ${questionId}, screen_question_id = ${questionId}, screen_view = 'question', updated_at = ${timestamp}
+      WHERE id = ${presentationId}
+    `;
+  });
 
   return getPresenterPayload(presentationId, presenterKey);
 }
@@ -745,10 +777,11 @@ export async function setScreenView(
     }
   }
 
-  await getD1()
-    .prepare("UPDATE presentations SET screen_view = ?, screen_question_id = ?, updated_at = ? WHERE id = ?")
-    .bind(screenView, screenView === "results" ? questionId : null, nowIso(), presentationId)
-    .run();
+  await getSql()`
+    UPDATE presentations
+    SET screen_view = ${screenView}, screen_question_id = ${screenView === "results" ? questionId : null}, updated_at = ${nowIso()}
+    WHERE id = ${presentationId}
+  `;
 
   return getPresenterPayload(presentationId, presenterKey);
 }
@@ -759,7 +792,7 @@ export async function resetAnswers(
   questionId: string | null
 ) {
   await assertPresenter(presentationId, presenterKey);
-  const db = getD1();
+  const sql = getSql();
 
   if (questionId) {
     const question = await fetchQuestion(questionId);
@@ -767,12 +800,12 @@ export async function resetAnswers(
       throw new AppError(404, "Vraag niet gevonden in deze presentatie.");
     }
 
-    await db
-      .prepare("DELETE FROM responses WHERE presentation_id = ? AND question_id = ?")
-      .bind(presentationId, questionId)
-      .run();
+    await sql`
+      DELETE FROM responses
+      WHERE presentation_id = ${presentationId} AND question_id = ${questionId}
+    `;
   } else {
-    await db.prepare("DELETE FROM responses WHERE presentation_id = ?").bind(presentationId).run();
+    await sql`DELETE FROM responses WHERE presentation_id = ${presentationId}`;
   }
 
   return getPresenterPayload(presentationId, presenterKey);
@@ -786,31 +819,32 @@ export async function getPublicSession(codeInput: string): Promise<PublicSession
     throw new AppError(404, "Sessie niet gevonden.");
   }
 
-  const db = getD1();
-  const [questionResult, optionResult, responseResult] = await Promise.all([
-    db
-      .prepare("SELECT * FROM questions WHERE presentation_id = ? ORDER BY position ASC, created_at ASC")
-      .bind(presentation.id)
-      .all<QuestionRow>(),
-    db
-      .prepare(
-        "SELECT question_options.* FROM question_options INNER JOIN questions ON questions.id = question_options.question_id WHERE questions.presentation_id = ? ORDER BY question_options.position ASC"
-      )
-      .bind(presentation.id)
-      .all<OptionRow>(),
-    db
-      .prepare(
-        "SELECT responses.*, question_options.label AS option_label FROM responses LEFT JOIN question_options ON question_options.id = responses.option_id WHERE responses.presentation_id = ? ORDER BY responses.created_at DESC LIMIT 250"
-      )
-      .bind(presentation.id)
-      .all<ResponseRow>(),
+  const sql = getSql();
+  const [questionRows, optionRows, responseRows] = await Promise.all([
+    sql<QuestionRow[]>`
+      SELECT *
+      FROM questions
+      WHERE presentation_id = ${presentation.id}
+      ORDER BY position ASC, created_at ASC
+    `,
+    sql<OptionRow[]>`
+      SELECT question_options.*
+      FROM question_options
+      INNER JOIN questions ON questions.id = question_options.question_id
+      WHERE questions.presentation_id = ${presentation.id}
+      ORDER BY question_options.position ASC
+    `,
+    sql<ResponseRow[]>`
+      SELECT responses.*, question_options.label AS option_label
+      FROM responses
+      LEFT JOIN question_options ON question_options.id = responses.option_id
+      WHERE responses.presentation_id = ${presentation.id}
+      ORDER BY responses.created_at DESC
+      LIMIT 250
+    `,
   ]);
 
-  const questions = buildQuestions(
-    questionResult.results ?? [],
-    optionResult.results ?? [],
-    responseResult.results ?? []
-  );
+  const questions = buildQuestions(questionRows, optionRows, responseRows);
 
   return {
     presentation: {
@@ -827,7 +861,7 @@ export async function getPublicSession(codeInput: string): Promise<PublicSession
       null,
     totals: {
       questions: questions.length,
-      answers: responseResult.results?.length ?? 0,
+      answers: responseRows.length,
     },
   };
 }
@@ -868,10 +902,13 @@ export async function submitAnswer(
       throw new AppError(400, "Kies een antwoordoptie.");
     }
 
-    const option = await getD1()
-      .prepare("SELECT id FROM question_options WHERE id = ? AND question_id = ?")
-      .bind(optionId, question.id)
-      .first<{ id: string }>();
+    const option = first(
+      await getSql()<{ id: string }[]>`
+        SELECT id
+        FROM question_options
+        WHERE id = ${optionId} AND question_id = ${question.id}
+      `
+    );
 
     if (!option) {
       throw new AppError(400, "Deze antwoordoptie hoort niet bij de actieve vraag.");
@@ -883,29 +920,19 @@ export async function submitAnswer(
     }
   }
 
-  const db = getD1();
+  const sql = getSql();
   const timestamp = nowIso();
 
-  await db.batch([
-    db
-      .prepare("DELETE FROM responses WHERE question_id = ? AND participant_id = ?")
-      .bind(question.id, participantId),
-    db
-      .prepare(
-        "INSERT INTO responses (id, presentation_id, question_id, participant_id, participant_name, option_id, text_answer, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
-      )
-      .bind(
-        makeId("rsp"),
-        presentation.id,
-        question.id,
-        participantId,
-        participantName,
-        optionId,
-        textAnswer,
-        timestamp,
-        timestamp
-      ),
-  ]);
+  await sql.begin(async (tx) => {
+    await tx`
+      DELETE FROM responses
+      WHERE question_id = ${question.id} AND participant_id = ${participantId}
+    `;
+    await tx`
+      INSERT INTO responses (id, presentation_id, question_id, participant_id, participant_name, option_id, text_answer, created_at, updated_at)
+      VALUES (${makeId("rsp")}, ${presentation.id}, ${question.id}, ${participantId}, ${participantName}, ${optionId}, ${textAnswer}, ${timestamp}, ${timestamp})
+    `;
+  });
 
   return getPublicSession(presentation.code);
 }

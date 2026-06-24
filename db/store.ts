@@ -892,7 +892,7 @@ export async function submitAnswer(
   }
 
   const participantId = cleanText(payload.participantId, 80) || makeId("guest");
-  const participantName = cleanText(payload.participantName, 50) || "Deelnemer";
+  const participantName = "Anoniem";
   let optionId: string | null = null;
   let textAnswer: string | null = null;
 

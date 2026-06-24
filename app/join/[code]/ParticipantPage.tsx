@@ -2,7 +2,6 @@
 
 import { CheckCircle2, Loader2, Send } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ResultView } from "@/app/components/ResultView";
 import type { PublicSessionPayload } from "@/app/types";
 
 type ParticipantPageProps = {
@@ -28,13 +27,6 @@ export default function ParticipantPage({ code }: ParticipantPageProps) {
     const storedId = window.localStorage.getItem("coach-staf-participant-id") ?? createParticipantId();
     window.localStorage.setItem("coach-staf-participant-id", storedId);
     return storedId;
-  });
-  const [participantName, setParticipantName] = useState(() => {
-    if (typeof window === "undefined") {
-      return "";
-    }
-
-    return window.localStorage.getItem("coach-staf-participant-name") ?? "";
   });
   const [textAnswer, setTextAnswer] = useState("");
   const [selectedOptionId, setSelectedOptionId] = useState("");
@@ -102,13 +94,11 @@ export default function ParticipantPage({ code }: ParticipantPageProps) {
     setError("");
 
     try {
-      window.localStorage.setItem("coach-staf-participant-name", participantName);
       const response = await fetch(`/api/session/${normalizedCode}/answers`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           participantId,
-          participantName,
           optionId: selectedOptionId,
           textAnswer,
         }),
@@ -178,20 +168,8 @@ export default function ParticipantPage({ code }: ParticipantPageProps) {
               <h2 className="mt-3 text-2xl font-black leading-9">{activeQuestion.prompt}</h2>
             </div>
 
-            <label className="block text-sm font-semibold text-zinc-200" htmlFor="participant-name">
-              Naam of team
-            </label>
-            <input
-              className="mt-2 w-full rounded-lg border border-zinc-600 bg-zinc-950 px-4 py-3 text-white outline-none placeholder:text-zinc-500 focus:border-emerald-300 focus:ring-2 focus:ring-emerald-300/30"
-              id="participant-name"
-              maxLength={50}
-              onChange={(event) => setParticipantName(event.target.value)}
-              placeholder="Bijvoorbeeld: staf tafel 1"
-              value={participantName}
-            />
-
             {activeQuestion.type === "multiple" ? (
-              <div className="mt-5 grid gap-3">
+              <div className="grid gap-3">
                 {activeQuestion.options.map((option) => (
                   <button
                     className={`rounded-lg border px-4 py-4 text-left text-base font-bold transition ${
@@ -230,13 +208,13 @@ export default function ParticipantPage({ code }: ParticipantPageProps) {
 
         {submitted && activeQuestion ? (
           <section className="rounded-lg border border-emerald-700 bg-emerald-950 p-5 shadow-sm">
-            <div className="mb-4 flex items-center gap-2 font-bold text-emerald-100">
+            <div className="flex items-center gap-2 font-bold text-emerald-100">
               <CheckCircle2 aria-hidden className="h-5 w-5" />
               Antwoord ontvangen
             </div>
-            <div className="rounded-lg bg-zinc-100 p-4 text-zinc-950">
-              <ResultView mode="compact" question={activeQuestion} />
-            </div>
+            <p className="mt-3 text-sm font-semibold leading-6 text-emerald-50">
+              Je antwoord is anoniem opgeslagen. De presentator bepaalt wanneer de resultaten zichtbaar worden.
+            </p>
           </section>
         ) : null}
       </div>

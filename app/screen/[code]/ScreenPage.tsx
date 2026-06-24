@@ -1,9 +1,8 @@
 "use client";
 
-import { BarChart3, Loader2, MessageSquareText, QrCode as QrCodeIcon } from "lucide-react";
+import { BarChart3, Loader2, QrCode as QrCodeIcon, Users } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { QrCode } from "@/app/components/QrCode";
-import { ResultView } from "@/app/components/ResultView";
 import type { PublicSessionPayload, QuestionResult } from "@/app/types";
 
 type ScreenPageProps = {
@@ -90,10 +89,48 @@ function SpotlightResults({ question }: { question: QuestionResult }) {
           className={`rounded-lg border p-5 text-zinc-950 shadow-sm ${cardStyles[index % cardStyles.length]}`}
           key={response.id}
         >
-          <p className="mb-3 text-sm font-black uppercase text-zinc-600">{response.participantName}</p>
           <p className="text-2xl font-black leading-8">{response.textAnswer}</p>
         </article>
       ))}
+    </section>
+  );
+}
+
+function ResponsePulse({ count, questionType }: { count: number; questionType: QuestionResult["type"] }) {
+  const label = questionType === "multiple" ? "stemmen" : "antwoorden";
+  const dots = Array.from({ length: 18 }, (_, index) => index);
+  const activeDots = Math.min(dots.length, Math.max(1, count));
+
+  return (
+    <section className="grid flex-1 items-center gap-8 rounded-lg border border-zinc-700 bg-zinc-900 p-8 md:grid-cols-[1fr_420px] md:p-10">
+      <div>
+        <p className="inline-flex items-center gap-3 text-lg font-black uppercase tracking-wide text-emerald-300">
+          <Users aria-hidden className="h-6 w-6" />
+          Reacties komen binnen
+        </p>
+        <div className="mt-6 flex items-end gap-5">
+          <span className="text-8xl font-black leading-none text-white md:text-9xl">{count}</span>
+          <span className="pb-4 text-3xl font-black text-zinc-300">{label}</span>
+        </div>
+        <p className="mt-6 max-w-2xl text-2xl font-semibold leading-9 text-zinc-300">
+          De resultaten blijven verborgen totdat de presentator ze op het grote scherm zet.
+        </p>
+      </div>
+
+      <div className="relative grid aspect-square place-items-center justify-self-center">
+        <div className="absolute h-72 w-72 rounded-full border border-emerald-300/30" />
+        <div className="absolute h-56 w-56 animate-pulse rounded-full bg-emerald-300/10" />
+        <div className="relative grid h-72 w-72 grid-cols-6 gap-3 rounded-full bg-zinc-950 p-8 shadow-2xl shadow-emerald-950/40">
+          {dots.map((dot) => (
+            <span
+              className={`h-7 w-7 rounded-full transition ${
+                dot < activeDots ? "bg-emerald-300 shadow-lg shadow-emerald-300/30" : "bg-zinc-800"
+              }`}
+              key={dot}
+            />
+          ))}
+        </div>
+      </div>
     </section>
   );
 }
@@ -254,24 +291,20 @@ export default function ScreenPage({ code }: ScreenPageProps) {
   return (
     <main className="min-h-screen bg-zinc-950 text-white">
       <div className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-6 px-6 py-6">
-        <header className="border-b border-zinc-700 pb-5">
-          <div>
-            <p className="text-sm font-bold uppercase text-emerald-300">Coach Staf Bijeenkomst</p>
-            <h1 className="mt-2 text-3xl font-black md:text-5xl">{session.presentation.title}</h1>
-          </div>
-        </header>
+        {activeQuestion ? (
+          <header className="border-b border-zinc-700 pb-5">
+            <div>
+              <p className="text-sm font-bold uppercase text-emerald-300">Coach Staf Bijeenkomst</p>
+              <h1 className="mt-2 text-3xl font-black md:text-5xl">{session.presentation.title}</h1>
+            </div>
+          </header>
+        ) : null}
 
         {!activeQuestion ? (
-          <section className="grid flex-1 items-center gap-8 lg:grid-cols-[1fr_320px]">
-            <div>
-              <p className="text-xl font-bold text-amber-200">De sessie is open</p>
-              <h2 className="mt-4 max-w-4xl text-5xl font-black leading-tight md:text-7xl">
-                Scan de QR-code of gebruik de code op je telefoon.
-              </h2>
-            </div>
-            <div className="justify-self-start lg:justify-self-end">
-              <QrCode label={joinLink || session.presentation.code} size={280} value={joinLink || session.presentation.code} />
-            </div>
+          <section className="grid flex-1 place-items-center text-center">
+            <h2 className="max-w-5xl text-6xl font-black leading-tight text-white md:text-8xl">
+              Coach Staf Bijeenkomst
+            </h2>
           </section>
         ) : (
           <section className="flex flex-1 flex-col gap-6">
@@ -283,19 +316,7 @@ export default function ScreenPage({ code }: ScreenPageProps) {
                 <h2 className="mt-5 text-5xl font-black leading-tight md:text-7xl">{activeQuestion.prompt}</h2>
               </div>
             </div>
-
-            <div className="rounded-lg border border-zinc-700 bg-zinc-100 p-5 text-zinc-950">
-              <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-                <h3 className="flex items-center gap-2 text-xl font-black">
-                  <MessageSquareText aria-hidden className="h-6 w-6 text-emerald-800" />
-                  Live antwoorden
-                </h3>
-                <span className="rounded-lg bg-zinc-900 px-3 py-2 font-bold text-white">
-                  {activeQuestion.answerCount} binnen
-                </span>
-              </div>
-              <ResultView mode="screen" question={activeQuestion} />
-            </div>
+            <ResponsePulse count={activeQuestion.answerCount} questionType={activeQuestion.type} />
           </section>
         )}
       </div>

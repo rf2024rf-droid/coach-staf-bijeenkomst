@@ -60,3 +60,17 @@ export type PublicSessionPayload = {
     answers: number;
   };
 };
+
+export type ModeratorPresentationSummary = {
+  id: string;
+  title: string;
+  code: string;
+  presenterKey: string;
+  createdAt: string;
+  updatedAt: string;
+  totals: {
+    questions: number;
+    answers: number;
+    participants: number;
+  };
+};

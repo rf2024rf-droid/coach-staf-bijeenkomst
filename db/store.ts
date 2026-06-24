@@ -107,6 +107,20 @@ export type PublicSessionPayload = {
   };
 };
 
+export type ModeratorPresentationSummary = {
+  id: string;
+  title: string;
+  code: string;
+  presenterKey: string;
+  createdAt: string;
+  updatedAt: string;
+  totals: {
+    questions: number;
+    answers: number;
+    participants: number;
+  };
+};
+
 export class AppError extends Error {
   status: number;
 
@@ -935,6 +949,169 @@ export async function submitAnswer(
   });
 
   return getPublicSession(presentation.code);
+}
+
+export async function listModeratorPresentations(): Promise<ModeratorPresentationSummary[]> {
+  await ensureSchema();
+
+  const rows = await getSql()<
+    Array<
+      PresentationRow & {
+        question_count: number;
+        answer_count: number;
+        participant_count: number;
+      }
+    >
+  >`
+    SELECT
+      presentations.*,
+      (SELECT COUNT(*)::int FROM questions WHERE questions.presentation_id = presentations.id) AS question_count,
+      (SELECT COUNT(*)::int FROM responses WHERE responses.presentation_id = presentations.id) AS answer_count,
+      (
+        SELECT COUNT(DISTINCT participant_id)::int
+        FROM responses
+        WHERE responses.presentation_id = presentations.id
+      ) AS participant_count
+    FROM presentations
+    ORDER BY updated_at DESC, created_at DESC
+  `;
+
+  return rows.map((row) => ({
+    id: row.id,
+    title: row.title,
+    code: row.code,
+    presenterKey: row.presenter_key,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    totals: {
+      questions: numberFromDb(row.question_count),
+      answers: numberFromDb(row.answer_count),
+      participants: numberFromDb(row.participant_count),
+    },
+  }));
+}
+
+export async function renamePresentation(presentationId: string, titleInput: unknown) {
+  await ensureSchema();
+
+  const title = cleanText(titleInput, 90);
+  if (!title) {
+    throw new AppError(400, "Titel is verplicht.");
+  }
+
+  const rows = await getSql()<PresentationRow[]>`
+    UPDATE presentations
+    SET title = ${title}, updated_at = ${nowIso()}
+    WHERE id = ${presentationId}
+    RETURNING *
+  `;
+
+  if (!rows.length) {
+    throw new AppError(404, "Presentatie niet gevonden.");
+  }
+
+  return first(rows);
+}
+
+export async function deletePresentation(presentationId: string) {
+  await ensureSchema();
+
+  const presentation = await fetchPresentationById(presentationId);
+  if (!presentation) {
+    throw new AppError(404, "Presentatie niet gevonden.");
+  }
+
+  const sql = getSql();
+
+  await sql.begin(async (tx) => {
+    await tx`DELETE FROM responses WHERE presentation_id = ${presentationId}`;
+    await tx`
+      DELETE FROM question_options
+      WHERE question_id IN (
+        SELECT id
+        FROM questions
+        WHERE presentation_id = ${presentationId}
+      )
+    `;
+    await tx`DELETE FROM questions WHERE presentation_id = ${presentationId}`;
+    await tx`DELETE FROM presentations WHERE id = ${presentationId}`;
+  });
+}
+
+export async function duplicatePresentation(presentationId: string) {
+  await ensureSchema();
+
+  const original = await fetchPresentationById(presentationId);
+  if (!original) {
+    throw new AppError(404, "Presentatie niet gevonden.");
+  }
+
+  const sql = getSql();
+  const questions = await sql<QuestionRow[]>`
+    SELECT *
+    FROM questions
+    WHERE presentation_id = ${presentationId}
+    ORDER BY position ASC, created_at ASC
+  `;
+  const options = await sql<OptionRow[]>`
+    SELECT question_options.*
+    FROM question_options
+    INNER JOIN questions ON questions.id = question_options.question_id
+    WHERE questions.presentation_id = ${presentationId}
+    ORDER BY question_options.position ASC
+  `;
+  const id = makeId("prs");
+  const presenterKey = makePresenterKey();
+  const timestamp = nowIso();
+  let code = makeCode();
+
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    const existing = await fetchPresentationByCode(code);
+    if (!existing) {
+      break;
+    }
+    code = makeCode();
+  }
+
+  const newTitle = `${original.title} kopie`.slice(0, 90);
+  const questionIdMap = new Map<string, string>();
+
+  await sql.begin(async (tx) => {
+    await tx`
+      INSERT INTO presentations (id, title, code, presenter_key, active_question_id, screen_question_id, screen_view, created_at, updated_at)
+      VALUES (${id}, ${newTitle}, ${code}, ${presenterKey}, NULL, NULL, 'question', ${timestamp}, ${timestamp})
+    `;
+
+    for (const question of questions) {
+      const newQuestionId = makeId("q");
+      questionIdMap.set(question.id, newQuestionId);
+      await tx`
+        INSERT INTO questions (id, presentation_id, type, prompt, status, position, created_at, updated_at)
+        VALUES (
+          ${newQuestionId},
+          ${id},
+          ${question.type},
+          ${question.prompt},
+          'closed',
+          ${question.position},
+          ${timestamp},
+          ${timestamp}
+        )
+      `;
+    }
+
+    for (const option of options) {
+      const newQuestionId = questionIdMap.get(option.question_id);
+      if (newQuestionId) {
+        await tx`
+          INSERT INTO question_options (id, question_id, label, position)
+          VALUES (${makeId("opt")}, ${newQuestionId}, ${option.label}, ${option.position})
+        `;
+      }
+    }
+  });
+
+  return getPresenterPayload(id, presenterKey);
 }
 
 export function errorPayload(error: unknown) {

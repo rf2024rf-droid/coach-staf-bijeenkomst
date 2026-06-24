@@ -30,9 +30,11 @@ Zet in Vercel minimaal deze environment variable:
 
 ```bash
 SUPABASE_DATABASE_URL=postgresql://...
+MODERATOR_PASSWORD=kies-een-eigen-wachtwoord
 ```
 
 Gebruik bij voorkeur de Supabase pooler connection string met `sslmode=require`.
+`MODERATOR_SESSION_SECRET` is optioneel, maar aanbevolen. Gebruik daarvoor een lange willekeurige tekst.
 
 Daarna kan Vercel bouwen met:
 
@@ -43,6 +45,7 @@ npm run build
 ## Belangrijke routes
 
 - `/` presentatie aanmaken of sessiecode invullen
+- `/moderator` moderator-login met lijst van presentaties
 - `/presenter/[id]?key=...` presenter dashboard
 - `/join/[code]` deelnemerscherm
 - `/screen/[code]` groot-scherm scherm
@@ -53,4 +56,5 @@ Dit platform is bedoeld voor simpele, niet-bedrijfsgevoelige sessies.
 
 - Deelnemers komen binnen via QR-code of sessiecode.
 - Presenter acties zijn beschermd met een willekeurige presenter key in de URL.
+- Moderator beheer is beschermd met `MODERATOR_PASSWORD`.
 - Sla geen gevoelige of vertrouwelijke bedrijfsinformatie op in publieke sessies.

@@ -2,7 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, KeyRound, LogIn, Plus, Presentation, Users } from "lucide-react";
+import { ArrowRight, KeyRound, LogIn, Plus, Presentation, ShieldCheck, Users } from "lucide-react";
 import type { PresenterPayload } from "@/app/types";
 
 type RecentPresentation = {
@@ -96,6 +96,13 @@ export default function Home() {
               <KeyRound aria-hidden className="h-4 w-4 text-amber-700" />
               Beheersleutel
             </span>
+            <a
+              className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 bg-white px-3 py-2 font-semibold hover:bg-zinc-50"
+              href="/moderator"
+            >
+              <ShieldCheck aria-hidden className="h-4 w-4 text-emerald-800" />
+              Moderator
+            </a>
           </div>
         </header>
 

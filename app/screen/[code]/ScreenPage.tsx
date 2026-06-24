@@ -65,6 +65,8 @@ function SpotlightResults({ question }: { question: QuestionResult }) {
   }
 
   const responses = question.responses.filter((response) => response.textAnswer);
+  const isCompact = responses.length > 16;
+  const visibleResponses = responses.slice(0, isCompact ? 54 : 24);
   const cardStyles = [
     "border-emerald-200 bg-emerald-50",
     "border-sky-200 bg-sky-50",
@@ -83,13 +85,35 @@ function SpotlightResults({ question }: { question: QuestionResult }) {
   }
 
   return (
-    <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-      {responses.slice(0, 24).map((response, index) => (
+    <section
+      className={
+        isCompact
+          ? "grid gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6"
+          : "grid gap-4 md:grid-cols-2 xl:grid-cols-3"
+      }
+    >
+      {visibleResponses.map((response, index) => (
         <article
-          className={`rounded-lg border p-5 text-zinc-950 shadow-sm ${cardStyles[index % cardStyles.length]}`}
+          className={`rounded-lg border text-zinc-950 shadow-sm ${
+            isCompact ? "p-3" : "p-5"
+          } ${cardStyles[index % cardStyles.length]}`}
           key={response.id}
         >
-          <p className="text-2xl font-black leading-8">{response.textAnswer}</p>
+          <p
+            className={isCompact ? "text-sm font-black leading-5 xl:text-base" : "text-2xl font-black leading-8"}
+            style={
+              isCompact
+                ? {
+                    display: "-webkit-box",
+                    WebkitBoxOrient: "vertical",
+                    WebkitLineClamp: 3,
+                    overflow: "hidden",
+                  }
+                : undefined
+            }
+          >
+            {response.textAnswer}
+          </p>
         </article>
       ))}
     </section>
@@ -205,6 +229,9 @@ export default function ScreenPage({ code }: ScreenPageProps) {
 
   const activeQuestion = session.activeQuestion;
   const resultsQuestion = session.screenQuestion ?? activeQuestion;
+  const compactOpenResults =
+    resultsQuestion?.type === "open" &&
+    resultsQuestion.responses.filter((response) => response.textAnswer).length > 16;
 
   if (session.screenView === "qr") {
     return (
@@ -258,15 +285,27 @@ export default function ScreenPage({ code }: ScreenPageProps) {
 
           {resultsQuestion ? (
             <section className="flex flex-1 flex-col gap-6">
-              <div className="rounded-lg border border-zinc-700 bg-zinc-900 p-7 md:p-9">
+              <div
+                className={`rounded-lg border border-zinc-700 bg-zinc-900 ${
+                  compactOpenResults ? "p-5" : "p-7 md:p-9"
+                }`}
+              >
                 <div className="mx-auto max-w-6xl">
                   <span className="rounded-md bg-sky-300 px-2 py-1 text-xs font-black uppercase text-sky-950">
                     Bespreekmoment
                   </span>
-                  <h2 className="mt-5 text-4xl font-black leading-tight md:text-6xl">
+                  <h2
+                    className={
+                      compactOpenResults
+                        ? "mt-3 text-3xl font-black leading-tight md:text-4xl"
+                        : "mt-5 text-4xl font-black leading-tight md:text-6xl"
+                    }
+                  >
                     {resultsQuestion.prompt}
                   </h2>
-                  <p className="mt-4 text-xl font-bold text-zinc-300">
+                  <p
+                    className={`${compactOpenResults ? "mt-2 text-base" : "mt-4 text-xl"} font-bold text-zinc-300`}
+                  >
                     {resultsQuestion.answerCount} antwoorden verzameld
                   </p>
                 </div>

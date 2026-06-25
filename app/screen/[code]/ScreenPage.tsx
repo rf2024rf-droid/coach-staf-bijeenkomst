@@ -1,6 +1,6 @@
 "use client";
 
-import { BarChart3, Loader2, QrCode as QrCodeIcon, Users } from "lucide-react";
+import { BarChart3, CheckCircle2, Loader2, MessageSquareText, QrCode as QrCodeIcon, Users } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { QrCode } from "@/app/components/QrCode";
 import type { PublicSessionPayload, QuestionResult } from "@/app/types";
@@ -122,8 +122,8 @@ function SpotlightResults({ question }: { question: QuestionResult }) {
 
 function ResponsePulse({ count, questionType }: { count: number; questionType: QuestionResult["type"] }) {
   const label = questionType === "multiple" ? "stemmen" : "antwoorden";
-  const dots = Array.from({ length: 18 }, (_, index) => index);
-  const activeDots = Math.min(dots.length, Math.max(1, count));
+  const responseCards = Array.from({ length: 8 }, (_, index) => index);
+  const activeCards = Math.min(responseCards.length, count);
 
   return (
     <section className="grid flex-1 items-center gap-8 rounded-lg border border-zinc-700 bg-zinc-900 p-8 md:grid-cols-[1fr_420px] md:p-10">
@@ -136,23 +136,42 @@ function ResponsePulse({ count, questionType }: { count: number; questionType: Q
           <span className="text-8xl font-black leading-none text-white md:text-9xl">{count}</span>
           <span className="pb-4 text-3xl font-black text-zinc-300">{label}</span>
         </div>
-        <p className="mt-6 max-w-2xl text-2xl font-semibold leading-9 text-zinc-300">
-          De resultaten blijven verborgen totdat de presentator ze op het grote scherm zet.
-        </p>
       </div>
 
-      <div className="relative grid aspect-square place-items-center justify-self-center">
-        <div className="absolute h-72 w-72 rounded-full border border-emerald-300/30" />
-        <div className="absolute h-56 w-56 animate-pulse rounded-full bg-emerald-300/10" />
-        <div className="relative grid h-72 w-72 grid-cols-6 gap-3 rounded-full bg-zinc-950 p-8 shadow-2xl shadow-emerald-950/40">
-          {dots.map((dot) => (
-            <span
-              className={`h-7 w-7 rounded-full transition ${
-                dot < activeDots ? "bg-emerald-300 shadow-lg shadow-emerald-300/30" : "bg-zinc-800"
-              }`}
-              key={dot}
-            />
-          ))}
+      <div className="w-full justify-self-center rounded-lg border border-zinc-700 bg-zinc-950 p-5 shadow-2xl shadow-emerald-950/30">
+        <div className="flex items-center justify-between gap-4 border-b border-zinc-800 pb-4">
+          <span className="inline-flex items-center gap-2 text-sm font-black uppercase text-emerald-300">
+            <MessageSquareText aria-hidden className="h-5 w-5" />
+            Inzendingen
+          </span>
+          <span className="rounded-md bg-emerald-300 px-3 py-1 font-mono text-lg font-black text-emerald-950">
+            {count}
+          </span>
+        </div>
+
+        <div className="mt-5 space-y-3">
+          {responseCards.map((card) => {
+            const isActive = card < activeCards;
+            const isLatest = count > 0 && card === (activeCards || 1) - 1;
+
+            return (
+              <div
+                className={`flex items-center gap-3 rounded-lg border px-4 py-3 transition ${
+                  isActive
+                    ? "border-emerald-300 bg-emerald-300/15 text-emerald-100 shadow-lg shadow-emerald-950/30"
+                    : "border-zinc-800 bg-zinc-900 text-zinc-600"
+                } ${isLatest ? "animate-pulse" : ""}`}
+                key={card}
+              >
+                <MessageSquareText aria-hidden className="h-5 w-5 shrink-0" />
+                <div className="min-w-0 flex-1 space-y-2">
+                  <div className={`h-2 rounded-full ${isActive ? "bg-emerald-200" : "bg-zinc-800"}`} />
+                  <div className={`h-2 w-2/3 rounded-full ${isActive ? "bg-emerald-200/70" : "bg-zinc-800"}`} />
+                </div>
+                <CheckCircle2 aria-hidden className={`h-5 w-5 shrink-0 ${isActive ? "text-emerald-300" : "text-zinc-700"}`} />
+              </div>
+            );
+          })}
         </div>
       </div>
     </section>

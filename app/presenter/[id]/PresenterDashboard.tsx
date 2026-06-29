@@ -315,6 +315,19 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
   }
 
   async function reset(questionId: string | null) {
+    const scopeLabel = questionId ? "de antwoorden van deze vraag" : "alle antwoorden in deze presentatie";
+    const firstConfirmed = window.confirm(`Weet je zeker dat je ${scopeLabel} wilt resetten?`);
+    if (!firstConfirmed) {
+      return;
+    }
+
+    const finalConfirmed = window.confirm(
+      `Laatste bevestiging: ${scopeLabel} worden definitief verwijderd. Dit kun je niet ongedaan maken.`
+    );
+    if (!finalConfirmed) {
+      return;
+    }
+
     const suffix = questionId ? `&questionId=${encodeURIComponent(questionId)}` : "";
     await mutate(async () => {
       const response = await fetch(`/api/presentations/${id}/answers?key=${encodeURIComponent(key)}${suffix}`, {

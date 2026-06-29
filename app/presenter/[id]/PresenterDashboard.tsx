@@ -391,8 +391,23 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
     );
   }
 
+  const activeQuestion = payload.activeQuestion;
+  const activeQuestionIndex = activeQuestion
+    ? payload.questions.findIndex((question) => question.id === activeQuestion.id)
+    : -1;
+  const previousQuestion = activeQuestionIndex > 0 ? payload.questions[activeQuestionIndex - 1] : null;
+  const nextQuestion =
+    activeQuestionIndex >= 0 && activeQuestionIndex < payload.questions.length - 1
+      ? payload.questions[activeQuestionIndex + 1]
+      : null;
+  const activeResultsVisible = Boolean(
+    activeQuestion &&
+      payload.presentation.screenView === "results" &&
+      payload.presentation.screenQuestionId === activeQuestion.id
+  );
+
   return (
-    <main className="min-h-screen bg-[#f5f5f0] text-zinc-950">
+    <main className={`min-h-screen bg-[#f5f5f0] text-zinc-950 ${activeQuestion ? "pb-72 md:pb-36" : ""}`}>
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-5 md:px-8">
         <header className="flex flex-col gap-4 border-b border-zinc-300 pb-5 lg:flex-row lg:items-end lg:justify-between">
           <div>
@@ -833,6 +848,75 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
           </section>
         </section>
       </div>
+
+      {activeQuestion ? (
+        <section
+          aria-label="Live commandocentrum"
+          className="fixed inset-x-3 bottom-3 z-50 mx-auto max-w-6xl rounded-lg border border-zinc-700 bg-zinc-950 p-3 text-white shadow-2xl shadow-zinc-950/30 md:bottom-4 md:p-4"
+        >
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="grid h-12 w-12 shrink-0 place-items-center rounded-lg bg-emerald-300 text-emerald-950">
+                <Play aria-hidden className="h-6 w-6 fill-current" />
+              </div>
+              <div className="min-w-0">
+                <p className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-wide text-emerald-300">
+                  <span className="h-2 w-2 rounded-full bg-emerald-300 shadow-lg shadow-emerald-300/40" />
+                  Nu live
+                </p>
+                <h2 className="truncate text-base font-black leading-6 md:text-lg">{activeQuestion.prompt}</h2>
+                <p className="mt-0.5 text-xs font-semibold text-zinc-400 md:text-sm">
+                  {activeQuestion.answerCount} antwoorden · groot scherm:{" "}
+                  {screenViewLabel(payload.presentation.screenView)}
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:flex lg:shrink-0">
+              <button
+                className="inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-3 text-sm font-bold text-white hover:bg-zinc-800 disabled:opacity-40"
+                disabled={saving || !previousQuestion}
+                onClick={() => previousQuestion && activate(previousQuestion.id)}
+                type="button"
+              >
+                <ArrowUp aria-hidden className="h-4 w-4" />
+                Vorige
+              </button>
+              <button
+                className="inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-3 text-sm font-bold text-white hover:bg-zinc-800 disabled:opacity-40"
+                disabled={saving || !nextQuestion}
+                onClick={() => nextQuestion && activate(nextQuestion.id)}
+                type="button"
+              >
+                <ArrowDown aria-hidden className="h-4 w-4" />
+                Volgende
+              </button>
+              <button
+                className={`inline-flex items-center justify-center gap-2 rounded-lg px-3 py-3 text-sm font-bold disabled:opacity-60 ${
+                  activeResultsVisible
+                    ? "bg-white text-zinc-950 hover:bg-zinc-100"
+                    : "bg-sky-700 text-white hover:bg-sky-800"
+                }`}
+                disabled={saving}
+                onClick={() => toggleResults(activeQuestion.id)}
+                type="button"
+              >
+                <BarChart3 aria-hidden className="h-4 w-4" />
+                {activeResultsVisible ? "Sluit resultaten" : "Resultaten"}
+              </button>
+              <button
+                className="inline-flex items-center justify-center gap-2 rounded-lg bg-amber-600 px-3 py-3 text-sm font-black text-white hover:bg-amber-700 disabled:opacity-60"
+                disabled={saving}
+                onClick={() => activate(null)}
+                type="button"
+              >
+                <Square aria-hidden className="h-4 w-4" />
+                Stop live
+              </button>
+            </div>
+          </div>
+        </section>
+      ) : null}
     </main>
   );
 }

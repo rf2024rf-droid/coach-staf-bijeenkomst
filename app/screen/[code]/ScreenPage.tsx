@@ -271,6 +271,7 @@ export default function ScreenPage({ code }: ScreenPageProps) {
 
   const activeQuestion = session.activeQuestion;
   const resultsQuestion = session.screenQuestion ?? activeQuestion;
+  const idleScreenText = session.presentation.idleScreenText || "Coach Staf Bijeenkomst";
   const compactOpenResults =
     resultsQuestion?.type === "open" &&
     resultsQuestion.responses.filter((response) => response.textAnswer).length > 16;
@@ -387,7 +388,7 @@ export default function ScreenPage({ code }: ScreenPageProps) {
         {!activeQuestion ? (
           <section className="grid flex-1 place-items-center text-center">
             <h2 className="max-w-5xl text-6xl font-black leading-tight text-white md:text-8xl">
-              Coach Staf Bijeenkomst
+              {idleScreenText}
             </h2>
           </section>
         ) : (

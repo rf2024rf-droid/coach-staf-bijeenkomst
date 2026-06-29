@@ -9,6 +9,7 @@ export type PresentationRow = {
   title: string;
   code: string;
   presenter_key: string;
+  idle_screen_text: string | null;
   active_question_id: string | null;
   screen_question_id: string | null;
   screen_view: ScreenView;
@@ -77,6 +78,7 @@ export type PresenterPayload = {
     title: string;
     code: string;
     presenterKey: string;
+    idleScreenText: string;
     activeQuestionId: string | null;
     screenQuestionId: string | null;
     screenView: ScreenView;
@@ -97,6 +99,7 @@ export type PublicSessionPayload = {
     id: string;
     title: string;
     code: string;
+    idleScreenText: string;
   };
   screenView: ScreenView;
   activeQuestion: QuestionResult | null;
@@ -139,6 +142,7 @@ const schemaStatements = [
     title TEXT NOT NULL,
     code TEXT NOT NULL UNIQUE,
     presenter_key TEXT NOT NULL,
+    idle_screen_text TEXT,
     active_question_id TEXT,
     screen_question_id TEXT,
     screen_view TEXT NOT NULL DEFAULT 'question',
@@ -172,6 +176,7 @@ const schemaStatements = [
     created_at TEXT NOT NULL DEFAULT (now()::text),
     updated_at TEXT NOT NULL DEFAULT (now()::text)
   )`,
+  "ALTER TABLE presentations ADD COLUMN IF NOT EXISTS idle_screen_text TEXT",
   "ALTER TABLE presentations ADD COLUMN IF NOT EXISTS screen_view TEXT NOT NULL DEFAULT 'question'",
   "ALTER TABLE presentations ADD COLUMN IF NOT EXISTS screen_question_id TEXT",
   "CREATE UNIQUE INDEX IF NOT EXISTS presentations_code_idx ON presentations (code)",
@@ -273,6 +278,7 @@ function mapPresentation(row: PresentationRow) {
     title: row.title,
     code: row.code,
     presenterKey: row.presenter_key,
+    idleScreenText: row.idle_screen_text || "Coach Staf Bijeenkomst",
     activeQuestionId: row.active_question_id,
     screenQuestionId: row.screen_question_id,
     screenView: row.screen_view ?? "question",
@@ -511,6 +517,24 @@ export async function getPresenterPayload(presentationId: string, presenterKey: 
       participants: numberFromDb(first(participantRows)?.count),
     },
   };
+}
+
+export async function updatePresentationSettings(
+  presentationId: string,
+  presenterKey: string,
+  payload: { idleScreenText?: unknown }
+) {
+  await assertPresenter(presentationId, presenterKey);
+
+  const idleScreenText = cleanText(payload.idleScreenText, 90) || null;
+
+  await getSql()`
+    UPDATE presentations
+    SET idle_screen_text = ${idleScreenText}, updated_at = ${nowIso()}
+    WHERE id = ${presentationId}
+  `;
+
+  return getPresenterPayload(presentationId, presenterKey);
 }
 
 export async function addQuestion(
@@ -865,6 +889,7 @@ export async function getPublicSession(codeInput: string): Promise<PublicSession
       id: presentation.id,
       title: presentation.title,
       code: presentation.code,
+      idleScreenText: presentation.idle_screen_text || "Coach Staf Bijeenkomst",
     },
     screenView: presentation.screen_view ?? "question",
     activeQuestion:
@@ -1078,8 +1103,8 @@ export async function duplicatePresentation(presentationId: string) {
 
   await sql.begin(async (tx) => {
     await tx`
-      INSERT INTO presentations (id, title, code, presenter_key, active_question_id, screen_question_id, screen_view, created_at, updated_at)
-      VALUES (${id}, ${newTitle}, ${code}, ${presenterKey}, NULL, NULL, 'question', ${timestamp}, ${timestamp})
+      INSERT INTO presentations (id, title, code, presenter_key, idle_screen_text, active_question_id, screen_question_id, screen_view, created_at, updated_at)
+      VALUES (${id}, ${newTitle}, ${code}, ${presenterKey}, ${original.idle_screen_text}, NULL, NULL, 'question', ${timestamp}, ${timestamp})
     `;
 
     for (const question of questions) {

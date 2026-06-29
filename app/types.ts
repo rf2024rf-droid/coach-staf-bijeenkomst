@@ -31,6 +31,7 @@ export type PresenterPayload = {
     title: string;
     code: string;
     presenterKey: string;
+    idleScreenText: string;
     activeQuestionId: string | null;
     screenQuestionId: string | null;
     screenView: ScreenView;
@@ -51,6 +52,7 @@ export type PublicSessionPayload = {
     id: string;
     title: string;
     code: string;
+    idleScreenText: string;
   };
   screenView: ScreenView;
   activeQuestion: QuestionResult | null;

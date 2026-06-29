@@ -287,6 +287,25 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
         : "Groot scherm toont de live vraag");
   }
 
+  async function saveIdleScreenText(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    const idleScreenText = String(formData.get("idleScreenText") ?? "");
+
+    await mutate(async () => {
+      const response = await fetch(`/api/presentations/${id}?key=${encodeURIComponent(key)}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ idleScreenText }),
+      });
+      const data = (await response.json()) as PresenterPayload | { error: string };
+      if (!response.ok || "error" in data) {
+        throw new Error("error" in data ? data.error : "Schermtekst kon niet worden opgeslagen.");
+      }
+      return data;
+    }, "Schermtekst opgeslagen");
+  }
+
   async function toggleResults(questionId: string) {
     const isShowingThisQuestion =
       payload?.presentation.screenView === "results" &&
@@ -465,6 +484,29 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
                 <span className="block font-semibold">Scherm-URL</span>
                 <span className="block break-all font-mono text-xs">{screenLink}</span>
               </div>
+              <form className="mb-4 rounded-lg border border-zinc-200 bg-zinc-50 p-3" onSubmit={saveIdleScreenText}>
+                <label className="block text-sm font-semibold text-zinc-700" htmlFor="idle-screen-text">
+                  Tekst op leeg scherm
+                </label>
+                <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+                  <input
+                    className="min-w-0 flex-1 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-bold outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
+                    defaultValue={payload.presentation.idleScreenText}
+                    id="idle-screen-text"
+                    key={payload.presentation.idleScreenText}
+                    maxLength={90}
+                    name="idleScreenText"
+                  />
+                  <button
+                    className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-800 px-3 py-2 text-sm font-bold text-white hover:bg-emerald-900 disabled:opacity-60"
+                    disabled={saving}
+                    type="submit"
+                  >
+                    <Save aria-hidden className="h-4 w-4" />
+                    Opslaan
+                  </button>
+                </div>
+              </form>
               <div className="grid gap-2">
                 <button
                   className={`inline-flex w-full items-center justify-center gap-2 rounded-lg px-4 py-3 font-bold transition disabled:opacity-60 ${

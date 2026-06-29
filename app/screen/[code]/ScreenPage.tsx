@@ -9,6 +9,11 @@ type ScreenPageProps = {
   code: string;
 };
 
+const idleScreenBackground = {
+  background:
+    "radial-gradient(circle at 22% 30%, #00963E 0%, rgba(0, 150, 62, 0.28) 18%, transparent 42%), radial-gradient(circle at 78% 68%, #00963E 0%, rgba(0, 150, 62, 0.22) 20%, transparent 44%), #000000",
+};
+
 function SpotlightResults({ question }: { question: QuestionResult }) {
   if (question.type === "multiple") {
     const winner = question.options.reduce(
@@ -365,7 +370,10 @@ export default function ScreenPage({ code }: ScreenPageProps) {
   }
 
   return (
-    <main className="min-h-screen bg-zinc-950 text-white">
+    <main
+      className={`min-h-screen text-white ${activeQuestion ? "bg-zinc-950" : "bg-black"}`}
+      style={activeQuestion ? undefined : idleScreenBackground}
+    >
       <div className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-6 px-6 py-6">
         {activeQuestion ? (
           <header className="border-b border-zinc-700 pb-5">

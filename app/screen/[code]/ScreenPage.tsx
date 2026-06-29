@@ -122,6 +122,24 @@ function SpotlightResults({ question }: { question: QuestionResult }) {
 
 function ResponsePulse({ count, questionType }: { count: number; questionType: QuestionResult["type"] }) {
   const label = questionType === "multiple" ? "stemmen" : "antwoorden";
+
+  if (questionType === "open") {
+    return (
+      <section className="grid flex-1 place-items-center rounded-lg border border-zinc-700 bg-zinc-900 p-8 text-center md:p-10">
+        <div>
+          <p className="inline-flex items-center gap-3 text-lg font-black uppercase tracking-wide text-emerald-300">
+            <Users aria-hidden className="h-6 w-6" />
+            Reacties komen binnen
+          </p>
+          <div className="mt-8 flex items-end justify-center gap-5">
+            <span className="text-8xl font-black leading-none text-white md:text-9xl">{count}</span>
+            <span className="pb-4 text-3xl font-black text-zinc-300">{label}</span>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
   const responseCards = Array.from({ length: 8 }, (_, index) => index);
   const activeCards = Math.min(responseCards.length, count);
 

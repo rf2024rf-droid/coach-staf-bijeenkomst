@@ -19,6 +19,26 @@ function optionLetter(position: number, fallbackIndex: number) {
   return String.fromCharCode(65 + index);
 }
 
+function pluralize(count: number, singular: string, plural: string) {
+  return count === 1 ? singular : plural;
+}
+
+function answerLabel(count: number) {
+  return pluralize(count, "antwoord", "antwoorden");
+}
+
+function participantLabel(count: number) {
+  return pluralize(count, "deelnemer", "deelnemers");
+}
+
+function voteLabel(count: number) {
+  return pluralize(count, "stem", "stemmen");
+}
+
+function correctVerb(count: number) {
+  return count === 1 ? "had" : "hadden";
+}
+
 function SpotlightResults({ question }: { question: QuestionResult }) {
   if (question.type === "multiple" || question.type === "quiz") {
     const winner = question.options.reduce(
@@ -45,9 +65,11 @@ function SpotlightResults({ question }: { question: QuestionResult }) {
             <p className="mt-5 text-8xl font-black leading-none text-emerald-800 md:text-9xl">
               {question.correctCount}
             </p>
-            <p className="mt-4 text-2xl font-black text-zinc-800">deelnemers hadden het goed</p>
+            <p className="mt-4 text-2xl font-black text-zinc-800">
+              {participantLabel(question.correctCount)} {correctVerb(question.correctCount)} het goed
+            </p>
             <p className="mt-3 text-xl font-bold text-zinc-700">
-              van {question.answerCount} gegeven antwoorden
+              van {question.answerCount} gegeven {answerLabel(question.answerCount)}
             </p>
             {correctOption ? (
               <div className="mt-8 rounded-lg bg-white p-6 text-center">
@@ -105,7 +127,7 @@ function SpotlightResults({ question }: { question: QuestionResult }) {
           </h3>
           <p className="mt-5 text-7xl font-black text-emerald-800">{winner.percentage}%</p>
           <p className="mt-3 text-xl font-bold text-zinc-700">
-            {winner.count} van {question.answerCount} antwoorden
+            {winner.count} van {question.answerCount} {answerLabel(question.answerCount)}
           </p>
         </section>
 
@@ -122,7 +144,9 @@ function SpotlightResults({ question }: { question: QuestionResult }) {
                   </h3>
                   <div className="text-right">
                     <p className="text-4xl font-black">{option.percentage}%</p>
-                    <p className="text-sm font-bold text-zinc-600">{option.count} antwoorden</p>
+                    <p className="text-sm font-bold text-zinc-600">
+                      {option.count} {answerLabel(option.count)}
+                    </p>
                   </div>
                 </div>
                 <div className="h-7 overflow-hidden rounded-full bg-white shadow-inner">
@@ -196,7 +220,7 @@ function SpotlightResults({ question }: { question: QuestionResult }) {
 }
 
 function ResponsePulse({ count, questionType }: { count: number; questionType: QuestionResult["type"] }) {
-  const label = questionType === "open" ? "antwoorden" : "stemmen";
+  const label = questionType === "open" ? answerLabel(count) : voteLabel(count);
 
   return (
     <section className="grid flex-1 place-items-center rounded-lg border border-zinc-700 bg-zinc-900 p-8 text-center md:p-10">
@@ -362,7 +386,7 @@ export default function ScreenPage({ code }: ScreenPageProps) {
                   <p
                     className={`${compactOpenResults ? "mt-2 text-base" : "mt-4 text-xl"} font-bold text-zinc-300`}
                   >
-                    {resultsQuestion.answerCount} antwoorden verzameld
+                    {resultsQuestion.answerCount} {answerLabel(resultsQuestion.answerCount)} verzameld
                   </p>
                 </div>
               </div>

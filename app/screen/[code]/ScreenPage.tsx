@@ -50,15 +50,15 @@ function SpotlightResults({ question }: { question: QuestionResult }) {
               {question.correctCount} van {question.answerCount} antwoorden
             </p>
             {correctOption ? (
-              <div className="mt-8 rounded-lg bg-white p-5">
+              <div className="mt-8 rounded-lg bg-white p-6 text-center">
                 <p className="inline-flex items-center gap-2 text-sm font-black uppercase text-emerald-800">
                   <CheckCircle2 aria-hidden className="h-5 w-5" />
                   Juist antwoord
                 </p>
-                <h3 className="mt-3 inline-flex items-center gap-3 text-3xl font-black leading-tight">
-                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-md bg-zinc-950 text-lg font-black text-white">
-                    {optionLetter(correctOption.position, 0)}
-                  </span>
+                <p className="mt-4 text-8xl font-black leading-none text-zinc-950 md:text-9xl">
+                  {optionLetter(correctOption.position, 0)}
+                </p>
+                <h3 className="mt-3 text-2xl font-black leading-tight text-zinc-800 md:text-3xl">
                   {correctOption.label}
                 </h3>
               </div>
@@ -88,18 +88,6 @@ function SpotlightResults({ question }: { question: QuestionResult }) {
                         </span>
                       ) : null}
                     </h3>
-                    <div className="text-right">
-                      <p className="text-4xl font-black">{option.percentage}%</p>
-                      <p className="text-sm font-bold text-zinc-600">{option.count} antwoorden</p>
-                    </div>
-                  </div>
-                  <div className="h-7 overflow-hidden rounded-full bg-white shadow-inner">
-                    <div
-                      className={`h-full rounded-full transition-all duration-500 ${
-                        option.isCorrect ? "bg-emerald-700" : "bg-zinc-500"
-                      }`}
-                      style={{ width: `${option.percentage}%` }}
-                    />
                   </div>
                 </div>
               ))}

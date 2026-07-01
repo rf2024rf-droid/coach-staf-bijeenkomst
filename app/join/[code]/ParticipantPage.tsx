@@ -134,10 +134,20 @@ export default function ParticipantPage({ code }: ParticipantPageProps) {
   const resultsQuestion = session?.screenView === "results" ? session.screenQuestion : null;
   const participantResult = session?.participantResult ?? null;
   const showQuizFeedback = resultsQuestion?.type === "quiz";
+  const quizResultsLocked = Boolean(
+    activeQuestion?.type === "quiz" && resultsQuestion?.id === activeQuestion.id
+  );
   const submitted = Boolean(activeQuestion && submittedQuestionId === activeQuestion.id);
   const isChoiceQuestion = activeQuestion?.type === "multiple" || activeQuestion?.type === "quiz";
   const canSubmit =
-    isChoiceQuestion ? Boolean(selectedOptionId) : Boolean(textAnswer.trim());
+    !quizResultsLocked && (isChoiceQuestion ? Boolean(selectedOptionId) : Boolean(textAnswer.trim()));
+  const submitButtonLabel = quizResultsLocked
+    ? "Antwoord gesloten"
+    : submitting
+      ? "Verzenden..."
+      : submitted
+        ? "Antwoord bijwerken"
+        : "Verzend antwoord";
 
   if (loading && !session) {
     return (
@@ -243,11 +253,14 @@ export default function ParticipantPage({ code }: ParticipantPageProps) {
               <div className="grid gap-3">
                 {activeQuestion.options.map((option, index) => (
                   <button
-                    className={`rounded-lg border px-4 py-4 text-left text-base font-bold transition ${
+                    className={`rounded-lg border px-4 py-4 text-left text-base font-bold transition disabled:cursor-not-allowed ${
                       selectedOptionId === option.id
                         ? "border-emerald-300 bg-emerald-300 text-emerald-950"
-                        : "border-zinc-700 bg-zinc-950 text-white hover:border-zinc-500 hover:bg-zinc-800"
+                        : quizResultsLocked
+                          ? "border-zinc-700 bg-zinc-950 text-zinc-400"
+                          : "border-zinc-700 bg-zinc-950 text-white hover:border-zinc-500 hover:bg-zinc-800"
                     }`}
+                    disabled={quizResultsLocked}
                     key={option.id}
                     onClick={() => setSelectedOptionId(option.id)}
                     type="button"
@@ -280,9 +293,21 @@ export default function ParticipantPage({ code }: ParticipantPageProps) {
               disabled={!canSubmit || submitting}
               type="submit"
             >
-              {submitted ? <CheckCircle2 aria-hidden className="h-5 w-5" /> : <Send aria-hidden className="h-5 w-5" />}
-              {submitting ? "Verzenden..." : submitted ? "Antwoord bijwerken" : "Verzend antwoord"}
+              {quizResultsLocked ? (
+                <XCircle aria-hidden className="h-5 w-5" />
+              ) : submitted ? (
+                <CheckCircle2 aria-hidden className="h-5 w-5" />
+              ) : (
+                <Send aria-hidden className="h-5 w-5" />
+              )}
+              {submitButtonLabel}
             </button>
+
+            {quizResultsLocked ? (
+              <p className="mt-3 rounded-lg border border-amber-700 bg-amber-950 px-4 py-3 text-sm font-semibold leading-6 text-amber-100">
+                De quizresultaten staan live. Je antwoord kan nu niet meer worden aangepast.
+              </p>
+            ) : null}
           </form>
         )}
 

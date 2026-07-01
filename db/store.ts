@@ -1049,6 +1049,14 @@ export async function submitAnswer(
     throw new AppError(409, "Deze vraag is gesloten.");
   }
 
+  if (
+    question.type === "quiz" &&
+    presentation.screen_view === "results" &&
+    presentation.screen_question_id === question.id
+  ) {
+    throw new AppError(409, "De quizresultaten staan live. Je antwoord kan nu niet meer worden aangepast.");
+  }
+
   const participantId = cleanText(payload.participantId, 80) || makeId("guest");
   const participantName = "Anoniem";
   let optionId: string | null = null;

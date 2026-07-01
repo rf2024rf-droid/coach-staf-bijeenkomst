@@ -1,6 +1,6 @@
 "use client";
 
-import { BarChart3, Loader2, QrCode as QrCodeIcon, Users } from "lucide-react";
+import { BarChart3, CheckCircle2, Loader2, QrCode as QrCodeIcon, Users } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { QrCode } from "@/app/components/QrCode";
 import type { PublicSessionPayload, QuestionResult } from "@/app/types";
@@ -15,11 +15,12 @@ const idleScreenBackground = {
 };
 
 function SpotlightResults({ question }: { question: QuestionResult }) {
-  if (question.type === "multiple") {
+  if (question.type === "multiple" || question.type === "quiz") {
     const winner = question.options.reduce(
       (top, option) => (option.count > top.count ? option : top),
-      question.options[0] ?? { id: "", label: "", count: 0, percentage: 0, position: 0 }
+      question.options[0] ?? { id: "", label: "", isCorrect: false, count: 0, percentage: 0, position: 0 }
     );
+    const correctOption = question.options.find((option) => option.isCorrect);
     const accents = [
       "bg-emerald-700",
       "bg-sky-800",
@@ -30,6 +31,63 @@ function SpotlightResults({ question }: { question: QuestionResult }) {
       "bg-lime-700",
       "bg-fuchsia-800",
     ];
+
+    if (question.type === "quiz") {
+      return (
+        <div className="grid gap-6 lg:grid-cols-[0.85fr_1.15fr]">
+          <section className="rounded-lg border border-emerald-200 bg-emerald-50 p-7 text-zinc-950">
+            <p className="text-sm font-black uppercase text-emerald-800">Quizuitslag</p>
+            <p className="mt-5 text-8xl font-black leading-none text-emerald-800 md:text-9xl">
+              {question.correctPercentage}%
+            </p>
+            <p className="mt-4 text-2xl font-black text-zinc-800">had het goed</p>
+            <p className="mt-3 text-xl font-bold text-zinc-700">
+              {question.correctCount} van {question.answerCount} antwoorden
+            </p>
+            {correctOption ? (
+              <div className="mt-8 rounded-lg bg-white p-5">
+                <p className="inline-flex items-center gap-2 text-sm font-black uppercase text-emerald-800">
+                  <CheckCircle2 aria-hidden className="h-5 w-5" />
+                  Juist antwoord
+                </p>
+                <h3 className="mt-3 text-3xl font-black leading-tight">{correctOption.label}</h3>
+              </div>
+            ) : null}
+          </section>
+
+          <section className="rounded-lg border border-zinc-700 bg-zinc-100 p-6 text-zinc-950">
+            <div className="space-y-5">
+              {question.options.map((option) => (
+                <div key={option.id} className="space-y-2">
+                  <div className="flex items-end justify-between gap-6">
+                    <h3 className="inline-flex items-center gap-3 text-2xl font-black leading-tight">
+                      {option.label}
+                      {option.isCorrect ? (
+                        <span className="rounded-md bg-emerald-100 px-2 py-1 text-xs font-black uppercase text-emerald-800">
+                          Juist
+                        </span>
+                      ) : null}
+                    </h3>
+                    <div className="text-right">
+                      <p className="text-4xl font-black">{option.percentage}%</p>
+                      <p className="text-sm font-bold text-zinc-600">{option.count} antwoorden</p>
+                    </div>
+                  </div>
+                  <div className="h-7 overflow-hidden rounded-full bg-white shadow-inner">
+                    <div
+                      className={`h-full rounded-full transition-all duration-500 ${
+                        option.isCorrect ? "bg-emerald-700" : "bg-zinc-500"
+                      }`}
+                      style={{ width: `${option.percentage}%` }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        </div>
+      );
+    }
 
     return (
       <div className="grid gap-6 lg:grid-cols-[0.8fr_1.2fr]">
@@ -126,7 +184,7 @@ function SpotlightResults({ question }: { question: QuestionResult }) {
 }
 
 function ResponsePulse({ count, questionType }: { count: number; questionType: QuestionResult["type"] }) {
-  const label = questionType === "multiple" ? "stemmen" : "antwoorden";
+  const label = questionType === "open" ? "antwoorden" : "stemmen";
 
   return (
     <section className="grid flex-1 place-items-center rounded-lg border border-zinc-700 bg-zinc-900 p-8 text-center md:p-10">
@@ -338,8 +396,12 @@ export default function ScreenPage({ code }: ScreenPageProps) {
           <section className="flex flex-1 flex-col gap-6">
             <div className="rounded-lg border border-zinc-700 bg-zinc-900 p-7 md:p-9">
               <div className="mx-auto max-w-6xl">
-                <span className="rounded-md bg-emerald-300 px-2 py-1 text-xs font-black uppercase text-emerald-950">
-                  {activeQuestion.type === "open" ? "Open antwoord" : "Multiple choice"}
+                  <span className="rounded-md bg-emerald-300 px-2 py-1 text-xs font-black uppercase text-emerald-950">
+                  {activeQuestion.type === "quiz"
+                    ? "Quizvraag"
+                    : activeQuestion.type === "open"
+                      ? "Open antwoord"
+                      : "Multiple choice"}
                 </span>
                 <h2 className="mt-5 text-5xl font-black leading-tight md:text-7xl">{activeQuestion.prompt}</h2>
               </div>

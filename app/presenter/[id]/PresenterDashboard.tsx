@@ -28,22 +28,139 @@ type PresenterDashboardProps = {
   id: string;
 };
 
+type OptionDraft = {
+  id: string;
+  label: string;
+  isCorrect: boolean;
+};
+
 type QuestionForm = {
   type: QuestionType;
   prompt: string;
   options: string;
+  quizOptions: OptionDraft[];
 };
 
 type QuestionEditForm = {
   prompt: string;
   options: string;
+  quizOptions: OptionDraft[];
 };
 
-const defaultQuestionForm: QuestionForm = {
-  type: "open",
-  prompt: "",
-  options: "Ja\nNee\nMisschien",
-};
+function makeOptionDraft(label = "", isCorrect = false): OptionDraft {
+  return {
+    id: `draft_${Date.now()}_${Math.random().toString(16).slice(2)}`,
+    label,
+    isCorrect,
+  };
+}
+
+function defaultQuizOptions() {
+  return [makeOptionDraft("", true), makeOptionDraft("")];
+}
+
+function createDefaultQuestionForm(): QuestionForm {
+  return {
+    type: "open",
+    prompt: "",
+    options: "Ja\nNee\nMisschien",
+    quizOptions: defaultQuizOptions(),
+  };
+}
+
+function questionTypeLabel(type: QuestionType) {
+  if (type === "quiz") {
+    return "Quizvraag";
+  }
+
+  return type === "open" ? "Open antwoord" : "Multiple choice";
+}
+
+function normalizeOptionDrafts(options: OptionDraft[]) {
+  if (options.some((option) => option.isCorrect)) {
+    return options;
+  }
+
+  return options.map((option, index) => ({ ...option, isCorrect: index === 0 }));
+}
+
+function QuizOptionsEditor({
+  options,
+  onChange,
+}: {
+  options: OptionDraft[];
+  onChange: (options: OptionDraft[]) => void;
+}) {
+  function updateOption(id: string, label: string) {
+    onChange(options.map((option) => (option.id === id ? { ...option, label } : option)));
+  }
+
+  function markCorrect(id: string) {
+    onChange(options.map((option) => ({ ...option, isCorrect: option.id === id })));
+  }
+
+  function addOption() {
+    onChange([...options, makeOptionDraft()]);
+  }
+
+  function removeOption(id: string) {
+    if (options.length <= 2) {
+      return;
+    }
+
+    onChange(normalizeOptionDrafts(options.filter((option) => option.id !== id)));
+  }
+
+  return (
+    <div className="mt-4 rounded-lg border border-zinc-200 bg-zinc-50 p-3">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <span className="text-sm font-bold text-zinc-700">Antwoordmogelijkheden</span>
+        <button
+          className="inline-flex items-center justify-center gap-2 rounded-lg bg-zinc-900 px-3 py-2 text-sm font-bold text-white hover:bg-zinc-700"
+          onClick={addOption}
+          type="button"
+        >
+          <Plus aria-hidden className="h-4 w-4" />
+          Optie
+        </button>
+      </div>
+      <div className="grid gap-2">
+        {options.map((option, index) => (
+          <div className="grid gap-2 rounded-lg bg-white p-2 sm:grid-cols-[1fr_auto_auto]" key={option.id}>
+            <input
+              className="min-w-0 rounded-lg border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
+              maxLength={90}
+              onChange={(event) => updateOption(option.id, event.target.value)}
+              placeholder={`Antwoord ${index + 1}`}
+              value={option.label}
+            />
+            <button
+              className={`inline-flex items-center justify-center gap-2 rounded-lg border px-3 py-2 text-sm font-bold ${
+                option.isCorrect
+                  ? "border-emerald-700 bg-emerald-50 text-emerald-900"
+                  : "border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50"
+              }`}
+              onClick={() => markCorrect(option.id)}
+              type="button"
+            >
+              <CheckCircle2 aria-hidden className="h-4 w-4" />
+              Juist
+            </button>
+            <button
+              aria-label="Verwijder antwoordoptie"
+              className="inline-flex items-center justify-center rounded-lg border border-zinc-300 bg-white px-3 py-2 text-zinc-700 hover:bg-zinc-100 disabled:opacity-40"
+              disabled={options.length <= 2}
+              onClick={() => removeOption(option.id)}
+              type="button"
+            >
+              <Trash2 aria-hidden className="h-4 w-4" />
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 function screenViewLabel(screenView: ScreenView) {
   if (screenView === "qr") {
@@ -65,9 +182,13 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
   const [keyInput, setKeyInput] = useState(initialKey);
   const [payload, setPayload] = useState<PresenterPayload | null>(null);
   const [origin] = useState(() => (typeof window === "undefined" ? "" : window.location.origin));
-  const [form, setForm] = useState<QuestionForm>(defaultQuestionForm);
+  const [form, setForm] = useState<QuestionForm>(() => createDefaultQuestionForm());
   const [editingQuestionId, setEditingQuestionId] = useState("");
-  const [editForm, setEditForm] = useState<QuestionEditForm>({ prompt: "", options: "" });
+  const [editForm, setEditForm] = useState<QuestionEditForm>(() => ({
+    prompt: "",
+    options: "",
+    quizOptions: defaultQuizOptions(),
+  }));
   const [loading, setLoading] = useState(Boolean(initialKey));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -170,10 +291,13 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
 
   async function createQuestion(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const options = form.options
-      .split("\n")
-      .map((option) => option.trim())
-      .filter(Boolean);
+    const options =
+      form.type === "quiz"
+        ? form.quizOptions.map((option) => ({ label: option.label, isCorrect: option.isCorrect }))
+        : form.options
+            .split("\n")
+            .map((option) => option.trim())
+            .filter(Boolean);
 
     await mutate(async () => {
       const response = await fetch(`/api/presentations/${id}/questions?key=${encodeURIComponent(key)}`, {
@@ -192,7 +316,7 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
       return data;
     }, "Vraag toegevoegd");
 
-    setForm(defaultQuestionForm);
+    setForm(createDefaultQuestionForm());
   }
 
   function startEditing(question: QuestionResult) {
@@ -200,14 +324,25 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
     setEditForm({
       prompt: question.prompt,
       options: question.options.map((option) => option.label).join("\n"),
+      quizOptions:
+        question.type === "quiz"
+          ? question.options.map((option) => ({
+              id: option.id,
+              label: option.label,
+              isCorrect: option.isCorrect,
+            }))
+          : defaultQuizOptions(),
     });
   }
 
   async function saveQuestionEdit(question: QuestionResult) {
-    const options = editForm.options
-      .split("\n")
-      .map((option) => option.trim())
-      .filter(Boolean);
+    const options =
+      question.type === "quiz"
+        ? editForm.quizOptions.map((option) => ({ label: option.label, isCorrect: option.isCorrect }))
+        : editForm.options
+            .split("\n")
+            .map((option) => option.trim())
+            .filter(Boolean);
 
     await mutate(async () => {
       const response = await fetch(`/api/presentations/${id}/questions?key=${encodeURIComponent(key)}`, {
@@ -228,7 +363,7 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
     }, "Vraag bijgewerkt");
 
     setEditingQuestionId("");
-    setEditForm({ prompt: "", options: "" });
+    setEditForm({ prompt: "", options: "", quizOptions: defaultQuizOptions() });
   }
 
   async function moveQuestion(questionId: string, direction: "up" | "down") {
@@ -577,6 +712,7 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
               >
                 <option value="open">Open antwoord</option>
                 <option value="multiple">Multiple choice</option>
+                <option value="quiz">Quizvraag</option>
               </select>
 
               <label className="mt-4 block text-sm font-semibold text-zinc-700" htmlFor="question-prompt">
@@ -603,6 +739,13 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
                     value={form.options}
                   />
                 </>
+              ) : null}
+
+              {form.type === "quiz" ? (
+                <QuizOptionsEditor
+                  onChange={(quizOptions) => setForm((current) => ({ ...current, quizOptions }))}
+                  options={form.quizOptions}
+                />
               ) : null}
 
               <button
@@ -657,7 +800,7 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
                         <div className="min-w-0 flex-1">
                           <div className="mb-2 flex flex-wrap items-center gap-2">
                             <span className="rounded-md bg-white px-2 py-1 text-xs font-bold uppercase text-zinc-600">
-                              {question.type === "open" ? "Open antwoord" : "Multiple choice"}
+                              {questionTypeLabel(question.type)}
                             </span>
                             {question.id === payload.presentation.activeQuestionId ? (
                               <span className="inline-flex items-center gap-1 rounded-md bg-emerald-800 px-2 py-1 text-xs font-black uppercase text-white">
@@ -783,6 +926,13 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
                           </>
                         ) : null}
 
+                        {question.type === "quiz" ? (
+                          <QuizOptionsEditor
+                            onChange={(quizOptions) => setEditForm((current) => ({ ...current, quizOptions }))}
+                            options={editForm.quizOptions}
+                          />
+                        ) : null}
+
                         <div className="mt-4 flex flex-wrap gap-2">
                           <button
                             className="inline-flex items-center gap-2 rounded-lg bg-emerald-800 px-3 py-2 text-sm font-bold text-white hover:bg-emerald-900 disabled:opacity-60"
@@ -797,7 +947,7 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
                             className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-bold hover:bg-zinc-100"
                             onClick={() => {
                               setEditingQuestionId("");
-                              setEditForm({ prompt: "", options: "" });
+                              setEditForm({ prompt: "", options: "", quizOptions: defaultQuizOptions() });
                             }}
                             type="button"
                           >
@@ -827,7 +977,7 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
                     <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                       <div>
                         <p className="text-xs font-bold uppercase text-emerald-800">
-                          Vraag {question.position}
+                          Vraag {question.position} · {questionTypeLabel(question.type)}
                         </p>
                         <h3 className="text-lg font-bold">{question.prompt}</h3>
                       </div>

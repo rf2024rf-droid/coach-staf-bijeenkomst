@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { CheckCircle2, ChevronDown, ChevronUp } from "lucide-react";
 import { useState } from "react";
 import type { QuestionResult } from "@/app/types";
 
@@ -13,20 +13,48 @@ export function ResultView({ question, mode = "dashboard" }: ResultViewProps) {
   const [expandedQuestionId, setExpandedQuestionId] = useState<string | null>(null);
   const showAllResponses = expandedQuestionId === question.id;
 
-  if (question.type === "multiple") {
+  if (question.type === "multiple" || question.type === "quiz") {
+    const correctOption = question.options.find((option) => option.isCorrect);
+
     return (
       <div className={mode === "screen" ? "space-y-5" : "space-y-3"}>
+        {question.type === "quiz" ? (
+          <section className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-emerald-950">
+            <p className="text-sm font-black uppercase">Quizuitslag</p>
+            <div className="mt-2 flex flex-wrap items-end gap-3">
+              <span className="text-4xl font-black">{question.correctPercentage}% goed</span>
+              <span className="pb-1 text-sm font-bold">
+                {question.correctCount} van {question.answerCount} antwoorden
+              </span>
+            </div>
+            {correctOption ? (
+              <p className="mt-2 inline-flex items-center gap-2 text-sm font-bold">
+                <CheckCircle2 aria-hidden className="h-4 w-4" />
+                Juist antwoord: {correctOption.label}
+              </p>
+            ) : null}
+          </section>
+        ) : null}
         {question.options.map((option) => (
           <div key={option.id} className="space-y-2">
             <div className="flex items-center justify-between gap-4 text-sm font-semibold text-zinc-800">
-              <span>{option.label}</span>
+              <span className="inline-flex items-center gap-2">
+                {option.label}
+                {question.type === "quiz" && option.isCorrect ? (
+                  <span className="rounded-md bg-emerald-100 px-2 py-0.5 text-xs font-black uppercase text-emerald-800">
+                    Juist
+                  </span>
+                ) : null}
+              </span>
               <span className="tabular-nums text-zinc-600">
                 {option.count} / {option.percentage}%
               </span>
             </div>
             <div className="h-3 overflow-hidden rounded-full bg-zinc-200">
               <div
-                className="h-full rounded-full bg-emerald-700 transition-all duration-500"
+                className={`h-full rounded-full transition-all duration-500 ${
+                  question.type === "quiz" && !option.isCorrect ? "bg-zinc-500" : "bg-emerald-700"
+                }`}
                 style={{ width: `${option.percentage}%` }}
               />
             </div>

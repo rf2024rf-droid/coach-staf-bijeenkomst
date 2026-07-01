@@ -25,7 +25,8 @@ create table if not exists question_options (
   id text primary key,
   question_id text not null references questions(id) on delete cascade,
   label text not null,
-  position integer not null
+  position integer not null,
+  is_correct boolean not null default false
 );
 
 create table if not exists responses (
@@ -42,6 +43,7 @@ create table if not exists responses (
 
 alter table presentations add column if not exists screen_view text not null default 'question';
 alter table presentations add column if not exists screen_question_id text;
+alter table question_options add column if not exists is_correct boolean not null default false;
 
 create unique index if not exists presentations_code_idx on presentations (code);
 create index if not exists questions_presentation_idx on questions (presentation_id);

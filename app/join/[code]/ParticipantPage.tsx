@@ -2,7 +2,7 @@
 
 import { CheckCircle2, Loader2, Send } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { PublicSessionPayload } from "@/app/types";
+import type { PublicSessionPayload, QuestionType } from "@/app/types";
 
 type ParticipantPageProps = {
   code: string;
@@ -14,6 +14,14 @@ function createParticipantId() {
   }
 
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function questionTypeLabel(type: QuestionType) {
+  if (type === "quiz") {
+    return "Quizvraag";
+  }
+
+  return type === "open" ? "Open antwoord" : "Multiple choice";
 }
 
 export default function ParticipantPage({ code }: ParticipantPageProps) {
@@ -118,8 +126,9 @@ export default function ParticipantPage({ code }: ParticipantPageProps) {
 
   const activeQuestion = session?.activeQuestion ?? null;
   const submitted = Boolean(activeQuestion && submittedQuestionId === activeQuestion.id);
+  const isChoiceQuestion = activeQuestion?.type === "multiple" || activeQuestion?.type === "quiz";
   const canSubmit =
-    activeQuestion?.type === "multiple" ? Boolean(selectedOptionId) : Boolean(textAnswer.trim());
+    isChoiceQuestion ? Boolean(selectedOptionId) : Boolean(textAnswer.trim());
 
   if (loading && !session) {
     return (
@@ -163,12 +172,12 @@ export default function ParticipantPage({ code }: ParticipantPageProps) {
           <form className="rounded-lg border border-zinc-700 bg-zinc-900 p-5 shadow-sm" onSubmit={submit}>
             <div className="mb-5">
               <span className="rounded-md bg-emerald-300 px-2 py-1 text-xs font-black uppercase text-emerald-950">
-                {activeQuestion.type === "open" ? "Open antwoord" : "Multiple choice"}
+                {questionTypeLabel(activeQuestion.type)}
               </span>
               <h2 className="mt-3 text-2xl font-black leading-9">{activeQuestion.prompt}</h2>
             </div>
 
-            {activeQuestion.type === "multiple" ? (
+            {isChoiceQuestion ? (
               <div className="grid gap-3">
                 {activeQuestion.options.map((option) => (
                   <button

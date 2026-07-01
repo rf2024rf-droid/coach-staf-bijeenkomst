@@ -1,4 +1,4 @@
-export type QuestionType = "open" | "multiple";
+export type QuestionType = "open" | "multiple" | "quiz";
 export type ScreenView = "question" | "qr" | "results";
 
 export type QuestionResult = {
@@ -8,10 +8,13 @@ export type QuestionResult = {
   status: "open" | "closed";
   position: number;
   answerCount: number;
+  correctCount: number;
+  correctPercentage: number;
   options: Array<{
     id: string;
     label: string;
     position: number;
+    isCorrect: boolean;
     count: number;
     percentage: number;
   }>;

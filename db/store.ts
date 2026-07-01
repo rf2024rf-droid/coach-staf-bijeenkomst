@@ -1,6 +1,6 @@
 import postgres from "postgres";
 
-export type QuestionType = "open" | "multiple";
+export type QuestionType = "open" | "multiple" | "quiz";
 export type QuestionStatus = "open" | "closed";
 export type ScreenView = "question" | "qr" | "results";
 
@@ -33,6 +33,7 @@ type OptionRow = {
   question_id: string;
   label: string;
   position: number;
+  is_correct: boolean | null;
 };
 
 type ResponseRow = {
@@ -55,10 +56,13 @@ export type QuestionResult = {
   status: QuestionStatus;
   position: number;
   answerCount: number;
+  correctCount: number;
+  correctPercentage: number;
   options: Array<{
     id: string;
     label: string;
     position: number;
+    isCorrect: boolean;
     count: number;
     percentage: number;
   }>;
@@ -136,6 +140,11 @@ export class AppError extends Error {
 
 type Database = ReturnType<typeof postgres>;
 
+type OptionInput = {
+  label: string;
+  isCorrect: boolean;
+};
+
 const schemaStatements = [
   `CREATE TABLE IF NOT EXISTS presentations (
     id TEXT PRIMARY KEY,
@@ -163,7 +172,8 @@ const schemaStatements = [
     id TEXT PRIMARY KEY,
     question_id TEXT NOT NULL REFERENCES questions(id) ON DELETE CASCADE,
     label TEXT NOT NULL,
-    position INTEGER NOT NULL
+    position INTEGER NOT NULL,
+    is_correct BOOLEAN NOT NULL DEFAULT false
   )`,
   `CREATE TABLE IF NOT EXISTS responses (
     id TEXT PRIMARY KEY,
@@ -179,6 +189,7 @@ const schemaStatements = [
   "ALTER TABLE presentations ADD COLUMN IF NOT EXISTS idle_screen_text TEXT",
   "ALTER TABLE presentations ADD COLUMN IF NOT EXISTS screen_view TEXT NOT NULL DEFAULT 'question'",
   "ALTER TABLE presentations ADD COLUMN IF NOT EXISTS screen_question_id TEXT",
+  "ALTER TABLE question_options ADD COLUMN IF NOT EXISTS is_correct BOOLEAN NOT NULL DEFAULT false",
   "CREATE UNIQUE INDEX IF NOT EXISTS presentations_code_idx ON presentations (code)",
   "CREATE INDEX IF NOT EXISTS questions_presentation_idx ON questions (presentation_id)",
   "CREATE INDEX IF NOT EXISTS options_question_idx ON question_options (question_id)",
@@ -268,6 +279,60 @@ function cleanText(value: unknown, maxLength: number) {
   return value.replace(/[\u0000-\u001F\u007F]/g, " ").replace(/\s+/g, " ").trim().slice(0, maxLength);
 }
 
+function isChoiceQuestion(type: QuestionType) {
+  return type === "multiple" || type === "quiz";
+}
+
+function normalizeOptionInputs(optionsInput: unknown, type: QuestionType) {
+  if (!Array.isArray(optionsInput) || !isChoiceQuestion(type)) {
+    return [];
+  }
+
+  const options = optionsInput
+    .map((option) => {
+      if (typeof option === "string") {
+        return { label: cleanText(option, 90), isCorrect: false };
+      }
+
+      if (option && typeof option === "object") {
+        const record = option as { label?: unknown; isCorrect?: unknown };
+        return {
+          label: cleanText(record.label, 90),
+          isCorrect: Boolean(record.isCorrect),
+        };
+      }
+
+      return { label: "", isCorrect: false };
+    })
+    .filter((option) => option.label)
+    .slice(0, 8);
+
+  if (type === "multiple") {
+    return options.map((option) => ({ ...option, isCorrect: false }));
+  }
+
+  return options;
+}
+
+function validateChoiceOptions(type: QuestionType, options: OptionInput[]) {
+  if (!isChoiceQuestion(type)) {
+    return;
+  }
+
+  if (options.length < 2) {
+    throw new AppError(
+      400,
+      type === "quiz"
+        ? "Een quizvraag heeft minimaal twee opties nodig."
+        : "Een multiple choice vraag heeft minimaal twee opties nodig."
+    );
+  }
+
+  if (type === "quiz" && options.filter((option) => option.isCorrect).length !== 1) {
+    throw new AppError(400, "Kies precies een juist antwoord voor de quizvraag.");
+  }
+}
+
 function normalizeCode(value: string) {
   return value.replace(/[^a-z0-9]/gi, "").toUpperCase().slice(0, 12);
 }
@@ -302,10 +367,15 @@ function buildQuestions(
           id: option.id,
           label: option.label,
           position: option.position,
+          isCorrect: Boolean(option.is_correct),
           count,
           percentage: responses.length ? Math.round((count / responses.length) * 100) : 0,
         };
       });
+    const correctCount =
+      question.type === "quiz"
+        ? options.filter((option) => option.isCorrect).reduce((total, option) => total + option.count, 0)
+        : 0;
 
     return {
       id: question.id,
@@ -314,6 +384,8 @@ function buildQuestions(
       status: question.status,
       position: question.position,
       answerCount: responses.length,
+      correctCount,
+      correctPercentage: responses.length ? Math.round((correctCount / responses.length) * 100) : 0,
       options,
       responses: responses.map((response) => ({
         id: response.id,
@@ -325,6 +397,22 @@ function buildQuestions(
       })),
     };
   });
+}
+
+function hideCorrectAnswers(question: QuestionResult | null) {
+  if (!question || question.type !== "quiz") {
+    return question;
+  }
+
+  return {
+    ...question,
+    correctCount: 0,
+    correctPercentage: 0,
+    options: question.options.map((option) => ({
+      ...option,
+      isCorrect: false,
+    })),
+  };
 }
 
 async function fetchPresentationById(id: string) {
@@ -400,7 +488,7 @@ async function insertQuestion(
   presentationId: string,
   type: QuestionType,
   prompt: string,
-  optionLabels: string[],
+  options: OptionInput[],
   openImmediately: boolean
 ) {
   const sql = getSql();
@@ -415,11 +503,11 @@ async function insertQuestion(
       VALUES (${id}, ${presentationId}, ${type}, ${prompt}, ${status}, ${position}, ${timestamp}, ${timestamp})
     `;
 
-    if (type === "multiple") {
-      for (const [index, label] of optionLabels.entries()) {
+    if (isChoiceQuestion(type)) {
+      for (const [index, option] of options.entries()) {
         await tx`
-          INSERT INTO question_options (id, question_id, label, position)
-          VALUES (${makeId("opt")}, ${id}, ${label}, ${index + 1})
+          INSERT INTO question_options (id, question_id, label, position, is_correct)
+          VALUES (${makeId("opt")}, ${id}, ${option.label}, ${index + 1}, ${option.isCorrect})
         `;
       }
     }
@@ -464,7 +552,10 @@ export async function createPresentation(titleInput: unknown) {
     id,
     "multiple",
     "Waar wil je vandaag de meeste focus op leggen?",
-    ["Wedstrijdanalyse", "Training", "Spelersontwikkeling", "Teamafspraken"],
+    ["Wedstrijdanalyse", "Training", "Spelersontwikkeling", "Teamafspraken"].map((label) => ({
+      label,
+      isCorrect: false,
+    })),
     false
   );
 
@@ -543,21 +634,16 @@ export async function addQuestion(
   payload: { type?: unknown; prompt?: unknown; options?: unknown }
 ) {
   const presentation = await assertPresenter(presentationId, presenterKey);
-  const type = payload.type === "multiple" ? "multiple" : "open";
+  const type: QuestionType =
+    payload.type === "multiple" ? "multiple" : payload.type === "quiz" ? "quiz" : "open";
   const prompt = cleanText(payload.prompt, 180);
 
   if (!prompt) {
     throw new AppError(400, "Vraagtekst is verplicht.");
   }
 
-  const options =
-    Array.isArray(payload.options) && type === "multiple"
-      ? payload.options.map((option) => cleanText(option, 90)).filter(Boolean).slice(0, 8)
-      : [];
-
-  if (type === "multiple" && options.length < 2) {
-    throw new AppError(400, "Een multiple choice vraag heeft minimaal twee opties nodig.");
-  }
+  const options = normalizeOptionInputs(payload.options, type);
+  validateChoiceOptions(type, options);
 
   await insertQuestion(presentation.id, type, prompt, options, !presentation.active_question_id);
   return getPresenterPayload(presentationId, presenterKey);
@@ -626,19 +712,13 @@ export async function updateQuestion(
     throw new AppError(400, "Vraagtekst is verplicht.");
   }
 
-  const optionLabels =
-    question.type === "multiple" && Array.isArray(payload.options)
-      ? payload.options.map((option) => cleanText(option, 90)).filter(Boolean).slice(0, 8)
-      : [];
-
-  if (question.type === "multiple" && optionLabels.length < 2) {
-    throw new AppError(400, "Een multiple choice vraag heeft minimaal twee opties nodig.");
-  }
+  const optionInputs = normalizeOptionInputs(payload.options, question.type);
+  validateChoiceOptions(question.type, optionInputs);
 
   const sql = getSql();
   const timestamp = nowIso();
   const current =
-    question.type === "multiple"
+    isChoiceQuestion(question.type)
       ? await sql<OptionRow[]>`
           SELECT *
           FROM question_options
@@ -654,24 +734,24 @@ export async function updateQuestion(
       WHERE id = ${questionId} AND presentation_id = ${presentationId}
     `;
 
-    if (question.type === "multiple") {
-      for (const [index, label] of optionLabels.entries()) {
+    if (isChoiceQuestion(question.type)) {
+      for (const [index, option] of optionInputs.entries()) {
         const existing = current[index];
         if (existing) {
           await tx`
             UPDATE question_options
-            SET label = ${label}, position = ${index + 1}
+            SET label = ${option.label}, position = ${index + 1}, is_correct = ${option.isCorrect}
             WHERE id = ${existing.id}
           `;
         } else {
           await tx`
-            INSERT INTO question_options (id, question_id, label, position)
-            VALUES (${makeId("opt")}, ${questionId}, ${label}, ${index + 1})
+            INSERT INTO question_options (id, question_id, label, position, is_correct)
+            VALUES (${makeId("opt")}, ${questionId}, ${option.label}, ${index + 1}, ${option.isCorrect})
           `;
         }
       }
 
-      for (const removed of current.slice(optionLabels.length)) {
+      for (const removed of current.slice(optionInputs.length)) {
         await tx`
           DELETE FROM responses
           WHERE question_id = ${questionId} AND option_id = ${removed.id}
@@ -883,6 +963,10 @@ export async function getPublicSession(codeInput: string): Promise<PublicSession
   ]);
 
   const questions = buildQuestions(questionRows, optionRows, responseRows);
+  const activeQuestion =
+    questions.find((question) => question.id === presentation.active_question_id && question.status === "open") ??
+    null;
+  const screenQuestion = questions.find((question) => question.id === presentation.screen_question_id) ?? null;
 
   return {
     presentation: {
@@ -892,12 +976,8 @@ export async function getPublicSession(codeInput: string): Promise<PublicSession
       idleScreenText: presentation.idle_screen_text || "Coach Staf Bijeenkomst",
     },
     screenView: presentation.screen_view ?? "question",
-    activeQuestion:
-      questions.find((question) => question.id === presentation.active_question_id && question.status === "open") ??
-      null,
-    screenQuestion:
-      questions.find((question) => question.id === presentation.screen_question_id) ??
-      null,
+    activeQuestion: hideCorrectAnswers(activeQuestion),
+    screenQuestion: presentation.screen_view === "results" ? screenQuestion : hideCorrectAnswers(screenQuestion),
     totals: {
       questions: questions.length,
       answers: responseRows.length,
@@ -935,7 +1015,7 @@ export async function submitAnswer(
   let optionId: string | null = null;
   let textAnswer: string | null = null;
 
-  if (question.type === "multiple") {
+  if (isChoiceQuestion(question.type)) {
     optionId = cleanText(payload.optionId, 80);
     if (!optionId) {
       throw new AppError(400, "Kies een antwoordoptie.");
@@ -1129,8 +1209,8 @@ export async function duplicatePresentation(presentationId: string) {
       const newQuestionId = questionIdMap.get(option.question_id);
       if (newQuestionId) {
         await tx`
-          INSERT INTO question_options (id, question_id, label, position)
-          VALUES (${makeId("opt")}, ${newQuestionId}, ${option.label}, ${option.position})
+          INSERT INTO question_options (id, question_id, label, position, is_correct)
+          VALUES (${makeId("opt")}, ${newQuestionId}, ${option.label}, ${option.position}, ${Boolean(option.is_correct)})
         `;
       }
     }

@@ -662,8 +662,14 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
             </article>
 
             <article className="rounded-lg border border-zinc-300 bg-white p-5 shadow-sm">
-              <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                <h2 className="text-lg font-bold">Vragen</h2>
+              <div className="mb-5 flex flex-col gap-3 border-b border-zinc-200 pb-4 md:flex-row md:items-start md:justify-between">
+                <div>
+                  <p className="text-xs font-black uppercase text-emerald-800">Bediening</p>
+                  <h2 className="mt-1 text-xl font-black">Presentatieflow</h2>
+                  <p className="mt-1 max-w-2xl text-sm text-zinc-600">
+                    Zet vragen live, wijzig de volgorde en beheer vragen. De antwoorden staan bewust in het blok hieronder.
+                  </p>
+                </div>
                 <button
                   className="inline-flex items-center justify-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-bold text-rose-800 hover:bg-rose-100 disabled:opacity-60"
                   disabled={saving || !payload.totals.answers}
@@ -674,116 +680,126 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
                   Reset alles
                 </button>
               </div>
-              <div className="grid gap-3">
-                {payload.questions.map((question, index) => (
-                  <div
-                    className={`rounded-lg border p-4 shadow-sm ${
-                      question.id === payload.presentation.activeQuestionId
-                        ? "border-emerald-500 bg-emerald-50 ring-2 ring-emerald-200"
-                        : "border-zinc-200 bg-zinc-50"
-                    }`}
-                    key={question.id}
-                  >
-                    <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                      <div>
-                        <div className="mb-2 flex flex-wrap items-center gap-2">
-                          <span className="rounded-md bg-white px-2 py-1 text-xs font-bold uppercase text-zinc-600">
-                            {question.type === "open" ? "Open antwoord" : "Multiple choice"}
-                          </span>
-                          {question.id === payload.presentation.activeQuestionId ? (
-                            <span className="inline-flex items-center gap-1 rounded-md bg-emerald-800 px-2 py-1 text-xs font-black uppercase text-white">
-                              <CheckCircle2 aria-hidden className="h-3.5 w-3.5" />
-                              Nu live
+              <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3">
+                <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <span className="text-xs font-black uppercase text-zinc-600">Vragen en acties</span>
+                  <span className="rounded-md bg-white px-2 py-1 text-xs font-bold text-zinc-600">
+                    {payload.questions.length} vragen
+                  </span>
+                </div>
+                <div className="grid gap-3">
+                  {payload.questions.map((question, index) => (
+                    <div
+                      className={`rounded-lg border p-4 shadow-sm ${
+                        question.id === payload.presentation.activeQuestionId
+                          ? "border-emerald-500 bg-emerald-50 ring-2 ring-emerald-200"
+                          : "border-zinc-200 bg-white"
+                      }`}
+                      key={question.id}
+                    >
+                      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                        <div className="min-w-0 flex-1">
+                          <div className="mb-2 flex flex-wrap items-center gap-2">
+                            <span className="rounded-md bg-white px-2 py-1 text-xs font-bold uppercase text-zinc-600">
+                              {question.type === "open" ? "Open antwoord" : "Multiple choice"}
                             </span>
-                          ) : null}
+                            {question.id === payload.presentation.activeQuestionId ? (
+                              <span className="inline-flex items-center gap-1 rounded-md bg-emerald-800 px-2 py-1 text-xs font-black uppercase text-white">
+                                <CheckCircle2 aria-hidden className="h-3.5 w-3.5" />
+                                Nu live
+                              </span>
+                            ) : null}
+                          </div>
+                          <h3 className="font-bold">{question.prompt}</h3>
+                          <p className="mt-1 text-sm text-zinc-600">{question.answerCount} antwoorden</p>
                         </div>
-                        <h3 className="font-bold">{question.prompt}</h3>
-                        <p className="mt-1 text-sm text-zinc-600">{question.answerCount} antwoorden</p>
+                        <div className="flex flex-col gap-2 lg:items-end">
+                          <span className="text-xs font-black uppercase text-zinc-500">Acties</span>
+                          <div className="flex flex-wrap gap-2 lg:justify-end">
+                            <button
+                              aria-label="Vraag omhoog"
+                              className="inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-bold hover:bg-zinc-100 disabled:opacity-40"
+                              disabled={saving || index === 0}
+                              onClick={() => moveQuestion(question.id, "up")}
+                              type="button"
+                            >
+                              <ArrowUp aria-hidden className="h-4 w-4" />
+                            </button>
+                            <button
+                              aria-label="Vraag omlaag"
+                              className="inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-bold hover:bg-zinc-100 disabled:opacity-40"
+                              disabled={saving || index === payload.questions.length - 1}
+                              onClick={() => moveQuestion(question.id, "down")}
+                              type="button"
+                            >
+                              <ArrowDown aria-hidden className="h-4 w-4" />
+                            </button>
+                            <button
+                              className="inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-bold hover:bg-zinc-100 disabled:opacity-60"
+                              disabled={saving}
+                              onClick={() => startEditing(question)}
+                              type="button"
+                            >
+                              <Pencil aria-hidden className="h-4 w-4" />
+                              Bewerk
+                            </button>
+                            <button
+                              className={`inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-bold disabled:opacity-60 ${
+                                payload.presentation.screenView === "results" &&
+                                payload.presentation.screenQuestionId === question.id
+                                  ? "bg-zinc-900 text-white hover:bg-zinc-700"
+                                  : "bg-sky-800 text-white hover:bg-sky-900"
+                              }`}
+                              disabled={saving}
+                              onClick={() => toggleResults(question.id)}
+                              type="button"
+                            >
+                              <BarChart3 aria-hidden className="h-4 w-4" />
+                              {payload.presentation.screenView === "results" &&
+                              payload.presentation.screenQuestionId === question.id
+                                ? "Sluit resultaten"
+                                : "Resultaten"}
+                            </button>
+                            <button
+                              className={`inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-bold text-white disabled:opacity-60 ${
+                                question.id === payload.presentation.activeQuestionId
+                                  ? "bg-amber-700 hover:bg-amber-800"
+                                  : "bg-emerald-800 hover:bg-emerald-900"
+                              }`}
+                              disabled={saving}
+                              onClick={() =>
+                                activate(question.id === payload.presentation.activeQuestionId ? null : question.id)
+                              }
+                              type="button"
+                            >
+                              {question.id === payload.presentation.activeQuestionId ? (
+                                <Square aria-hidden className="h-4 w-4" />
+                              ) : (
+                                <Play aria-hidden className="h-4 w-4" />
+                              )}
+                              {question.id === payload.presentation.activeQuestionId ? "Stop live" : "Live"}
+                            </button>
+                            <button
+                              className="inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-bold hover:bg-zinc-100 disabled:opacity-60"
+                              disabled={saving || !question.answerCount}
+                              onClick={() => reset(question.id)}
+                              type="button"
+                            >
+                              <RotateCcw aria-hidden className="h-4 w-4" />
+                              Reset
+                            </button>
+                            <button
+                              className="inline-flex items-center justify-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-bold text-rose-800 hover:bg-rose-100 disabled:opacity-60"
+                              disabled={saving}
+                              onClick={() => removeQuestion(question.id, question.prompt)}
+                              type="button"
+                            >
+                              <Trash2 aria-hidden className="h-4 w-4" />
+                              Verwijder
+                            </button>
+                          </div>
+                        </div>
                       </div>
-                      <div className="flex flex-wrap gap-2">
-                        <button
-                          aria-label="Vraag omhoog"
-                          className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-bold hover:bg-zinc-100 disabled:opacity-40"
-                          disabled={saving || index === 0}
-                          onClick={() => moveQuestion(question.id, "up")}
-                          type="button"
-                        >
-                          <ArrowUp aria-hidden className="h-4 w-4" />
-                        </button>
-                        <button
-                          aria-label="Vraag omlaag"
-                          className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-bold hover:bg-zinc-100 disabled:opacity-40"
-                          disabled={saving || index === payload.questions.length - 1}
-                          onClick={() => moveQuestion(question.id, "down")}
-                          type="button"
-                        >
-                          <ArrowDown aria-hidden className="h-4 w-4" />
-                        </button>
-                        <button
-                          className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-bold hover:bg-zinc-100 disabled:opacity-60"
-                          disabled={saving}
-                          onClick={() => startEditing(question)}
-                          type="button"
-                        >
-                          <Pencil aria-hidden className="h-4 w-4" />
-                          Bewerk
-                        </button>
-                        <button
-                          className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-bold disabled:opacity-60 ${
-                            payload.presentation.screenView === "results" &&
-                            payload.presentation.screenQuestionId === question.id
-                              ? "bg-zinc-900 text-white hover:bg-zinc-700"
-                              : "bg-sky-800 text-white hover:bg-sky-900"
-                          }`}
-                          disabled={saving}
-                          onClick={() => toggleResults(question.id)}
-                          type="button"
-                        >
-                          <BarChart3 aria-hidden className="h-4 w-4" />
-                          {payload.presentation.screenView === "results" &&
-                          payload.presentation.screenQuestionId === question.id
-                            ? "Sluit resultaten"
-                            : "Resultaten"}
-                        </button>
-                        <button
-                          className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-bold text-white disabled:opacity-60 ${
-                            question.id === payload.presentation.activeQuestionId
-                              ? "bg-amber-700 hover:bg-amber-800"
-                              : "bg-emerald-800 hover:bg-emerald-900"
-                          }`}
-                          disabled={saving}
-                          onClick={() =>
-                            activate(question.id === payload.presentation.activeQuestionId ? null : question.id)
-                          }
-                          type="button"
-                        >
-                          {question.id === payload.presentation.activeQuestionId ? (
-                            <Square aria-hidden className="h-4 w-4" />
-                          ) : (
-                            <Play aria-hidden className="h-4 w-4" />
-                          )}
-                          {question.id === payload.presentation.activeQuestionId ? "Stop live" : "Live"}
-                        </button>
-                        <button
-                          className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-bold hover:bg-zinc-100 disabled:opacity-60"
-                          disabled={saving || !question.answerCount}
-                          onClick={() => reset(question.id)}
-                          type="button"
-                        >
-                          <RotateCcw aria-hidden className="h-4 w-4" />
-                          Reset
-                        </button>
-                        <button
-                          className="inline-flex items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-bold text-rose-800 hover:bg-rose-100 disabled:opacity-60"
-                          disabled={saving}
-                          onClick={() => removeQuestion(question.id, question.prompt)}
-                          type="button"
-                        >
-                          <Trash2 aria-hidden className="h-4 w-4" />
-                          Verwijder
-                        </button>
-                      </div>
-                    </div>
                     {editingQuestionId === question.id ? (
                       <div className="mt-4 rounded-lg border border-emerald-200 bg-white p-4">
                         <label className="block text-sm font-semibold text-zinc-700" htmlFor={`edit-prompt-${question.id}`}>
@@ -837,26 +853,36 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
                     ) : null}
                   </div>
                 ))}
+                </div>
               </div>
             </article>
 
-            <section className="grid gap-4">
-              {payload.questions.map((question) => (
-                <article className="rounded-lg border border-zinc-300 bg-white p-5 shadow-sm" key={question.id}>
-                  <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                    <div>
-                      <p className="text-xs font-bold uppercase text-emerald-800">
-                        Vraag {question.position}
-                      </p>
-                      <h2 className="text-lg font-bold">{question.prompt}</h2>
+            <section className="rounded-lg border border-zinc-300 bg-white p-5 shadow-sm">
+              <div className="mb-5 border-b border-zinc-200 pb-4">
+                <p className="text-xs font-black uppercase text-sky-800">Overzicht</p>
+                <h2 className="mt-1 text-xl font-black">Vragen en antwoorden</h2>
+                <p className="mt-1 max-w-2xl text-sm text-zinc-600">
+                  Hier bekijk je rustig alle binnengekomen antwoorden, zonder beheerknoppen ertussen.
+                </p>
+              </div>
+              <div className="grid gap-4">
+                {payload.questions.map((question) => (
+                  <article className="rounded-lg border border-zinc-200 bg-zinc-50 p-4" key={question.id}>
+                    <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                      <div>
+                        <p className="text-xs font-bold uppercase text-emerald-800">
+                          Vraag {question.position}
+                        </p>
+                        <h3 className="text-lg font-bold">{question.prompt}</h3>
+                      </div>
+                      <span className="rounded-lg bg-white px-3 py-2 text-sm font-bold text-zinc-700">
+                        {question.answerCount} antwoorden
+                      </span>
                     </div>
-                    <span className="rounded-lg bg-zinc-100 px-3 py-2 text-sm font-bold text-zinc-700">
-                      {question.answerCount} antwoorden
-                    </span>
-                  </div>
-                  <ResultView question={question} />
-                </article>
-              ))}
+                    <ResultView question={question} />
+                  </article>
+                ))}
+              </div>
             </section>
           </section>
         </section>

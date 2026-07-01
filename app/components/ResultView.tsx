@@ -9,6 +9,11 @@ type ResultViewProps = {
   mode?: "compact" | "screen" | "dashboard";
 };
 
+function optionLetter(position: number, fallbackIndex: number) {
+  const index = Math.max((position || fallbackIndex + 1) - 1, 0);
+  return String.fromCharCode(65 + index);
+}
+
 export function ResultView({ question, mode = "dashboard" }: ResultViewProps) {
   const [expandedQuestionId, setExpandedQuestionId] = useState<string | null>(null);
   const showAllResponses = expandedQuestionId === question.id;
@@ -35,10 +40,13 @@ export function ResultView({ question, mode = "dashboard" }: ResultViewProps) {
             ) : null}
           </section>
         ) : null}
-        {question.options.map((option) => (
+        {question.options.map((option, index) => (
           <div key={option.id} className="space-y-2">
             <div className="flex items-center justify-between gap-4 text-sm font-semibold text-zinc-800">
               <span className="inline-flex items-center gap-2">
+                <span className="grid h-6 w-6 shrink-0 place-items-center rounded-md bg-zinc-900 text-xs font-black text-white">
+                  {optionLetter(option.position, index)}
+                </span>
                 {option.label}
                 {question.type === "quiz" && option.isCorrect ? (
                   <span className="rounded-md bg-emerald-100 px-2 py-0.5 text-xs font-black uppercase text-emerald-800">

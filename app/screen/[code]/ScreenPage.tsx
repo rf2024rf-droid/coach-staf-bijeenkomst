@@ -14,6 +14,11 @@ const idleScreenBackground = {
     "radial-gradient(circle at 22% 30%, #00963E 0%, rgba(0, 150, 62, 0.28) 18%, transparent 42%), radial-gradient(circle at 78% 68%, #00963E 0%, rgba(0, 150, 62, 0.22) 20%, transparent 44%), #000000",
 };
 
+function optionLetter(position: number, fallbackIndex: number) {
+  const index = Math.max((position || fallbackIndex + 1) - 1, 0);
+  return String.fromCharCode(65 + index);
+}
+
 function SpotlightResults({ question }: { question: QuestionResult }) {
   if (question.type === "multiple" || question.type === "quiz") {
     const winner = question.options.reduce(
@@ -50,17 +55,32 @@ function SpotlightResults({ question }: { question: QuestionResult }) {
                   <CheckCircle2 aria-hidden className="h-5 w-5" />
                   Juist antwoord
                 </p>
-                <h3 className="mt-3 text-3xl font-black leading-tight">{correctOption.label}</h3>
+                <h3 className="mt-3 inline-flex items-center gap-3 text-3xl font-black leading-tight">
+                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-md bg-zinc-950 text-lg font-black text-white">
+                    {optionLetter(correctOption.position, 0)}
+                  </span>
+                  {correctOption.label}
+                </h3>
               </div>
             ) : null}
           </section>
 
           <section className="rounded-lg border border-zinc-700 bg-zinc-100 p-6 text-zinc-950">
             <div className="space-y-5">
-              {question.options.map((option) => (
-                <div key={option.id} className="space-y-2">
+              {question.options.map((option, index) => (
+                <div
+                  className={`space-y-2 rounded-lg border p-3 ${
+                    option.isCorrect
+                      ? "border-emerald-500 bg-emerald-50 ring-4 ring-emerald-200"
+                      : "border-zinc-200 bg-white/40"
+                  }`}
+                  key={option.id}
+                >
                   <div className="flex items-end justify-between gap-6">
                     <h3 className="inline-flex items-center gap-3 text-2xl font-black leading-tight">
+                      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-zinc-950 text-base font-black text-white">
+                        {optionLetter(option.position, index)}
+                      </span>
                       {option.label}
                       {option.isCorrect ? (
                         <span className="rounded-md bg-emerald-100 px-2 py-1 text-xs font-black uppercase text-emerald-800">
@@ -107,7 +127,12 @@ function SpotlightResults({ question }: { question: QuestionResult }) {
             {question.options.map((option, index) => (
               <div key={option.id} className="space-y-2">
                 <div className="flex items-end justify-between gap-6">
-                  <h3 className="text-2xl font-black leading-tight">{option.label}</h3>
+                  <h3 className="inline-flex items-center gap-3 text-2xl font-black leading-tight">
+                    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-zinc-950 text-base font-black text-white">
+                      {optionLetter(option.position, index)}
+                    </span>
+                    {option.label}
+                  </h3>
                   <div className="text-right">
                     <p className="text-4xl font-black">{option.percentage}%</p>
                     <p className="text-sm font-bold text-zinc-600">{option.count} antwoorden</p>

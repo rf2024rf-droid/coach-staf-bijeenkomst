@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCircle2, Loader2, Send } from "lucide-react";
+import { CheckCircle2, Loader2, Send, XCircle } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PublicSessionPayload, QuestionType } from "@/app/types";
 
@@ -22,6 +22,11 @@ function questionTypeLabel(type: QuestionType) {
   }
 
   return type === "open" ? "Open antwoord" : "Multiple choice";
+}
+
+function optionLetter(position: number | null | undefined, fallbackIndex = 0) {
+  const index = Math.max((position ?? fallbackIndex + 1) - 1, 0);
+  return String.fromCharCode(65 + index);
 }
 
 export default function ParticipantPage({ code }: ParticipantPageProps) {
@@ -47,7 +52,8 @@ export default function ParticipantPage({ code }: ParticipantPageProps) {
   const load = useCallback(
     async (silent = false) => {
       try {
-        const response = await fetch(`/api/session/${normalizedCode}`, { cache: "no-store" });
+        const suffix = participantId ? `?participantId=${encodeURIComponent(participantId)}` : "";
+        const response = await fetch(`/api/session/${normalizedCode}${suffix}`, { cache: "no-store" });
         const data = (await response.json()) as PublicSessionPayload | { error: string };
         if (!response.ok || "error" in data) {
           throw new Error("error" in data ? data.error : "Sessie kon niet worden geladen.");
@@ -73,7 +79,7 @@ export default function ParticipantPage({ code }: ParticipantPageProps) {
         }
       }
     },
-    [normalizedCode]
+    [normalizedCode, participantId]
   );
 
   useEffect(() => {
@@ -125,6 +131,9 @@ export default function ParticipantPage({ code }: ParticipantPageProps) {
   }
 
   const activeQuestion = session?.activeQuestion ?? null;
+  const resultsQuestion = session?.screenView === "results" ? session.screenQuestion : null;
+  const participantResult = session?.participantResult ?? null;
+  const showQuizFeedback = resultsQuestion?.type === "quiz";
   const submitted = Boolean(activeQuestion && submittedQuestionId === activeQuestion.id);
   const isChoiceQuestion = activeQuestion?.type === "multiple" || activeQuestion?.type === "quiz";
   const canSubmit =
@@ -163,6 +172,59 @@ export default function ParticipantPage({ code }: ParticipantPageProps) {
 
         {error ? <p className="rounded-lg border border-rose-700 bg-rose-950 px-4 py-3 text-sm font-semibold text-rose-100">{error}</p> : null}
 
+        {showQuizFeedback ? (
+          <section
+            className={`rounded-lg border p-5 shadow-sm ${
+              participantResult?.isCorrect
+                ? "border-emerald-500 bg-emerald-950 text-emerald-50"
+                : "border-amber-500 bg-amber-950 text-amber-50"
+            }`}
+          >
+            {participantResult ? (
+              <>
+                <div className="flex items-center gap-2 text-lg font-black">
+                  {participantResult.isCorrect ? (
+                    <CheckCircle2 aria-hidden className="h-6 w-6" />
+                  ) : (
+                    <XCircle aria-hidden className="h-6 w-6" />
+                  )}
+                  {participantResult.isCorrect ? "Goed beantwoord" : "Helaas, fout beantwoord"}
+                </div>
+                <p className="mt-3 text-sm font-bold leading-6">
+                  Jouw antwoord:{" "}
+                  <span className="font-black">
+                    {participantResult.optionPosition
+                      ? `${optionLetter(participantResult.optionPosition)}. `
+                      : ""}
+                    {participantResult.optionLabel}
+                  </span>
+                </p>
+                {!participantResult.isCorrect && participantResult.correctOptionLabel ? (
+                  <p className="mt-1 text-sm font-bold leading-6">
+                    Juiste antwoord:{" "}
+                    <span className="font-black">
+                      {participantResult.correctOptionPosition
+                        ? `${optionLetter(participantResult.correctOptionPosition)}. `
+                        : ""}
+                      {participantResult.correctOptionLabel}
+                    </span>
+                  </p>
+                ) : null}
+              </>
+            ) : (
+              <>
+                <div className="flex items-center gap-2 text-lg font-black">
+                  <XCircle aria-hidden className="h-6 w-6" />
+                  Geen antwoord gevonden
+                </div>
+                <p className="mt-3 text-sm font-bold leading-6">
+                  De quizresultaten staan live, maar op deze telefoon is geen ingezonden antwoord voor deze vraag gevonden.
+                </p>
+              </>
+            )}
+          </section>
+        ) : null}
+
         {!activeQuestion ? (
           <section className="rounded-lg border border-zinc-700 bg-zinc-900 p-6 text-center shadow-sm">
             <h2 className="text-2xl font-black">Wachten op de volgende vraag</h2>
@@ -179,7 +241,7 @@ export default function ParticipantPage({ code }: ParticipantPageProps) {
 
             {isChoiceQuestion ? (
               <div className="grid gap-3">
-                {activeQuestion.options.map((option) => (
+                {activeQuestion.options.map((option, index) => (
                   <button
                     className={`rounded-lg border px-4 py-4 text-left text-base font-bold transition ${
                       selectedOptionId === option.id
@@ -190,7 +252,16 @@ export default function ParticipantPage({ code }: ParticipantPageProps) {
                     onClick={() => setSelectedOptionId(option.id)}
                     type="button"
                   >
-                    {option.label}
+                    <span className="flex items-start gap-3">
+                      <span
+                        className={`grid h-7 w-7 shrink-0 place-items-center rounded-md text-sm font-black ${
+                          selectedOptionId === option.id ? "bg-emerald-950 text-emerald-100" : "bg-zinc-800 text-zinc-100"
+                        }`}
+                      >
+                        {optionLetter(option.position, index)}
+                      </span>
+                      <span>{option.label}</span>
+                    </span>
                   </button>
                 ))}
               </div>

@@ -60,6 +60,16 @@ export type PublicSessionPayload = {
   screenView: ScreenView;
   activeQuestion: QuestionResult | null;
   screenQuestion: QuestionResult | null;
+  participantResult: {
+    questionId: string;
+    optionId: string | null;
+    optionLabel: string | null;
+    optionPosition: number | null;
+    isCorrect: boolean | null;
+    correctOptionId: string | null;
+    correctOptionLabel: string | null;
+    correctOptionPosition: number | null;
+  } | null;
   totals: {
     questions: number;
     answers: number;

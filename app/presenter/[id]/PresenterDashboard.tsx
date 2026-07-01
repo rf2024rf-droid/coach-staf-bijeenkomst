@@ -76,6 +76,10 @@ function questionTypeLabel(type: QuestionType) {
   return type === "open" ? "Open antwoord" : "Multiple choice";
 }
 
+function optionLetter(index: number) {
+  return String.fromCharCode(65 + index);
+}
+
 function normalizeOptionDrafts(options: OptionDraft[]) {
   if (options.some((option) => option.isCorrect)) {
     return options;
@@ -127,13 +131,18 @@ function QuizOptionsEditor({
       <div className="grid gap-2">
         {options.map((option, index) => (
           <div className="grid gap-2 rounded-lg bg-white p-2 sm:grid-cols-[1fr_auto_auto]" key={option.id}>
-            <input
-              className="min-w-0 rounded-lg border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
-              maxLength={90}
-              onChange={(event) => updateOption(option.id, event.target.value)}
-              placeholder={`Antwoord ${index + 1}`}
-              value={option.label}
-            />
+            <label className="flex min-w-0 items-center gap-2">
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-zinc-900 text-sm font-black text-white">
+                {optionLetter(index)}
+              </span>
+              <input
+                className="min-w-0 flex-1 rounded-lg border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
+                maxLength={90}
+                onChange={(event) => updateOption(option.id, event.target.value)}
+                placeholder={`Antwoord ${index + 1}`}
+                value={option.label}
+              />
+            </label>
             <button
               className={`inline-flex items-center justify-center gap-2 rounded-lg border px-3 py-2 text-sm font-bold ${
                 option.isCorrect

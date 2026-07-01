@@ -108,6 +108,16 @@ export type PublicSessionPayload = {
   screenView: ScreenView;
   activeQuestion: QuestionResult | null;
   screenQuestion: QuestionResult | null;
+  participantResult: {
+    questionId: string;
+    optionId: string | null;
+    optionLabel: string | null;
+    optionPosition: number | null;
+    isCorrect: boolean | null;
+    correctOptionId: string | null;
+    correctOptionLabel: string | null;
+    correctOptionPosition: number | null;
+  } | null;
   totals: {
     questions: number;
     answers: number;
@@ -929,7 +939,7 @@ export async function resetAnswers(
   return getPresenterPayload(presentationId, presenterKey);
 }
 
-export async function getPublicSession(codeInput: string): Promise<PublicSessionPayload> {
+export async function getPublicSession(codeInput: string, participantIdInput?: unknown): Promise<PublicSessionPayload> {
   await ensureSchema();
 
   const presentation = await fetchPresentationByCode(codeInput);
@@ -967,6 +977,34 @@ export async function getPublicSession(codeInput: string): Promise<PublicSession
     questions.find((question) => question.id === presentation.active_question_id && question.status === "open") ??
     null;
   const screenQuestion = questions.find((question) => question.id === presentation.screen_question_id) ?? null;
+  const participantId = cleanText(participantIdInput, 80);
+  const correctOption =
+    presentation.screen_view === "results" && screenQuestion?.type === "quiz"
+      ? screenQuestion.options.find((option) => option.isCorrect) ?? null
+      : null;
+  const participantResponse =
+    participantId && screenQuestion?.type === "quiz" && presentation.screen_view === "results"
+      ? responseRows.find(
+          (response) => response.question_id === screenQuestion.id && response.participant_id === participantId
+        ) ?? null
+      : null;
+  const participantOption =
+    participantResponse?.option_id && screenQuestion
+      ? screenQuestion.options.find((option) => option.id === participantResponse.option_id) ?? null
+      : null;
+  const participantResult =
+    screenQuestion?.type === "quiz" && presentation.screen_view === "results" && participantResponse
+      ? {
+          questionId: screenQuestion.id,
+          optionId: participantResponse.option_id,
+          optionLabel: participantOption?.label ?? participantResponse.option_label,
+          optionPosition: participantOption?.position ?? null,
+          isCorrect: participantOption ? participantOption.isCorrect : null,
+          correctOptionId: correctOption?.id ?? null,
+          correctOptionLabel: correctOption?.label ?? null,
+          correctOptionPosition: correctOption?.position ?? null,
+        }
+      : null;
 
   return {
     presentation: {
@@ -978,6 +1016,7 @@ export async function getPublicSession(codeInput: string): Promise<PublicSession
     screenView: presentation.screen_view ?? "question",
     activeQuestion: hideCorrectAnswers(activeQuestion),
     screenQuestion: presentation.screen_view === "results" ? screenQuestion : hideCorrectAnswers(screenQuestion),
+    participantResult,
     totals: {
       questions: questions.length,
       answers: responseRows.length,
@@ -1053,7 +1092,7 @@ export async function submitAnswer(
     `;
   });
 
-  return getPublicSession(presentation.code);
+  return getPublicSession(presentation.code, participantId);
 }
 
 export async function listModeratorPresentations(): Promise<ModeratorPresentationSummary[]> {

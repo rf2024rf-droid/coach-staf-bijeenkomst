@@ -39,15 +39,15 @@ function SpotlightResults({ question }: { question: QuestionResult }) {
 
     if (question.type === "quiz") {
       return (
-        <div className="grid gap-6 lg:grid-cols-[0.85fr_1.15fr]">
+        <div className="grid items-start gap-6 lg:grid-cols-[0.85fr_1.15fr]">
           <section className="rounded-lg border border-emerald-200 bg-emerald-50 p-7 text-zinc-950">
             <p className="text-sm font-black uppercase text-emerald-800">Quizuitslag</p>
             <p className="mt-5 text-8xl font-black leading-none text-emerald-800 md:text-9xl">
-              {question.correctPercentage}%
+              {question.correctCount}
             </p>
-            <p className="mt-4 text-2xl font-black text-zinc-800">had het goed</p>
+            <p className="mt-4 text-2xl font-black text-zinc-800">deelnemers hadden het goed</p>
             <p className="mt-3 text-xl font-bold text-zinc-700">
-              {question.correctCount} van {question.answerCount} antwoorden
+              van {question.answerCount} gegeven antwoorden
             </p>
             {correctOption ? (
               <div className="mt-8 rounded-lg bg-white p-6 text-center">
@@ -65,30 +65,29 @@ function SpotlightResults({ question }: { question: QuestionResult }) {
             ) : null}
           </section>
 
-          <section className="rounded-lg border border-zinc-700 bg-zinc-100 p-6 text-zinc-950">
-            <div className="space-y-5">
+          <section className="self-start rounded-lg border border-zinc-700 bg-zinc-100 p-4 text-zinc-950 shadow-2xl shadow-zinc-950/20 md:p-5">
+            <p className="mb-4 text-sm font-black uppercase text-zinc-600">Antwoordopties</p>
+            <div className="grid gap-3">
               {question.options.map((option, index) => (
                 <div
-                  className={`space-y-2 rounded-lg border p-3 ${
+                  className={`rounded-lg border p-4 ${
                     option.isCorrect
                       ? "border-emerald-500 bg-emerald-50 ring-4 ring-emerald-200"
-                      : "border-zinc-200 bg-white/40"
+                      : "border-zinc-200 bg-white"
                   }`}
                   key={option.id}
                 >
-                  <div className="flex items-end justify-between gap-6">
-                    <h3 className="inline-flex items-center gap-3 text-2xl font-black leading-tight">
-                      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-zinc-950 text-base font-black text-white">
-                        {optionLetter(option.position, index)}
+                  <h3 className="flex items-center gap-3 text-2xl font-black leading-tight">
+                    <span className="grid h-10 w-10 shrink-0 place-items-center rounded-md bg-zinc-950 text-lg font-black text-white">
+                      {optionLetter(option.position, index)}
+                    </span>
+                    <span className="min-w-0 flex-1">{option.label}</span>
+                    {option.isCorrect ? (
+                      <span className="shrink-0 rounded-md bg-emerald-100 px-2 py-1 text-xs font-black uppercase text-emerald-800">
+                        Juist
                       </span>
-                      {option.label}
-                      {option.isCorrect ? (
-                        <span className="rounded-md bg-emerald-100 px-2 py-1 text-xs font-black uppercase text-emerald-800">
-                          Juist
-                        </span>
-                      ) : null}
-                    </h3>
-                  </div>
+                    ) : null}
+                  </h3>
                 </div>
               ))}
             </div>

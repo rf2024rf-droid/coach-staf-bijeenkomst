@@ -2,7 +2,7 @@ import postgres from "postgres";
 
 export type QuestionType = "open" | "multiple" | "quiz";
 export type QuestionStatus = "open" | "closed";
-export type ScreenView = "question" | "qr" | "results";
+export type ScreenView = "question" | "qr" | "results" | "ranking";
 
 export type PresentationRow = {
   id: string;
@@ -24,6 +24,7 @@ type QuestionRow = {
   prompt: string;
   status: QuestionStatus;
   position: number;
+  finalized_at: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -55,6 +56,7 @@ export type QuestionResult = {
   prompt: string;
   status: QuestionStatus;
   position: number;
+  finalized: boolean;
   answerCount: number;
   correctCount: number;
   correctPercentage: number;
@@ -76,6 +78,20 @@ export type QuestionResult = {
   }>;
 };
 
+export type LeaderboardEntry = {
+  participantId: string;
+  label: string;
+  rank: number;
+  score: number;
+  answered: number;
+};
+
+export type QuizTotals = {
+  total: number;
+  finalized: number;
+  participants: number;
+};
+
 export type PresenterPayload = {
   presentation: {
     id: string;
@@ -91,6 +107,8 @@ export type PresenterPayload = {
   };
   questions: QuestionResult[];
   activeQuestion: QuestionResult | null;
+  leaderboard: LeaderboardEntry[];
+  quizTotals: QuizTotals;
   totals: {
     questions: number;
     answers: number;
@@ -108,6 +126,7 @@ export type PublicSessionPayload = {
   screenView: ScreenView;
   activeQuestion: QuestionResult | null;
   screenQuestion: QuestionResult | null;
+  participantLabel: string | null;
   participantResult: {
     questionId: string;
     optionId: string | null;
@@ -118,6 +137,8 @@ export type PublicSessionPayload = {
     correctOptionLabel: string | null;
     correctOptionPosition: number | null;
   } | null;
+  leaderboard: LeaderboardEntry[];
+  quizTotals: QuizTotals;
   totals: {
     questions: number;
     answers: number;
@@ -155,6 +176,8 @@ type OptionInput = {
   isCorrect: boolean;
 };
 
+type PresentationTemplate = "default" | "quiz";
+
 const schemaStatements = [
   `CREATE TABLE IF NOT EXISTS presentations (
     id TEXT PRIMARY KEY,
@@ -175,6 +198,7 @@ const schemaStatements = [
     prompt TEXT NOT NULL,
     status TEXT NOT NULL DEFAULT 'closed',
     position INTEGER NOT NULL,
+    finalized_at TEXT,
     created_at TEXT NOT NULL DEFAULT (now()::text),
     updated_at TEXT NOT NULL DEFAULT (now()::text)
   )`,
@@ -199,6 +223,7 @@ const schemaStatements = [
   "ALTER TABLE presentations ADD COLUMN IF NOT EXISTS idle_screen_text TEXT",
   "ALTER TABLE presentations ADD COLUMN IF NOT EXISTS screen_view TEXT NOT NULL DEFAULT 'question'",
   "ALTER TABLE presentations ADD COLUMN IF NOT EXISTS screen_question_id TEXT",
+  "ALTER TABLE questions ADD COLUMN IF NOT EXISTS finalized_at TEXT",
   "ALTER TABLE question_options ADD COLUMN IF NOT EXISTS is_correct BOOLEAN NOT NULL DEFAULT false",
   "CREATE UNIQUE INDEX IF NOT EXISTS presentations_code_idx ON presentations (code)",
   "CREATE INDEX IF NOT EXISTS questions_presentation_idx ON questions (presentation_id)",
@@ -393,6 +418,7 @@ function buildQuestions(
       prompt: question.prompt,
       status: question.status,
       position: question.position,
+      finalized: Boolean(question.finalized_at),
       answerCount: responses.length,
       correctCount,
       correctPercentage: responses.length ? Math.round((correctCount / responses.length) * 100) : 0,
@@ -407,6 +433,89 @@ function buildQuestions(
       })),
     };
   });
+}
+
+function buildParticipantLabels(responseRows: ResponseRow[]) {
+  const firstSeen = new Map<string, string>();
+
+  for (const response of [...responseRows].reverse()) {
+    if (!firstSeen.has(response.participant_id)) {
+      firstSeen.set(response.participant_id, response.created_at);
+    }
+  }
+
+  return new Map(
+    [...firstSeen.entries()]
+      .sort((left, right) => left[1].localeCompare(right[1]) || left[0].localeCompare(right[0]))
+      .map(([participantId], index) => [participantId, `Deelnemer ${index + 1}`])
+  );
+}
+
+function buildLeaderboard(
+  questionRows: QuestionRow[],
+  optionRows: OptionRow[],
+  responseRows: ResponseRow[]
+): { leaderboard: LeaderboardEntry[]; quizTotals: QuizTotals; participantLabels: Map<string, string> } {
+  const participantLabels = buildParticipantLabels(responseRows);
+  const quizQuestionIds = new Set(questionRows.filter((question) => question.type === "quiz").map((question) => question.id));
+  const finalizedQuizQuestionIds = new Set(
+    questionRows
+      .filter((question) => question.type === "quiz" && question.finalized_at)
+      .map((question) => question.id)
+  );
+  const correctOptionIds = new Set(
+    optionRows.filter((option) => Boolean(option.is_correct)).map((option) => option.id)
+  );
+  const entryMap = new Map<string, { participantId: string; label: string; score: number; answered: number }>();
+
+  for (const [participantId, label] of participantLabels.entries()) {
+    entryMap.set(participantId, { participantId, label, score: 0, answered: 0 });
+  }
+
+  for (const response of responseRows) {
+    if (!finalizedQuizQuestionIds.has(response.question_id)) {
+      continue;
+    }
+
+    const entry =
+      entryMap.get(response.participant_id) ??
+      {
+        participantId: response.participant_id,
+        label: participantLabels.get(response.participant_id) ?? "Deelnemer",
+        score: 0,
+        answered: 0,
+      };
+
+    entry.answered += 1;
+    if (response.option_id && correctOptionIds.has(response.option_id)) {
+      entry.score += 1;
+    }
+    entryMap.set(response.participant_id, entry);
+  }
+
+  const sortedEntries = [...entryMap.values()]
+    .filter((entry) => entry.answered > 0 || finalizedQuizQuestionIds.size > 0)
+    .sort((left, right) => right.score - left.score || left.label.localeCompare(right.label, "nl-NL"));
+
+  let previousScore: number | null = null;
+  let previousRank = 0;
+
+  const leaderboard = sortedEntries.map((entry, index) => {
+    const rank = previousScore === entry.score ? previousRank : index + 1;
+    previousScore = entry.score;
+    previousRank = rank;
+    return { ...entry, rank };
+  });
+
+  return {
+    leaderboard,
+    participantLabels,
+    quizTotals: {
+      total: quizQuestionIds.size,
+      finalized: finalizedQuizQuestionIds.size,
+      participants: leaderboard.length,
+    },
+  };
 }
 
 function hideCorrectAnswers(question: QuestionResult | null) {
@@ -534,11 +643,12 @@ async function insertQuestion(
   return id;
 }
 
-export async function createPresentation(titleInput: unknown) {
+export async function createPresentation(titleInput: unknown, templateInput: unknown = "default") {
   await ensureSchema();
 
   const sql = getSql();
   const title = cleanText(titleInput, 90) || "Coach Staf Bijeenkomst";
+  const template: PresentationTemplate = templateInput === "quiz" ? "quiz" : "default";
   const id = makeId("prs");
   const presenterKey = makePresenterKey();
   const timestamp = nowIso();
@@ -557,17 +667,32 @@ export async function createPresentation(titleInput: unknown) {
     VALUES (${id}, ${title}, ${code}, ${presenterKey}, NULL, NULL, 'question', ${timestamp}, ${timestamp})
   `;
 
-  await insertQuestion(id, "open", "Wat wil je vandaag zeker bespreken?", [], true);
-  await insertQuestion(
-    id,
-    "multiple",
-    "Waar wil je vandaag de meeste focus op leggen?",
-    ["Wedstrijdanalyse", "Training", "Spelersontwikkeling", "Teamafspraken"].map((label) => ({
-      label,
-      isCorrect: false,
-    })),
-    false
-  );
+  if (template === "quiz") {
+    await insertQuestion(
+      id,
+      "quiz",
+      "Voorbeeld quizvraag: welk antwoord is juist?",
+      [
+        { label: "Antwoord A", isCorrect: true },
+        { label: "Antwoord B", isCorrect: false },
+        { label: "Antwoord C", isCorrect: false },
+        { label: "Antwoord D", isCorrect: false },
+      ],
+      true
+    );
+  } else {
+    await insertQuestion(id, "open", "Wat wil je vandaag zeker bespreken?", [], true);
+    await insertQuestion(
+      id,
+      "multiple",
+      "Waar wil je vandaag de meeste focus op leggen?",
+      ["Wedstrijdanalyse", "Training", "Spelersontwikkeling", "Teamafspraken"].map((label) => ({
+        label,
+        isCorrect: false,
+      })),
+      false
+    );
+  }
 
   return getPresenterPayload(id, presenterKey);
 }
@@ -605,6 +730,7 @@ export async function getPresenterPayload(presentationId: string, presenterKey: 
   ]);
 
   const questions = buildQuestions(questionRows, optionRows, responseRows);
+  const { leaderboard, quizTotals } = buildLeaderboard(questionRows, optionRows, responseRows);
 
   return {
     presentation: mapPresentation(presentation),
@@ -612,6 +738,8 @@ export async function getPresenterPayload(presentationId: string, presenterKey: 
     activeQuestion:
       questions.find((question) => question.id === presentation.active_question_id && question.status === "open") ??
       null,
+    leaderboard,
+    quizTotals,
     totals: {
       questions: questions.length,
       answers: responseRows.length,
@@ -872,6 +1000,10 @@ export async function setActiveQuestion(
     throw new AppError(404, "Vraag niet gevonden in deze presentatie.");
   }
 
+  if (question.type === "quiz" && question.finalized_at) {
+    throw new AppError(409, "Deze quizvraag is al afgesloten voor de puntentelling.");
+  }
+
   await sql.begin(async (tx) => {
     await tx`
       UPDATE questions
@@ -901,10 +1033,11 @@ export async function setScreenView(
 ) {
   await assertPresenter(presentationId, presenterKey);
 
-  if (screenView !== "question" && screenView !== "qr" && screenView !== "results") {
+  if (screenView !== "question" && screenView !== "qr" && screenView !== "results" && screenView !== "ranking") {
     throw new AppError(400, "Ongeldige schermweergave.");
   }
 
+  let resultsQuestion: QuestionRow | null = null;
   if (screenView === "results") {
     if (!questionId) {
       throw new AppError(400, "Kies een vraag om resultaten te tonen.");
@@ -914,13 +1047,36 @@ export async function setScreenView(
     if (!question || question.presentation_id !== presentationId) {
       throw new AppError(404, "Vraag niet gevonden in deze presentatie.");
     }
+    resultsQuestion = question;
   }
 
-  await getSql()`
-    UPDATE presentations
-    SET screen_view = ${screenView}, screen_question_id = ${screenView === "results" ? questionId : null}, updated_at = ${nowIso()}
-    WHERE id = ${presentationId}
-  `;
+  const sql = getSql();
+  const timestamp = nowIso();
+
+  if (screenView === "results" && resultsQuestion?.type === "quiz") {
+    await sql.begin(async (tx) => {
+      await tx`
+        UPDATE questions
+        SET status = 'closed', finalized_at = COALESCE(finalized_at, ${timestamp}), updated_at = ${timestamp}
+        WHERE id = ${resultsQuestion.id}
+      `;
+      await tx`
+        UPDATE presentations
+        SET
+          active_question_id = CASE WHEN active_question_id = ${resultsQuestion.id} THEN NULL ELSE active_question_id END,
+          screen_view = ${screenView},
+          screen_question_id = ${questionId},
+          updated_at = ${timestamp}
+        WHERE id = ${presentationId}
+      `;
+    });
+  } else {
+    await sql`
+      UPDATE presentations
+      SET screen_view = ${screenView}, screen_question_id = ${screenView === "results" ? questionId : null}, updated_at = ${timestamp}
+      WHERE id = ${presentationId}
+    `;
+  }
 
   return getPresenterPayload(presentationId, presenterKey);
 }
@@ -943,8 +1099,18 @@ export async function resetAnswers(
       DELETE FROM responses
       WHERE presentation_id = ${presentationId} AND question_id = ${questionId}
     `;
+    await sql`
+      UPDATE questions
+      SET finalized_at = NULL, status = 'closed', updated_at = ${nowIso()}
+      WHERE presentation_id = ${presentationId} AND id = ${questionId} AND type = 'quiz'
+    `;
   } else {
     await sql`DELETE FROM responses WHERE presentation_id = ${presentationId}`;
+    await sql`
+      UPDATE questions
+      SET finalized_at = NULL, status = 'closed', updated_at = ${nowIso()}
+      WHERE presentation_id = ${presentationId} AND type = 'quiz'
+    `;
   }
 
   return getPresenterPayload(presentationId, presenterKey);
@@ -979,16 +1145,17 @@ export async function getPublicSession(codeInput: string, participantIdInput?: u
       LEFT JOIN question_options ON question_options.id = responses.option_id
       WHERE responses.presentation_id = ${presentation.id}
       ORDER BY responses.created_at DESC
-      LIMIT 250
     `,
   ]);
 
   const questions = buildQuestions(questionRows, optionRows, responseRows);
+  const { leaderboard, quizTotals, participantLabels } = buildLeaderboard(questionRows, optionRows, responseRows);
   const activeQuestion =
     questions.find((question) => question.id === presentation.active_question_id && question.status === "open") ??
     null;
   const screenQuestion = questions.find((question) => question.id === presentation.screen_question_id) ?? null;
   const participantId = cleanText(participantIdInput, 80);
+  const participantLabel = participantId ? participantLabels.get(participantId) ?? null : null;
   const correctOption =
     presentation.screen_view === "results" && screenQuestion?.type === "quiz"
       ? screenQuestion.options.find((option) => option.isCorrect) ?? null
@@ -1027,7 +1194,10 @@ export async function getPublicSession(codeInput: string, participantIdInput?: u
     screenView: presentation.screen_view ?? "question",
     activeQuestion: hideCorrectAnswers(activeQuestion),
     screenQuestion: presentation.screen_view === "results" ? screenQuestion : hideCorrectAnswers(screenQuestion),
+    participantLabel,
     participantResult,
+    leaderboard,
+    quizTotals,
     totals: {
       questions: questions.length,
       answers: responseRows.length,
@@ -1058,6 +1228,10 @@ export async function submitAnswer(
   const question = await fetchQuestion(presentation.active_question_id);
   if (!question || question.status !== "open") {
     throw new AppError(409, "Deze vraag is gesloten.");
+  }
+
+  if (question.type === "quiz" && question.finalized_at) {
+    throw new AppError(409, "Deze quizvraag is al afgesloten voor de puntentelling.");
   }
 
   if (

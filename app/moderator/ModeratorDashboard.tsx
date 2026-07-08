@@ -42,6 +42,7 @@ export default function ModeratorDashboard() {
   const [presentations, setPresentations] = useState<ModeratorPresentationSummary[]>([]);
   const [password, setPassword] = useState("");
   const [newTitle, setNewTitle] = useState("Coach Staf Bijeenkomst");
+  const [newTemplate, setNewTemplate] = useState<"default" | "quiz">("default");
   const [query, setQuery] = useState("");
   const [editingId, setEditingId] = useState("");
   const [titleDraft, setTitleDraft] = useState("");
@@ -170,7 +171,7 @@ export default function ModeratorDashboard() {
       const response = await fetch("/api/presentations", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ title }),
+        body: JSON.stringify({ title, template: newTemplate }),
       });
       const payload = (await response.json()) as PresenterPayload | { error: string };
       if (!response.ok || "error" in payload) {
@@ -359,7 +360,7 @@ export default function ModeratorDashboard() {
               Maak hier de presentatie aan. Daarna opent direct de presenteromgeving met dezelfde centrale moderatorlogin.
             </p>
           </div>
-          <form className="grid gap-3 sm:grid-cols-[minmax(240px,380px)_auto]" onSubmit={createPresentation}>
+          <form className="grid gap-3 sm:grid-cols-[minmax(220px,340px)_minmax(180px,240px)] lg:grid-cols-[minmax(220px,340px)_minmax(180px,240px)_auto]" onSubmit={createPresentation}>
             <label className="sr-only" htmlFor="new-presentation-title">
               Titel
             </label>
@@ -370,6 +371,18 @@ export default function ModeratorDashboard() {
               onChange={(event) => setNewTitle(event.target.value)}
               value={newTitle}
             />
+            <label className="sr-only" htmlFor="new-presentation-template">
+              Presentatietype
+            </label>
+            <select
+              className="rounded-lg border border-zinc-300 bg-white px-4 py-3 text-base font-bold outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
+              id="new-presentation-template"
+              onChange={(event) => setNewTemplate(event.target.value === "quiz" ? "quiz" : "default")}
+              value={newTemplate}
+            >
+              <option value="default">Interactieve sessie</option>
+              <option value="quiz">Quizpresentatie</option>
+            </select>
             <button
               className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-800 px-4 py-3 font-bold text-white hover:bg-emerald-900 disabled:opacity-60"
               disabled={busy === "create"}

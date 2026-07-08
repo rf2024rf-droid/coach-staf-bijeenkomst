@@ -17,6 +17,7 @@ create table if not exists questions (
   prompt text not null,
   status text not null default 'closed',
   position integer not null,
+  finalized_at text,
   created_at text not null default (now()::text),
   updated_at text not null default (now()::text)
 );
@@ -43,6 +44,7 @@ create table if not exists responses (
 
 alter table presentations add column if not exists screen_view text not null default 'question';
 alter table presentations add column if not exists screen_question_id text;
+alter table questions add column if not exists finalized_at text;
 alter table question_options add column if not exists is_correct boolean not null default false;
 
 create unique index if not exists presentations_code_idx on presentations (code);

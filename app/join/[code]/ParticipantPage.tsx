@@ -37,8 +37,9 @@ export default function ParticipantPage({ code }: ParticipantPageProps) {
       return "";
     }
 
-    const storedId = window.localStorage.getItem("coach-staf-participant-id") ?? createParticipantId();
-    window.localStorage.setItem("coach-staf-participant-id", storedId);
+    const storageKey = `coach-staf-participant-id-${normalizedCode}`;
+    const storedId = window.localStorage.getItem(storageKey) ?? createParticipantId();
+    window.localStorage.setItem(storageKey, storedId);
     return storedId;
   });
   const [textAnswer, setTextAnswer] = useState("");
@@ -134,6 +135,11 @@ export default function ParticipantPage({ code }: ParticipantPageProps) {
   const resultsQuestion = session?.screenView === "results" ? session.screenQuestion : null;
   const participantResult = session?.participantResult ?? null;
   const showQuizFeedback = resultsQuestion?.type === "quiz";
+  const participantScore = participantId
+    ? session?.leaderboard.find((entry) => entry.participantId === participantId) ?? null
+    : null;
+  const participantDisplayId =
+    session?.participantLabel ?? (participantId ? `ID ${participantId.replace(/[^a-z0-9]/gi, "").slice(0, 6).toUpperCase()}` : "");
   const quizResultsLocked = Boolean(
     activeQuestion?.type === "quiz" && resultsQuestion?.id === activeQuestion.id
   );
@@ -177,7 +183,21 @@ export default function ParticipantPage({ code }: ParticipantPageProps) {
         <header className="rounded-lg border border-zinc-700 bg-zinc-900 p-4 shadow-sm">
           <p className="text-sm font-semibold uppercase text-emerald-300">Coach Staf Bijeenkomst</p>
           <h1 className="mt-1 text-2xl font-black">{session.presentation.title}</h1>
-          <p className="mt-2 font-mono text-sm font-bold text-zinc-300">{session.presentation.code}</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <span className="rounded-md bg-zinc-950 px-2 py-1 font-mono text-sm font-bold text-zinc-300">
+              {session.presentation.code}
+            </span>
+            {participantDisplayId ? (
+              <span className="rounded-md bg-emerald-300 px-2 py-1 text-sm font-black text-emerald-950">
+                {participantDisplayId}
+              </span>
+            ) : null}
+            {session.quizTotals.finalized ? (
+              <span className="rounded-md bg-amber-300 px-2 py-1 text-sm font-black text-amber-950">
+                Score {participantScore?.score ?? 0}/{session.quizTotals.finalized}
+              </span>
+            ) : null}
+          </div>
         </header>
 
         {error ? <p className="rounded-lg border border-rose-700 bg-rose-950 px-4 py-3 text-sm font-semibold text-rose-100">{error}</p> : null}

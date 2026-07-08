@@ -1,6 +1,6 @@
 "use client";
 
-import { BarChart3, CheckCircle2, Loader2, QrCode as QrCodeIcon, Users } from "lucide-react";
+import { BarChart3, CheckCircle2, Loader2, QrCode as QrCodeIcon, Trophy, Users } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { QrCode } from "@/app/components/QrCode";
 import type { PublicSessionPayload, QuestionResult } from "@/app/types";
@@ -33,6 +33,10 @@ function participantLabel(count: number) {
 
 function voteLabel(count: number) {
   return pluralize(count, "stem", "stemmen");
+}
+
+function pointLabel(count: number) {
+  return pluralize(count, "punt", "punten");
 }
 
 function correctVerb(count: number) {
@@ -219,6 +223,101 @@ function SpotlightResults({ question }: { question: QuestionResult }) {
   );
 }
 
+function LeaderboardScreen({ session }: { session: PublicSessionPayload }) {
+  const isFinal =
+    session.quizTotals.total > 0 && session.quizTotals.finalized >= session.quizTotals.total;
+  const topEntries = session.leaderboard.slice(0, 3);
+  const otherEntries = session.leaderboard.slice(3, 27);
+
+  return (
+    <main className="min-h-screen bg-zinc-950 text-white">
+      <div className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-6 px-6 py-6">
+        <header className="flex flex-col gap-4 border-b border-zinc-700 pb-5 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <p className="text-sm font-bold uppercase text-emerald-300">Coach Staf Bijeenkomst</p>
+            <h1 className="mt-2 text-3xl font-black md:text-5xl">{session.presentation.title}</h1>
+          </div>
+          <span className="inline-flex items-center gap-2 rounded-lg bg-amber-300 px-5 py-3 text-xl font-black text-amber-950">
+            <Trophy aria-hidden className="h-6 w-6" />
+            {isFinal ? "Eindklassering" : "Tussenstand"}
+          </span>
+        </header>
+
+        {!session.quizTotals.finalized || !session.leaderboard.length ? (
+          <section className="grid flex-1 place-items-center text-center">
+            <div>
+              <p className="text-xl font-bold text-amber-200">
+                {session.quizTotals.finalized ? "Nog geen deelnemers in de stand" : "Nog geen quizscore"}
+              </p>
+              <h2 className="mt-4 max-w-4xl text-5xl font-black leading-tight md:text-7xl">
+                {session.quizTotals.finalized
+                  ? "Er zijn nog geen antwoorden die punten opleveren."
+                  : "Toon eerst de resultaten van een quizvraag."}
+              </h2>
+            </div>
+          </section>
+        ) : (
+          <section className="flex flex-1 flex-col gap-6">
+            <div className="rounded-lg border border-zinc-700 bg-zinc-900 p-6 md:p-8">
+              <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+                <div>
+                  <p className="text-sm font-black uppercase text-amber-200">
+                    {session.quizTotals.finalized} van {session.quizTotals.total} quizvragen afgesloten
+                  </p>
+                  <h2 className="mt-2 text-4xl font-black leading-tight md:text-6xl">
+                    {isFinal ? "Eindstand" : "Stand na de laatste quizvraag"}
+                  </h2>
+                </div>
+                <p className="text-2xl font-black text-zinc-300">
+                  {session.quizTotals.participants} {participantLabel(session.quizTotals.participants)}
+                </p>
+              </div>
+            </div>
+
+            <div className="grid gap-4 lg:grid-cols-3">
+              {topEntries.map((entry) => (
+                <article
+                  className={`rounded-lg border p-6 shadow-2xl ${
+                    entry.rank === 1
+                      ? "border-amber-300 bg-amber-100 text-amber-950"
+                      : "border-zinc-700 bg-zinc-100 text-zinc-950"
+                  }`}
+                  key={entry.participantId}
+                >
+                  <p className="text-sm font-black uppercase">Plaats {entry.rank}</p>
+                  <h3 className="mt-3 text-3xl font-black">{entry.label}</h3>
+                  <p className="mt-5 text-6xl font-black leading-none">{entry.score}</p>
+                  <p className="mt-2 text-xl font-black">{pointLabel(entry.score)}</p>
+                  <p className="mt-4 text-sm font-bold opacity-75">
+                    {entry.answered} van {session.quizTotals.finalized} beantwoord
+                  </p>
+                </article>
+              ))}
+            </div>
+
+            <section className="rounded-lg border border-zinc-700 bg-zinc-100 p-5 text-zinc-950">
+              <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+                {otherEntries.map((entry) => (
+                  <div
+                    className="grid grid-cols-[64px_1fr_auto] items-center gap-3 rounded-lg bg-white px-4 py-3"
+                    key={entry.participantId}
+                  >
+                    <span className="text-2xl font-black text-zinc-500">#{entry.rank}</span>
+                    <span className="min-w-0 truncate text-lg font-black">{entry.label}</span>
+                    <span className="rounded-md bg-zinc-950 px-3 py-2 font-black text-white">
+                      {entry.score} {pointLabel(entry.score)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </section>
+          </section>
+        )}
+      </div>
+    </main>
+  );
+}
+
 function ResponsePulse({ count, questionType }: { count: number; questionType: QuestionResult["type"] }) {
   const label = questionType === "open" ? answerLabel(count) : voteLabel(count);
 
@@ -346,6 +445,10 @@ export default function ScreenPage({ code }: ScreenPageProps) {
         </div>
       </main>
     );
+  }
+
+  if (session.screenView === "ranking") {
+    return <LeaderboardScreen session={session} />;
   }
 
   if (session.screenView === "results") {

@@ -1,5 +1,19 @@
 export type QuestionType = "open" | "multiple" | "quiz";
-export type ScreenView = "question" | "qr" | "results";
+export type ScreenView = "question" | "qr" | "results" | "ranking";
+
+export type LeaderboardEntry = {
+  participantId: string;
+  label: string;
+  rank: number;
+  score: number;
+  answered: number;
+};
+
+export type QuizTotals = {
+  total: number;
+  finalized: number;
+  participants: number;
+};
 
 export type QuestionResult = {
   id: string;
@@ -7,6 +21,7 @@ export type QuestionResult = {
   prompt: string;
   status: "open" | "closed";
   position: number;
+  finalized: boolean;
   answerCount: number;
   correctCount: number;
   correctPercentage: number;
@@ -43,6 +58,8 @@ export type PresenterPayload = {
   };
   questions: QuestionResult[];
   activeQuestion: QuestionResult | null;
+  leaderboard: LeaderboardEntry[];
+  quizTotals: QuizTotals;
   totals: {
     questions: number;
     answers: number;
@@ -60,6 +77,7 @@ export type PublicSessionPayload = {
   screenView: ScreenView;
   activeQuestion: QuestionResult | null;
   screenQuestion: QuestionResult | null;
+  participantLabel: string | null;
   participantResult: {
     questionId: string;
     optionId: string | null;
@@ -70,6 +88,8 @@ export type PublicSessionPayload = {
     correctOptionLabel: string | null;
     correctOptionPosition: number | null;
   } | null;
+  leaderboard: LeaderboardEntry[];
+  quizTotals: QuizTotals;
   totals: {
     questions: number;
     answers: number;

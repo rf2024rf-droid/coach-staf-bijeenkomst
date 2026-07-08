@@ -17,6 +17,7 @@ import {
   Save,
   Square,
   Trash2,
+  Trophy,
   X,
 } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
@@ -179,6 +180,10 @@ function screenViewLabel(screenView: ScreenView) {
 
   if (screenView === "results") {
     return "resultaten";
+  }
+
+  if (screenView === "ranking") {
+    return "stand";
   }
 
   return "live vraag";
@@ -441,6 +446,8 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
     },
     screenView === "qr"
       ? "QR-code staat groot op het scherm"
+      : screenView === "ranking"
+        ? "Stand staat op het grote scherm"
       : screenView === "results"
         ? "Resultaten staan groot op het scherm"
         : "Groot scherm toont de live vraag");
@@ -471,6 +478,10 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
       payload.presentation.screenQuestionId === questionId;
 
     await updateScreenView(isShowingThisQuestion ? "question" : "results", isShowingThisQuestion ? null : questionId);
+  }
+
+  async function toggleRanking() {
+    await updateScreenView(payload?.presentation.screenView === "ranking" ? "question" : "ranking");
   }
 
   async function reset(questionId: string | null) {
@@ -583,6 +594,10 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
       payload.presentation.screenView === "results" &&
       payload.presentation.screenQuestionId === activeQuestion.id
   );
+  const rankingLabel =
+    payload.quizTotals.total > 0 && payload.quizTotals.finalized >= payload.quizTotals.total
+      ? "Eindklassering"
+      : "Tussenstand";
 
   return (
     <main className={`min-h-screen bg-[#f5f5f0] text-zinc-950 ${activeQuestion ? "pb-72 md:pb-36" : ""}`}>
@@ -720,6 +735,19 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
                   Toon QR groot
                 </button>
                 <button
+                  className={`inline-flex w-full items-center justify-center gap-2 rounded-lg px-4 py-3 font-bold transition disabled:opacity-60 ${
+                    payload.presentation.screenView === "ranking"
+                      ? "bg-zinc-900 text-white hover:bg-zinc-700"
+                      : "bg-amber-600 text-white hover:bg-amber-700"
+                  }`}
+                  disabled={saving || !payload.quizTotals.finalized}
+                  onClick={toggleRanking}
+                  type="button"
+                >
+                  <Trophy aria-hidden className="h-5 w-5" />
+                  {payload.presentation.screenView === "ranking" ? "Sluit stand" : rankingLabel}
+                </button>
+                <button
                   className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-white px-4 py-3 font-bold hover:bg-zinc-50"
                   onClick={() => copy(screenLink, "Groot-scherm-URL")}
                   type="button"
@@ -847,6 +875,12 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
                                 Nu live
                               </span>
                             ) : null}
+                            {question.type === "quiz" && question.finalized ? (
+                              <span className="inline-flex items-center gap-1 rounded-md bg-amber-100 px-2 py-1 text-xs font-black uppercase text-amber-900">
+                                <Trophy aria-hidden className="h-3.5 w-3.5" />
+                                Afgesloten
+                              </span>
+                            ) : null}
                           </div>
                           <h3 className="font-bold">{question.prompt}</h3>
                           <p className="mt-1 text-sm text-zinc-600">{question.answerCount} antwoorden</p>
@@ -904,7 +938,7 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
                                   ? "bg-amber-700 hover:bg-amber-800"
                                   : "bg-emerald-800 hover:bg-emerald-900"
                               }`}
-                              disabled={saving}
+                              disabled={saving || question.finalized}
                               onClick={() =>
                                 activate(question.id === payload.presentation.activeQuestionId ? null : question.id)
                               }
@@ -915,7 +949,11 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
                               ) : (
                                 <Play aria-hidden className="h-4 w-4" />
                               )}
-                              {question.id === payload.presentation.activeQuestionId ? "Stop live" : "Live"}
+                              {question.finalized
+                                ? "Afgesloten"
+                                : question.id === payload.presentation.activeQuestionId
+                                  ? "Stop live"
+                                  : "Live"}
                             </button>
                             <button
                               className="inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-bold hover:bg-zinc-100 disabled:opacity-60"
@@ -1056,7 +1094,7 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:flex lg:shrink-0">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-5 lg:flex lg:shrink-0">
               <button
                 className="inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-3 text-sm font-bold text-white hover:bg-zinc-800 disabled:opacity-40"
                 disabled={saving || !previousQuestion}
@@ -1087,6 +1125,19 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
               >
                 <BarChart3 aria-hidden className="h-4 w-4" />
                 {activeResultsVisible ? "Sluit resultaten" : "Resultaten"}
+              </button>
+              <button
+                className={`inline-flex items-center justify-center gap-2 rounded-lg px-3 py-3 text-sm font-bold disabled:opacity-60 ${
+                  payload.presentation.screenView === "ranking"
+                    ? "bg-white text-zinc-950 hover:bg-zinc-100"
+                    : "bg-amber-700 text-white hover:bg-amber-800"
+                }`}
+                disabled={saving || !payload.quizTotals.finalized}
+                onClick={toggleRanking}
+                type="button"
+              >
+                <Trophy aria-hidden className="h-4 w-4" />
+                Stand
               </button>
               <button
                 className="inline-flex items-center justify-center gap-2 rounded-lg bg-amber-600 px-3 py-3 text-sm font-black text-white hover:bg-amber-700 disabled:opacity-60"

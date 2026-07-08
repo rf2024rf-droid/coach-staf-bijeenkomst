@@ -120,14 +120,6 @@ function QuizOptionsEditor({
     <div className="mt-4 rounded-lg border border-zinc-200 bg-zinc-50 p-3">
       <div className="mb-3 flex items-center justify-between gap-3">
         <span className="text-sm font-bold text-zinc-700">Antwoordmogelijkheden</span>
-        <button
-          className="inline-flex items-center justify-center gap-2 rounded-lg bg-zinc-900 px-3 py-2 text-sm font-bold text-white hover:bg-zinc-700"
-          onClick={addOption}
-          type="button"
-        >
-          <Plus aria-hidden className="h-4 w-4" />
-          Optie
-        </button>
       </div>
       <div className="grid gap-2">
         {options.map((option, index) => (
@@ -167,6 +159,14 @@ function QuizOptionsEditor({
             </button>
           </div>
         ))}
+        <button
+          className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-zinc-400 bg-white px-3 py-3 text-sm font-bold text-zinc-800 hover:border-zinc-700 hover:bg-zinc-50"
+          onClick={addOption}
+          type="button"
+        >
+          <Plus aria-hidden className="h-4 w-4" />
+          Optie toevoegen
+        </button>
       </div>
     </div>
   );

@@ -1,4 +1,5 @@
 import { errorPayload, setActiveQuestion } from "@/db/store";
+import { resolvePresenterKey } from "@/lib/presenterAccess";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -7,7 +8,7 @@ type RouteContext = {
 export async function PATCH(request: Request, context: RouteContext) {
   try {
     const { id } = await context.params;
-    const key = new URL(request.url).searchParams.get("key") ?? "";
+    const key = await resolvePresenterKey(request, id);
     const payload = (await request.json().catch(() => ({}))) as {
       questionId?: unknown;
     };

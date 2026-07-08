@@ -13,9 +13,9 @@ import {
   Search,
   Trash2,
 } from "lucide-react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import type { ModeratorPresentationSummary } from "@/app/types";
+import type { ModeratorPresentationSummary, PresenterPayload } from "@/app/types";
 
 type SessionState = {
   configured: boolean;
@@ -37,9 +37,11 @@ function formatDate(value: string) {
 }
 
 export default function ModeratorDashboard() {
+  const router = useRouter();
   const [session, setSession] = useState<SessionState | null>(null);
   const [presentations, setPresentations] = useState<ModeratorPresentationSummary[]>([]);
   const [password, setPassword] = useState("");
+  const [newTitle, setNewTitle] = useState("Coach Staf Bijeenkomst");
   const [query, setQuery] = useState("");
   const [editingId, setEditingId] = useState("");
   const [titleDraft, setTitleDraft] = useState("");
@@ -153,6 +155,37 @@ export default function ModeratorDashboard() {
     window.setTimeout(() => setNotice(""), 1800);
   }
 
+  async function createPresentation(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const title = newTitle.trim();
+    if (!title) {
+      setError("Titel is verplicht.");
+      return;
+    }
+
+    setBusy("create");
+    setError("");
+
+    try {
+      const response = await fetch("/api/presentations", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ title }),
+      });
+      const payload = (await response.json()) as PresenterPayload | { error: string };
+      if (!response.ok || "error" in payload) {
+        throw new Error("error" in payload ? payload.error : "Presentatie kon niet worden aangemaakt.");
+      }
+
+      setNotice("Presentatie aangemaakt");
+      router.push(`/presenter/${payload.presentation.id}`);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Presentatie kon niet worden aangemaakt.");
+    } finally {
+      setBusy("");
+    }
+  }
+
   async function renamePresentation(id: string) {
     const title = titleDraft.trim();
     if (!title) {
@@ -256,8 +289,8 @@ export default function ModeratorDashboard() {
               <KeyRound aria-hidden className="h-5 w-5" />
             </div>
             <div>
-              <h1 className="text-xl font-black">Moderator login</h1>
-              <p className="text-sm text-zinc-600">Beheer bestaande presentaties en QR-codes.</p>
+              <h1 className="text-xl font-black">Bedrijfsmoderator login</h1>
+              <p className="text-sm text-zinc-600">Beheer alle presentaties, QR-codes en presenter-schermen.</p>
             </div>
           </div>
           <label className="block text-sm font-semibold text-zinc-700" htmlFor="moderator-password">
@@ -290,19 +323,12 @@ export default function ModeratorDashboard() {
         <header className="flex flex-col gap-4 border-b border-zinc-300 pb-5 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="text-sm font-semibold uppercase text-emerald-800">Coach Staf Bijeenkomst</p>
-            <h1 className="mt-2 text-3xl font-black md:text-4xl">Moderator beheer</h1>
+            <h1 className="mt-2 text-3xl font-black md:text-4xl">Centrale moderatoromgeving</h1>
             <p className="mt-2 max-w-2xl text-zinc-700">
-              Open bestaande presentaties, behoud QR-codes, hernoem sessies of maak een schone kopie.
+              Maak sessies aan, open presenter-bediening, behoud QR-codes en beheer alle presentaties vanuit een plek.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Link
-              className="inline-flex items-center gap-2 rounded-lg bg-emerald-800 px-4 py-3 text-sm font-bold text-white hover:bg-emerald-900"
-              href="/"
-            >
-              <Plus aria-hidden className="h-4 w-4" />
-              Nieuwe presentatie
-            </Link>
             <button
               className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 bg-white px-4 py-3 text-sm font-bold hover:bg-zinc-50"
               disabled={busy === "logout"}
@@ -324,6 +350,36 @@ export default function ModeratorDashboard() {
             {error || notice}
           </div>
         ) : null}
+
+        <section className="grid gap-4 rounded-lg border border-zinc-300 bg-white p-5 shadow-sm lg:grid-cols-[1fr_auto] lg:items-end">
+          <div>
+            <p className="text-xs font-black uppercase text-emerald-800">Nieuwe sessie</p>
+            <h2 className="mt-1 text-xl font-black">Presentatie aanmaken</h2>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-600">
+              Maak hier de presentatie aan. Daarna opent direct de presenteromgeving met dezelfde centrale moderatorlogin.
+            </p>
+          </div>
+          <form className="grid gap-3 sm:grid-cols-[minmax(240px,380px)_auto]" onSubmit={createPresentation}>
+            <label className="sr-only" htmlFor="new-presentation-title">
+              Titel
+            </label>
+            <input
+              className="rounded-lg border border-zinc-300 px-4 py-3 text-base outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
+              id="new-presentation-title"
+              maxLength={90}
+              onChange={(event) => setNewTitle(event.target.value)}
+              value={newTitle}
+            />
+            <button
+              className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-800 px-4 py-3 font-bold text-white hover:bg-emerald-900 disabled:opacity-60"
+              disabled={busy === "create"}
+              type="submit"
+            >
+              <Plus aria-hidden className="h-5 w-5" />
+              {busy === "create" ? "Aanmaken..." : "Maak presentatie"}
+            </button>
+          </form>
+        </section>
 
         <section className="grid gap-4 md:grid-cols-4">
           <article className="rounded-lg border border-zinc-300 bg-white p-4 shadow-sm">
@@ -365,7 +421,7 @@ export default function ModeratorDashboard() {
           ) : (
             <div className="grid gap-4">
               {filtered.map((presentation) => {
-                const presenterUrl = `/presenter/${presentation.id}?key=${presentation.presenterKey}`;
+                const presenterUrl = `/presenter/${presentation.id}`;
                 const joinUrl = `${origin}/join/${presentation.code}`;
                 const screenUrl = `${origin}/screen/${presentation.code}`;
                 const isEditing = editingId === presentation.id;

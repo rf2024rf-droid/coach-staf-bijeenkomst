@@ -620,6 +620,17 @@ export async function getPresenterPayload(presentationId: string, presenterKey: 
   };
 }
 
+export async function getPresenterKeyForModerator(presentationId: string) {
+  await ensureSchema();
+
+  const presentation = await fetchPresentationById(presentationId);
+  if (!presentation) {
+    throw new AppError(404, "Presentatie niet gevonden.");
+  }
+
+  return presentation.presenter_key;
+}
+
 export async function updatePresentationSettings(
   presentationId: string,
   presenterKey: string,

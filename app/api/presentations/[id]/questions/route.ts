@@ -5,6 +5,7 @@ import {
   moveQuestion,
   updateQuestion,
 } from "@/db/store";
+import { resolvePresenterKey } from "@/lib/presenterAccess";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -13,7 +14,7 @@ type RouteContext = {
 export async function POST(request: Request, context: RouteContext) {
   try {
     const { id } = await context.params;
-    const key = new URL(request.url).searchParams.get("key") ?? "";
+    const key = await resolvePresenterKey(request, id);
     const payload = (await request.json().catch(() => ({}))) as {
       type?: unknown;
       prompt?: unknown;
@@ -30,7 +31,7 @@ export async function POST(request: Request, context: RouteContext) {
 export async function PATCH(request: Request, context: RouteContext) {
   try {
     const { id } = await context.params;
-    const key = new URL(request.url).searchParams.get("key") ?? "";
+    const key = await resolvePresenterKey(request, id);
     const payload = (await request.json().catch(() => ({}))) as {
       action?: unknown;
       questionId?: unknown;
@@ -62,7 +63,7 @@ export async function DELETE(request: Request, context: RouteContext) {
   try {
     const { id } = await context.params;
     const url = new URL(request.url);
-    const key = url.searchParams.get("key") ?? "";
+    const key = await resolvePresenterKey(request, id);
     const questionId = url.searchParams.get("questionId") ?? "";
 
     if (!questionId) {

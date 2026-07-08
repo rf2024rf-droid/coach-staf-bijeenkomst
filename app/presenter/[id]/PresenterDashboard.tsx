@@ -198,7 +198,7 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
     options: "",
     quizOptions: defaultQuizOptions(),
   }));
-  const [loading, setLoading] = useState(Boolean(initialKey));
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -217,14 +217,30 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
     return `${origin}/screen/${payload.presentation.code}`;
   }, [origin, payload]);
 
-  const load = useCallback(
-    async (silent = false) => {
-      if (!key) {
-        return;
+  const apiPath = useCallback(
+    (path: string, params: Record<string, string | null | undefined> = {}) => {
+      const search = new URLSearchParams();
+
+      if (key) {
+        search.set("key", key);
       }
 
+      for (const [name, value] of Object.entries(params)) {
+        if (value) {
+          search.set(name, value);
+        }
+      }
+
+      const query = search.toString();
+      return query ? `${path}?${query}` : path;
+    },
+    [key]
+  );
+
+  const load = useCallback(
+    async (silent = false) => {
       try {
-        const response = await fetch(`/api/presentations/${id}?key=${encodeURIComponent(key)}`, {
+        const response = await fetch(apiPath(`/api/presentations/${id}`), {
           cache: "no-store",
         });
         const data = (await response.json()) as PresenterPayload | { error: string };
@@ -243,7 +259,7 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
         }
       }
     },
-    [id, key]
+    [apiPath, id]
   );
 
   useEffect(() => {
@@ -266,7 +282,7 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
     event.preventDefault();
     const nextKey = keyInput.trim();
     setKey(nextKey);
-    router.replace(`/presenter/${id}?key=${encodeURIComponent(nextKey)}`);
+    router.replace(nextKey ? `/presenter/${id}?key=${encodeURIComponent(nextKey)}` : `/presenter/${id}`);
   }
 
   async function copy(value: string, label: string) {
@@ -309,7 +325,7 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
             .filter(Boolean);
 
     await mutate(async () => {
-      const response = await fetch(`/api/presentations/${id}/questions?key=${encodeURIComponent(key)}`, {
+      const response = await fetch(apiPath(`/api/presentations/${id}/questions`), {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
@@ -354,7 +370,7 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
             .filter(Boolean);
 
     await mutate(async () => {
-      const response = await fetch(`/api/presentations/${id}/questions?key=${encodeURIComponent(key)}`, {
+      const response = await fetch(apiPath(`/api/presentations/${id}/questions`), {
         method: "PATCH",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
@@ -377,7 +393,7 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
 
   async function moveQuestion(questionId: string, direction: "up" | "down") {
     await mutate(async () => {
-      const response = await fetch(`/api/presentations/${id}/questions?key=${encodeURIComponent(key)}`, {
+      const response = await fetch(apiPath(`/api/presentations/${id}/questions`), {
         method: "PATCH",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
@@ -396,7 +412,7 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
 
   async function activate(questionId: string | null) {
     await mutate(async () => {
-      const response = await fetch(`/api/presentations/${id}/active?key=${encodeURIComponent(key)}`, {
+      const response = await fetch(apiPath(`/api/presentations/${id}/active`), {
         method: "PATCH",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ questionId }),
@@ -411,7 +427,7 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
 
   async function updateScreenView(screenView: ScreenView, questionId: string | null = null) {
     await mutate(async () => {
-      const response = await fetch(`/api/presentations/${id}/screen-view?key=${encodeURIComponent(key)}`, {
+      const response = await fetch(apiPath(`/api/presentations/${id}/screen-view`), {
         method: "PATCH",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ screenView, questionId }),
@@ -435,7 +451,7 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
     const idleScreenText = String(formData.get("idleScreenText") ?? "");
 
     await mutate(async () => {
-      const response = await fetch(`/api/presentations/${id}?key=${encodeURIComponent(key)}`, {
+      const response = await fetch(apiPath(`/api/presentations/${id}`), {
         method: "PATCH",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ idleScreenText }),
@@ -470,9 +486,8 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
       return;
     }
 
-    const suffix = questionId ? `&questionId=${encodeURIComponent(questionId)}` : "";
     await mutate(async () => {
-      const response = await fetch(`/api/presentations/${id}/answers?key=${encodeURIComponent(key)}${suffix}`, {
+      const response = await fetch(apiPath(`/api/presentations/${id}/answers`, { questionId }), {
         method: "DELETE",
       });
       const data = (await response.json()) as PresenterPayload | { error: string };
@@ -491,7 +506,7 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
 
     await mutate(async () => {
       const response = await fetch(
-        `/api/presentations/${id}/questions?key=${encodeURIComponent(key)}&questionId=${encodeURIComponent(questionId)}`,
+        apiPath(`/api/presentations/${id}/questions`, { questionId }),
         { method: "DELETE" }
       );
       const data = (await response.json()) as PresenterPayload | { error: string };
@@ -502,7 +517,7 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
     }, "Vraag verwijderd");
   }
 
-  if (!key || (error.includes("Beheersleutel") && !payload)) {
+  if (!loading && !payload && (!key || error.includes("Beheersleutel") || error.includes("Log eerst in"))) {
     return (
       <main className="grid min-h-screen place-items-center bg-[#f5f5f0] px-5">
         <form className="w-full max-w-md rounded-lg border border-zinc-300 bg-white p-6 shadow-sm" onSubmit={applyKey}>

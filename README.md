@@ -1,6 +1,6 @@
 # Coach Staf Bijeenkomst
 
-Interactief presentatieplatform voor live vragen, QR-deelname, een apart groot-scherm scherm en een presenter dashboard.
+Interactief presentatieplatform voor live vragen, QR-deelname, een apart groot-scherm scherm, een presenter dashboard en een centrale moderatorlogin.
 
 ## Stack
 
@@ -44,9 +44,10 @@ npm run build
 
 ## Belangrijke routes
 
-- `/` presentatie aanmaken of sessiecode invullen
-- `/moderator` moderator-login met lijst van presentaties
-- `/presenter/[id]?key=...` presenter dashboard
+- `/` startpunt voor moderatorlogin of sessiecode
+- `/moderator` centrale moderatorlogin met alle presentaties
+- `/presenter/[id]` presenter dashboard via moderatorlogin
+- `/presenter/[id]?key=...` presenter dashboard via losse beheersleutel
 - `/join/[code]` deelnemerscherm
 - `/screen/[code]` groot-scherm scherm
 
@@ -55,6 +56,7 @@ npm run build
 Dit platform is bedoeld voor simpele, niet-bedrijfsgevoelige sessies.
 
 - Deelnemers komen binnen via QR-code of sessiecode.
-- Presenter acties zijn beschermd met een willekeurige presenter key in de URL.
+- Presentaties aanmaken kan alleen via de centrale moderatorlogin.
+- Presenter acties werken via de centrale moderatorlogin of via een willekeurige presenter key.
 - Moderator beheer is beschermd met `MODERATOR_PASSWORD`.
 - Sla geen gevoelige of vertrouwelijke bedrijfsinformatie op in publieke sessies.

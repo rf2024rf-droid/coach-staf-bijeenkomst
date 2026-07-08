@@ -3,12 +3,25 @@ create table if not exists presentations (
   title text not null,
   code text not null unique,
   presenter_key text not null,
+  owner_user_id text,
+  owner_email text,
   idle_screen_text text,
   active_question_id text,
   screen_question_id text,
   screen_view text not null default 'question',
   created_at text not null default (now()::text),
   updated_at text not null default (now()::text)
+);
+
+create table if not exists app_accounts (
+  id text primary key,
+  email text not null unique,
+  role text not null default 'tester',
+  status text not null default 'pending',
+  supabase_user_id text,
+  created_at text not null default (now()::text),
+  updated_at text not null default (now()::text),
+  last_login_at text
 );
 
 create table if not exists questions (
@@ -54,6 +67,8 @@ create table if not exists participant_profiles (
   updated_at text not null default (now()::text)
 );
 
+alter table presentations add column if not exists owner_user_id text;
+alter table presentations add column if not exists owner_email text;
 alter table presentations add column if not exists idle_screen_text text;
 alter table presentations add column if not exists screen_view text not null default 'question';
 alter table presentations add column if not exists screen_question_id text;
@@ -61,6 +76,9 @@ alter table questions add column if not exists finalized_at text;
 alter table question_options add column if not exists is_correct boolean not null default false;
 
 create unique index if not exists presentations_code_idx on presentations (code);
+create index if not exists presentations_owner_idx on presentations (owner_user_id);
+create unique index if not exists app_accounts_email_idx on app_accounts (email);
+create index if not exists app_accounts_supabase_user_idx on app_accounts (supabase_user_id);
 create index if not exists questions_presentation_idx on questions (presentation_id);
 create index if not exists options_question_idx on question_options (question_id);
 create index if not exists responses_presentation_idx on responses (presentation_id);

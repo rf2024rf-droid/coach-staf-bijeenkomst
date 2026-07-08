@@ -4,7 +4,7 @@ import {
   listModeratorPresentations,
   renamePresentation,
 } from "@/db/store";
-import { assertModerator } from "@/lib/moderatorAuth";
+import { assertModeratorActor } from "@/lib/accountAuth";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -12,11 +12,11 @@ type RouteContext = {
 
 export async function PATCH(request: Request, context: RouteContext) {
   try {
-    assertModerator(request);
+    const actor = assertModeratorActor(request);
     const { id } = await context.params;
     const payload = (await request.json().catch(() => ({}))) as { title?: unknown };
-    await renamePresentation(id, payload.title);
-    const presentations = await listModeratorPresentations();
+    await renamePresentation(id, payload.title, actor);
+    const presentations = await listModeratorPresentations(actor);
     return Response.json({ presentations });
   } catch (error) {
     const { status, body } = errorPayload(error);
@@ -26,10 +26,10 @@ export async function PATCH(request: Request, context: RouteContext) {
 
 export async function DELETE(request: Request, context: RouteContext) {
   try {
-    assertModerator(request);
+    const actor = assertModeratorActor(request);
     const { id } = await context.params;
-    await deletePresentation(id);
-    const presentations = await listModeratorPresentations();
+    await deletePresentation(id, actor);
+    const presentations = await listModeratorPresentations(actor);
     return Response.json({ presentations });
   } catch (error) {
     const { status, body } = errorPayload(error);

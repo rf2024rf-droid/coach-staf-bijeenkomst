@@ -1,5 +1,6 @@
 export type QuestionType = "open" | "multiple" | "quiz";
 export type ScreenView = "question" | "qr" | "results" | "ranking";
+export type ModeratorRole = "admin" | "tester";
 
 export type LeaderboardEntry = {
   participantId: string;
@@ -101,11 +102,26 @@ export type ModeratorPresentationSummary = {
   title: string;
   code: string;
   presenterKey: string;
+  ownerEmail: string | null;
   createdAt: string;
   updatedAt: string;
   totals: {
     questions: number;
     answers: number;
     participants: number;
+  };
+};
+
+export type ModeratorAccountSummary = {
+  id: string;
+  email: string;
+  role: ModeratorRole;
+  status: "pending" | "active";
+  supabaseUserId: string | null;
+  createdAt: string;
+  updatedAt: string;
+  lastLoginAt: string | null;
+  totals: {
+    presentations: number;
   };
 };

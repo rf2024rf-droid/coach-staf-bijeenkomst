@@ -24,7 +24,7 @@ export default function Home() {
             <p className="text-sm font-semibold uppercase text-emerald-800">Coach Staf Bijeenkomst</p>
             <h1 className="mt-2 text-3xl font-black md:text-5xl">Startpunt voor sessies</h1>
             <p className="mt-3 max-w-2xl leading-7 text-zinc-700">
-              Moderators beheren presentaties centraal. Deelnemers gebruiken alleen de sessiecode of QR-code.
+              Moderators beheren presentaties met hun eigen account. Deelnemers gebruiken alleen de sessiecode of QR-code.
             </p>
           </div>
           <a
@@ -48,7 +48,7 @@ export default function Home() {
               </div>
             </div>
             <p className="leading-7 text-zinc-700">
-              Log in als bedrijfsmoderator om presentaties aan te maken, bestaande sessies te openen, QR-codes te
+              Log in als beheerder of tester om presentaties aan te maken, bestaande sessies te openen, QR-codes te
               behouden en het grote scherm te bedienen.
             </p>
             <a

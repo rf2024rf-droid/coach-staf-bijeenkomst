@@ -7,26 +7,56 @@ import {
   KeyRound,
   Loader2,
   LogOut,
+  MailCheck,
   Monitor,
   Pencil,
   Plus,
   Search,
+  ShieldCheck,
   Trash2,
+  UserPlus,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import type { ModeratorPresentationSummary, PresenterPayload } from "@/app/types";
+import type {
+  ModeratorAccountSummary,
+  ModeratorPresentationSummary,
+  ModeratorRole,
+  PresenterPayload,
+} from "@/app/types";
 
 type SessionState = {
   configured: boolean;
+  moderatorConfigured: boolean;
+  accountAuthConfigured: boolean;
+  signupCodeRequired: boolean;
   authenticated: boolean;
+  role: ModeratorRole | null;
+  email: string | null;
+  limits: {
+    accountCount: number;
+    presentationCount: number;
+    maxAccounts: number;
+    maxPresentations: number | null;
+    maxQuestions: number | null;
+  };
 };
 
 type PresentationsResponse = {
   presentations: ModeratorPresentationSummary[];
 };
 
-function formatDate(value: string) {
+type AccountsResponse = {
+  accounts: ModeratorAccountSummary[];
+};
+
+type AuthMode = "login" | "signup" | "admin";
+
+function formatDate(value: string | null) {
+  if (!value) {
+    return "-";
+  }
+
   return new Intl.DateTimeFormat("nl-NL", {
     day: "2-digit",
     month: "short",
@@ -36,11 +66,23 @@ function formatDate(value: string) {
   }).format(new Date(value));
 }
 
+function statusLabel(status: ModeratorAccountSummary["status"]) {
+  return status === "active" ? "Actief" : "Wacht op mailactivatie";
+}
+
 export default function ModeratorDashboard() {
   const router = useRouter();
   const [session, setSession] = useState<SessionState | null>(null);
   const [presentations, setPresentations] = useState<ModeratorPresentationSummary[]>([]);
+  const [accounts, setAccounts] = useState<ModeratorAccountSummary[]>([]);
+  const [authMode, setAuthMode] = useState<AuthMode>("login");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [signupEmail, setSignupEmail] = useState("");
+  const [signupPassword, setSignupPassword] = useState("");
+  const [signupPasswordRepeat, setSignupPasswordRepeat] = useState("");
+  const [signupCode, setSignupCode] = useState("");
+  const [adminPassword, setAdminPassword] = useState("");
   const [newTitle, setNewTitle] = useState("Coach Staf Bijeenkomst");
   const [newTemplate, setNewTemplate] = useState<"default" | "quiz">("default");
   const [query, setQuery] = useState("");
@@ -61,7 +103,8 @@ export default function ModeratorDashboard() {
     return presentations.filter(
       (presentation) =>
         presentation.title.toLowerCase().includes(needle) ||
-        presentation.code.toLowerCase().includes(needle)
+        presentation.code.toLowerCase().includes(needle) ||
+        (presentation.ownerEmail ?? "").toLowerCase().includes(needle)
     );
   }, [presentations, query]);
 
@@ -78,6 +121,21 @@ export default function ModeratorDashboard() {
     [presentations]
   );
 
+  const presentationLimitReached = Boolean(
+    session?.role === "tester" &&
+      session.limits.maxPresentations &&
+      presentations.length >= session.limits.maxPresentations
+  );
+
+  const loadAccounts = useCallback(async () => {
+    const response = await fetch("/api/moderator/accounts", { cache: "no-store" });
+    const data = (await response.json()) as AccountsResponse | { error: string };
+    if (!response.ok || "error" in data) {
+      throw new Error("error" in data ? data.error : "Accounts konden niet worden geladen.");
+    }
+    setAccounts(data.accounts);
+  }, []);
+
   const loadPresentations = useCallback(async () => {
     const response = await fetch("/api/moderator/presentations", { cache: "no-store" });
     const data = (await response.json()) as PresentationsResponse | { error: string };
@@ -90,10 +148,19 @@ export default function ModeratorDashboard() {
   const loadSession = useCallback(async () => {
     try {
       const response = await fetch("/api/moderator/session", { cache: "no-store" });
-      const data = (await response.json()) as SessionState;
+      const data = (await response.json()) as SessionState | { error: string };
+      if (!response.ok || "error" in data) {
+        throw new Error("error" in data ? data.error : "Moderatorstatus kon niet worden geladen.");
+      }
+
       setSession(data);
       if (data.authenticated) {
         await loadPresentations();
+        if (data.role === "admin") {
+          await loadAccounts();
+        } else {
+          setAccounts([]);
+        }
       }
       setError("");
     } catch (caught) {
@@ -101,7 +168,7 @@ export default function ModeratorDashboard() {
     } finally {
       setLoading(false);
     }
-  }, [loadPresentations]);
+  }, [loadAccounts, loadPresentations]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -119,22 +186,24 @@ export default function ModeratorDashboard() {
 
   async function login(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setBusy("login");
+    setBusy(authMode);
     setError("");
 
     try {
-      const response = await fetch("/api/moderator/login", {
+      const response = await fetch(authMode === "admin" ? "/api/moderator/login" : "/api/accounts/login", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ password }),
+        body: JSON.stringify(authMode === "admin" ? { password: adminPassword } : { email, password }),
       });
       const data = (await response.json()) as { ok: true } | { error: string };
       if (!response.ok || "error" in data) {
         throw new Error("error" in data ? data.error : "Inloggen is mislukt.");
       }
-      setSession({ configured: true, authenticated: true });
+
+      setEmail("");
       setPassword("");
-      await loadPresentations();
+      setAdminPassword("");
+      await loadSession();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Inloggen is mislukt.");
     } finally {
@@ -142,11 +211,55 @@ export default function ModeratorDashboard() {
     }
   }
 
+  async function signup(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (signupPassword !== signupPasswordRepeat) {
+      setError("De wachtwoorden zijn niet gelijk.");
+      return;
+    }
+
+    setBusy("signup");
+    setError("");
+
+    try {
+      const response = await fetch("/api/accounts/signup", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          email: signupEmail,
+          password: signupPassword,
+          signupCode,
+        }),
+      });
+      const data = (await response.json()) as { ok: true; message: string } | { error: string };
+      if (!response.ok || "error" in data) {
+        throw new Error("error" in data ? data.error : "Account kon niet worden aangemaakt.");
+      }
+
+      setNotice(data.message);
+      setAuthMode("login");
+      setEmail(signupEmail);
+      setSignupEmail("");
+      setSignupPassword("");
+      setSignupPasswordRepeat("");
+      setSignupCode("");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Account kon niet worden aangemaakt.");
+    } finally {
+      setBusy("");
+    }
+  }
+
   async function logout() {
     setBusy("logout");
-    await fetch("/api/moderator/logout", { method: "POST" });
-    setSession((current) => ({ configured: current?.configured ?? true, authenticated: false }));
+    await fetch("/api/accounts/logout", { method: "POST" });
+    setSession((current) =>
+      current
+        ? { ...current, authenticated: false, role: null, email: null }
+        : current
+    );
     setPresentations([]);
+    setAccounts([]);
     setBusy("");
   }
 
@@ -161,6 +274,11 @@ export default function ModeratorDashboard() {
     const title = newTitle.trim();
     if (!title) {
       setError("Titel is verplicht.");
+      return;
+    }
+
+    if (presentationLimitReached) {
+      setError(`Je kunt maximaal ${session?.limits.maxPresentations} presentaties of quizzen aanmaken.`);
       return;
     }
 
@@ -207,6 +325,7 @@ export default function ModeratorDashboard() {
       setTitleDraft("");
       setNotice("Presentatie hernoemd");
       window.setTimeout(() => setNotice(""), 1800);
+      void loadSession();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Presentatie kon niet worden hernoemd.");
     } finally {
@@ -215,6 +334,11 @@ export default function ModeratorDashboard() {
   }
 
   async function duplicatePresentation(id: string) {
+    if (presentationLimitReached) {
+      setError(`Je kunt maximaal ${session?.limits.maxPresentations} presentaties of quizzen aanmaken.`);
+      return;
+    }
+
     setBusy(`duplicate-${id}`);
     setError("");
     try {
@@ -224,6 +348,7 @@ export default function ModeratorDashboard() {
       applyPresentations((await response.json()) as PresentationsResponse | { error: string });
       setNotice("Presentatie gedupliceerd met nieuwe QR-code");
       window.setTimeout(() => setNotice(""), 1800);
+      void loadSession();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Presentatie kon niet worden gedupliceerd.");
     } finally {
@@ -246,6 +371,7 @@ export default function ModeratorDashboard() {
       applyPresentations((await response.json()) as PresentationsResponse | { error: string });
       setNotice("Presentatie verwijderd");
       window.setTimeout(() => setNotice(""), 1800);
+      void loadSession();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Presentatie kon niet worden verwijderd.");
     } finally {
@@ -267,14 +393,14 @@ export default function ModeratorDashboard() {
   if (!session?.configured) {
     return (
       <main className="grid min-h-screen place-items-center bg-[#f5f5f0] px-5 text-zinc-950">
-        <section className="w-full max-w-lg rounded-lg border border-amber-200 bg-white p-6 shadow-sm">
+        <section className="w-full max-w-xl rounded-lg border border-amber-200 bg-white p-6 shadow-sm">
           <div className="mb-4 grid h-12 w-12 place-items-center rounded-lg bg-amber-700 text-white">
             <KeyRound aria-hidden className="h-6 w-6" />
           </div>
-          <h1 className="text-2xl font-black">Moderator-login instellen</h1>
+          <h1 className="text-2xl font-black">Login instellen</h1>
           <p className="mt-3 leading-7 text-zinc-700">
-            Zet in Vercel bij Environment Variables eerst <code>MODERATOR_PASSWORD</code>.
-            Daarna opnieuw deployen. Dan kun je hier inloggen en presentaties beheren.
+            Zet in Vercel minimaal <code>SUPABASE_URL</code> en <code>SUPABASE_ANON_KEY</code> voor testeraccounts.
+            Voor beheerderlogin kun je <code>MODERATOR_PASSWORD</code> blijven gebruiken.
           </p>
         </section>
       </main>
@@ -283,37 +409,194 @@ export default function ModeratorDashboard() {
 
   if (!session.authenticated) {
     return (
-      <main className="grid min-h-screen place-items-center bg-[#f5f5f0] px-5 text-zinc-950">
-        <form className="w-full max-w-md rounded-lg border border-zinc-300 bg-white p-6 shadow-sm" onSubmit={login}>
-          <div className="mb-5 flex items-center gap-3">
-            <div className="grid h-10 w-10 place-items-center rounded-lg bg-zinc-900 text-white">
-              <KeyRound aria-hidden className="h-5 w-5" />
+      <main className="min-h-screen bg-[#f5f5f0] px-5 py-8 text-zinc-950">
+        <div className="mx-auto grid w-full max-w-5xl gap-5 lg:grid-cols-[0.9fr_1.1fr]">
+          <section className="rounded-lg border border-zinc-300 bg-white p-6 shadow-sm">
+            <p className="text-sm font-semibold uppercase text-emerald-800">Coach Staf Bijeenkomst</p>
+            <h1 className="mt-2 text-3xl font-black">Moderatoromgeving</h1>
+            <p className="mt-3 leading-7 text-zinc-700">
+              Testers kunnen met hun eigen e-mailadres inloggen en alleen hun eigen presentaties beheren.
+              Nieuwe accounts moeten eerst via e-mail worden geactiveerd.
+            </p>
+            <div className="mt-5 grid gap-3 text-sm font-semibold text-zinc-700">
+              <div className="rounded-lg bg-zinc-50 p-3">
+                Maximaal {session.limits.maxAccounts} testaccounts
+              </div>
+              <div className="rounded-lg bg-zinc-50 p-3">
+                Testers: maximaal {session.limits.maxPresentations ?? 2} presentaties en {session.limits.maxQuestions ?? 12} vragen per presentatie
+              </div>
+              <div className="rounded-lg bg-zinc-50 p-3">
+                Aangemaakt: {session.limits.accountCount}/{session.limits.maxAccounts} testaccounts
+              </div>
             </div>
-            <div>
-              <h1 className="text-xl font-black">Bedrijfsmoderator login</h1>
-              <p className="text-sm text-zinc-600">Beheer alle presentaties, QR-codes en presenter-schermen.</p>
+          </section>
+
+          <section className="rounded-lg border border-zinc-300 bg-white p-6 shadow-sm">
+            <div className="mb-5 grid gap-2 sm:grid-cols-3">
+              {(["login", "signup", "admin"] as AuthMode[]).map((mode) => (
+                <button
+                  className={`rounded-lg px-3 py-3 text-sm font-black ${
+                    authMode === mode ? "bg-zinc-950 text-white" : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200"
+                  }`}
+                  key={mode}
+                  onClick={() => {
+                    setAuthMode(mode);
+                    setError("");
+                    setNotice("");
+                  }}
+                  type="button"
+                >
+                  {mode === "login" ? "Inloggen" : mode === "signup" ? "Account aanvragen" : "Beheerder"}
+                </button>
+              ))}
             </div>
-          </div>
-          <label className="block text-sm font-semibold text-zinc-700" htmlFor="moderator-password">
-            Wachtwoord
-          </label>
-          <input
-            className="mt-2 w-full rounded-lg border border-zinc-300 px-4 py-3 outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
-            id="moderator-password"
-            onChange={(event) => setPassword(event.target.value)}
-            type="password"
-            value={password}
-          />
-          {error ? <p className="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-800">{error}</p> : null}
-          <button
-            className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-800 px-4 py-3 font-bold text-white hover:bg-emerald-900 disabled:opacity-60"
-            disabled={busy === "login"}
-            type="submit"
-          >
-            <KeyRound aria-hidden className="h-5 w-5" />
-            {busy === "login" ? "Inloggen..." : "Open beheer"}
-          </button>
-        </form>
+
+            {notice || error ? (
+              <div
+                className={`mb-4 rounded-lg px-4 py-3 text-sm font-semibold ${
+                  error ? "bg-rose-50 text-rose-800" : "bg-emerald-50 text-emerald-900"
+                }`}
+              >
+                {error || notice}
+              </div>
+            ) : null}
+
+            {authMode === "signup" ? (
+              <form onSubmit={signup}>
+                <div className="mb-5 flex items-center gap-3">
+                  <div className="grid h-10 w-10 place-items-center rounded-lg bg-emerald-800 text-white">
+                    <UserPlus aria-hidden className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-black">Account aanvragen</h2>
+                    <p className="text-sm text-zinc-600">Na aanmelding ontvang je een activatielink per e-mail.</p>
+                  </div>
+                </div>
+                <label className="block text-sm font-semibold text-zinc-700" htmlFor="signup-email">
+                  E-mailadres
+                </label>
+                <input
+                  className="mt-2 w-full rounded-lg border border-zinc-300 px-4 py-3 outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
+                  id="signup-email"
+                  onChange={(event) => setSignupEmail(event.target.value)}
+                  type="email"
+                  value={signupEmail}
+                />
+                <label className="mt-4 block text-sm font-semibold text-zinc-700" htmlFor="signup-password">
+                  Wachtwoord
+                </label>
+                <input
+                  className="mt-2 w-full rounded-lg border border-zinc-300 px-4 py-3 outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
+                  id="signup-password"
+                  minLength={8}
+                  onChange={(event) => setSignupPassword(event.target.value)}
+                  type="password"
+                  value={signupPassword}
+                />
+                <label className="mt-4 block text-sm font-semibold text-zinc-700" htmlFor="signup-password-repeat">
+                  Herhaal wachtwoord
+                </label>
+                <input
+                  className="mt-2 w-full rounded-lg border border-zinc-300 px-4 py-3 outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
+                  id="signup-password-repeat"
+                  minLength={8}
+                  onChange={(event) => setSignupPasswordRepeat(event.target.value)}
+                  type="password"
+                  value={signupPasswordRepeat}
+                />
+                {session.signupCodeRequired ? (
+                  <>
+                    <label className="mt-4 block text-sm font-semibold text-zinc-700" htmlFor="signup-code">
+                      Uitnodigingscode
+                    </label>
+                    <input
+                      className="mt-2 w-full rounded-lg border border-zinc-300 px-4 py-3 outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
+                      id="signup-code"
+                      onChange={(event) => setSignupCode(event.target.value)}
+                      value={signupCode}
+                    />
+                  </>
+                ) : null}
+                <button
+                  className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-800 px-4 py-3 font-bold text-white hover:bg-emerald-900 disabled:opacity-60"
+                  disabled={busy === "signup" || !session.accountAuthConfigured}
+                  type="submit"
+                >
+                  <MailCheck aria-hidden className="h-5 w-5" />
+                  {busy === "signup" ? "Aanvragen..." : "Maak account aan"}
+                </button>
+                {!session.accountAuthConfigured ? (
+                  <p className="mt-3 text-sm font-semibold text-rose-800">
+                    Supabase Auth staat nog niet ingesteld in Vercel.
+                  </p>
+                ) : null}
+              </form>
+            ) : (
+              <form onSubmit={login}>
+                <div className="mb-5 flex items-center gap-3">
+                  <div className="grid h-10 w-10 place-items-center rounded-lg bg-zinc-900 text-white">
+                    {authMode === "admin" ? <ShieldCheck aria-hidden className="h-5 w-5" /> : <KeyRound aria-hidden className="h-5 w-5" />}
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-black">
+                      {authMode === "admin" ? "Beheerder login" : "Tester login"}
+                    </h2>
+                    <p className="text-sm text-zinc-600">
+                      {authMode === "admin"
+                        ? "Voor de maker van het platform."
+                        : "Log in met je geactiveerde account."}
+                    </p>
+                  </div>
+                </div>
+                {authMode === "admin" ? (
+                  <>
+                    <label className="block text-sm font-semibold text-zinc-700" htmlFor="admin-password">
+                      Beheerwachtwoord
+                    </label>
+                    <input
+                      className="mt-2 w-full rounded-lg border border-zinc-300 px-4 py-3 outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
+                      id="admin-password"
+                      onChange={(event) => setAdminPassword(event.target.value)}
+                      type="password"
+                      value={adminPassword}
+                    />
+                  </>
+                ) : (
+                  <>
+                    <label className="block text-sm font-semibold text-zinc-700" htmlFor="account-email">
+                      E-mailadres
+                    </label>
+                    <input
+                      className="mt-2 w-full rounded-lg border border-zinc-300 px-4 py-3 outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
+                      id="account-email"
+                      onChange={(event) => setEmail(event.target.value)}
+                      type="email"
+                      value={email}
+                    />
+                    <label className="mt-4 block text-sm font-semibold text-zinc-700" htmlFor="account-password">
+                      Wachtwoord
+                    </label>
+                    <input
+                      className="mt-2 w-full rounded-lg border border-zinc-300 px-4 py-3 outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
+                      id="account-password"
+                      onChange={(event) => setPassword(event.target.value)}
+                      type="password"
+                      value={password}
+                    />
+                  </>
+                )}
+                <button
+                  className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-800 px-4 py-3 font-bold text-white hover:bg-emerald-900 disabled:opacity-60"
+                  disabled={busy === authMode || (authMode === "login" && !session.accountAuthConfigured)}
+                  type="submit"
+                >
+                  <KeyRound aria-hidden className="h-5 w-5" />
+                  {busy === authMode ? "Inloggen..." : "Inloggen"}
+                </button>
+              </form>
+            )}
+          </section>
+        </div>
       </main>
     );
   }
@@ -324,22 +607,24 @@ export default function ModeratorDashboard() {
         <header className="flex flex-col gap-4 border-b border-zinc-300 pb-5 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="text-sm font-semibold uppercase text-emerald-800">Coach Staf Bijeenkomst</p>
-            <h1 className="mt-2 text-3xl font-black md:text-4xl">Centrale moderatoromgeving</h1>
+            <h1 className="mt-2 text-3xl font-black md:text-4xl">
+              {session.role === "admin" ? "Platformbeheer" : "Mijn moderatoromgeving"}
+            </h1>
             <p className="mt-2 max-w-2xl text-zinc-700">
-              Maak sessies aan, open presenter-bediening, behoud QR-codes en beheer alle presentaties vanuit een plek.
+              {session.role === "admin"
+                ? "Beheer alle accounts, presentaties, QR-codes en presenter-schermen."
+                : `Ingelogd als ${session.email}. Je presentaties en quizzen blijven bewaard.`}
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <button
-              className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 bg-white px-4 py-3 text-sm font-bold hover:bg-zinc-50"
-              disabled={busy === "logout"}
-              onClick={logout}
-              type="button"
-            >
-              <LogOut aria-hidden className="h-4 w-4" />
-              Uitloggen
-            </button>
-          </div>
+          <button
+            className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 bg-white px-4 py-3 text-sm font-bold hover:bg-zinc-50"
+            disabled={busy === "logout"}
+            onClick={logout}
+            type="button"
+          >
+            <LogOut aria-hidden className="h-4 w-4" />
+            Uitloggen
+          </button>
         </header>
 
         {notice || error ? (
@@ -357,7 +642,9 @@ export default function ModeratorDashboard() {
             <p className="text-xs font-black uppercase text-emerald-800">Nieuwe sessie</p>
             <h2 className="mt-1 text-xl font-black">Presentatie aanmaken</h2>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-600">
-              Maak hier de presentatie aan. Daarna opent direct de presenteromgeving met dezelfde centrale moderatorlogin.
+              {session.role === "tester"
+                ? `Je kunt maximaal ${session.limits.maxPresentations} presentaties of quizzen maken met maximaal ${session.limits.maxQuestions} vragen per presentatie.`
+                : "Maak hier een presentatie aan. Beheerderpresentaties hebben geen testaccountlimiet."}
             </p>
           </div>
           <form className="grid gap-3 sm:grid-cols-[minmax(220px,340px)_minmax(180px,240px)] lg:grid-cols-[minmax(220px,340px)_minmax(180px,240px)_auto]" onSubmit={createPresentation}>
@@ -385,7 +672,7 @@ export default function ModeratorDashboard() {
             </select>
             <button
               className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-800 px-4 py-3 font-bold text-white hover:bg-emerald-900 disabled:opacity-60"
-              disabled={busy === "create"}
+              disabled={busy === "create" || presentationLimitReached}
               type="submit"
             >
               <Plus aria-hidden className="h-5 w-5" />
@@ -397,7 +684,10 @@ export default function ModeratorDashboard() {
         <section className="grid gap-4 md:grid-cols-4">
           <article className="rounded-lg border border-zinc-300 bg-white p-4 shadow-sm">
             <p className="text-sm font-semibold text-zinc-600">Presentaties</p>
-            <p className="mt-2 text-3xl font-black">{presentations.length}</p>
+            <p className="mt-2 text-3xl font-black">
+              {presentations.length}
+              {session.role === "tester" && session.limits.maxPresentations ? `/${session.limits.maxPresentations}` : ""}
+            </p>
           </article>
           <article className="rounded-lg border border-zinc-300 bg-white p-4 shadow-sm">
             <p className="text-sm font-semibold text-zinc-600">Vragen</p>
@@ -408,20 +698,69 @@ export default function ModeratorDashboard() {
             <p className="mt-2 text-3xl font-black">{totals.answers}</p>
           </article>
           <article className="rounded-lg border border-zinc-300 bg-white p-4 shadow-sm">
-            <p className="text-sm font-semibold text-zinc-600">Deelnemers</p>
-            <p className="mt-2 text-3xl font-black">{totals.participants}</p>
+            <p className="text-sm font-semibold text-zinc-600">
+              {session.role === "admin" ? "Testaccounts" : "Deelnemers"}
+            </p>
+            <p className="mt-2 text-3xl font-black">
+              {session.role === "admin"
+                ? `${session.limits.accountCount}/${session.limits.maxAccounts}`
+                : totals.participants}
+            </p>
           </article>
         </section>
 
+        {session.role === "admin" ? (
+          <section className="rounded-lg border border-zinc-300 bg-white p-5 shadow-sm">
+            <div className="mb-5 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+              <div>
+                <p className="text-xs font-black uppercase text-emerald-800">Beheerder</p>
+                <h2 className="text-lg font-black">Aangemelde accounts</h2>
+              </div>
+              <span className="rounded-md bg-zinc-100 px-3 py-2 text-sm font-bold text-zinc-700">
+                {accounts.length}/{session.limits.maxAccounts} testaccounts
+              </span>
+            </div>
+            {!accounts.length ? (
+              <div className="rounded-lg border border-dashed border-zinc-300 p-6 text-center text-zinc-600">
+                Nog geen testaccounts aangemaakt.
+              </div>
+            ) : (
+              <div className="grid gap-3">
+                {accounts.map((account) => (
+                  <article className="grid gap-3 rounded-lg border border-zinc-200 bg-zinc-50 p-4 md:grid-cols-[1fr_auto]" key={account.id}>
+                    <div>
+                      <h3 className="font-black">{account.email}</h3>
+                      <div className="mt-2 flex flex-wrap gap-2 text-sm">
+                        <span className={`rounded-md px-2 py-1 font-bold ${account.status === "active" ? "bg-emerald-100 text-emerald-900" : "bg-amber-100 text-amber-900"}`}>
+                          {statusLabel(account.status)}
+                        </span>
+                        <span className="rounded-md bg-white px-2 py-1 text-zinc-700">
+                          {account.totals.presentations} presentaties
+                        </span>
+                      </div>
+                    </div>
+                    <div className="text-sm text-zinc-600 md:text-right">
+                      <p>Aangemaakt {formatDate(account.createdAt)}</p>
+                      <p>Laatst ingelogd {formatDate(account.lastLoginAt)}</p>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
+          </section>
+        ) : null}
+
         <section className="rounded-lg border border-zinc-300 bg-white p-5 shadow-sm">
           <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <h2 className="text-lg font-black">Aangemaakte presentaties</h2>
+            <h2 className="text-lg font-black">
+              {session.role === "admin" ? "Aangemaakte presentaties" : "Mijn presentaties"}
+            </h2>
             <label className="relative block w-full md:w-80">
               <Search aria-hidden className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
               <input
                 className="w-full rounded-lg border border-zinc-300 py-3 pl-10 pr-3 outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder="Zoek op titel of code"
+                placeholder="Zoek op titel, code of eigenaar"
                 value={query}
               />
             </label>
@@ -468,6 +807,11 @@ export default function ModeratorDashboard() {
                           <span className="rounded-md bg-zinc-900 px-2 py-1 font-mono font-black text-white">
                             {presentation.code}
                           </span>
+                          {session.role === "admin" ? (
+                            <span className="rounded-md bg-emerald-50 px-2 py-1 font-bold text-emerald-900">
+                              {presentation.ownerEmail ?? "Beheerder"}
+                            </span>
+                          ) : null}
                           <span className="rounded-md bg-white px-2 py-1 text-zinc-700">
                             {presentation.totals.questions} vragen
                           </span>
@@ -529,7 +873,7 @@ export default function ModeratorDashboard() {
                         </button>
                         <button
                           className="inline-flex items-center gap-2 rounded-lg bg-sky-800 px-3 py-2 text-sm font-bold text-white hover:bg-sky-900 disabled:opacity-60"
-                          disabled={busy === `duplicate-${presentation.id}`}
+                          disabled={busy === `duplicate-${presentation.id}` || presentationLimitReached}
                           onClick={() => duplicatePresentation(presentation.id)}
                           type="button"
                         >

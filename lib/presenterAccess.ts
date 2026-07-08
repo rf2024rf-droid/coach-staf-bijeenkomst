@@ -1,5 +1,5 @@
 import { getPresenterKeyForModerator } from "@/db/store";
-import { isModeratorRequest } from "@/lib/moderatorAuth";
+import { getModeratorActor } from "@/lib/accountAuth";
 
 export async function resolvePresenterKey(request: Request, presentationId: string) {
   const key = new URL(request.url).searchParams.get("key") ?? "";
@@ -7,8 +7,9 @@ export async function resolvePresenterKey(request: Request, presentationId: stri
     return key;
   }
 
-  if (isModeratorRequest(request)) {
-    return getPresenterKeyForModerator(presentationId);
+  const actor = getModeratorActor(request);
+  if (actor) {
+    return getPresenterKeyForModerator(presentationId, actor);
   }
 
   return "";

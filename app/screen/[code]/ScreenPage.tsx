@@ -202,6 +202,9 @@ function SpotlightResults({ question }: { question: QuestionResult }) {
           } ${cardStyles[index % cardStyles.length]}`}
           key={response.id}
         >
+          <p className={isCompact ? "mb-1 text-xs font-black uppercase text-zinc-600" : "mb-3 text-sm font-black uppercase text-zinc-600"}>
+            {response.participantName}
+          </p>
           <p
             className={isCompact ? "text-sm font-black leading-5 xl:text-base" : "text-2xl font-black leading-8"}
             style={

@@ -3,6 +3,7 @@ create table if not exists presentations (
   title text not null,
   code text not null unique,
   presenter_key text not null,
+  idle_screen_text text,
   active_question_id text,
   screen_question_id text,
   screen_view text not null default 'question',
@@ -42,6 +43,18 @@ create table if not exists responses (
   updated_at text not null default (now()::text)
 );
 
+create table if not exists participant_profiles (
+  id text primary key,
+  presentation_id text not null references presentations(id) on delete cascade,
+  participant_id text not null,
+  display_name text not null,
+  is_anonymous boolean not null default true,
+  display_index integer not null,
+  created_at text not null default (now()::text),
+  updated_at text not null default (now()::text)
+);
+
+alter table presentations add column if not exists idle_screen_text text;
 alter table presentations add column if not exists screen_view text not null default 'question';
 alter table presentations add column if not exists screen_question_id text;
 alter table questions add column if not exists finalized_at text;
@@ -54,3 +67,7 @@ create index if not exists responses_presentation_idx on responses (presentation
 create index if not exists responses_question_idx on responses (question_id);
 create unique index if not exists responses_question_participant_idx
   on responses (question_id, participant_id);
+create unique index if not exists participant_profiles_presentation_participant_idx
+  on participant_profiles (presentation_id, participant_id);
+create index if not exists participant_profiles_presentation_idx
+  on participant_profiles (presentation_id);

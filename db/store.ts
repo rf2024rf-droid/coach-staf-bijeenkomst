@@ -50,6 +50,17 @@ type ResponseRow = {
   updated_at: string;
 };
 
+type ParticipantProfileRow = {
+  id: string;
+  presentation_id: string;
+  participant_id: string;
+  display_name: string;
+  is_anonymous: boolean;
+  display_index: number;
+  created_at: string;
+  updated_at: string;
+};
+
 export type QuestionResult = {
   id: string;
   type: QuestionType;
@@ -220,6 +231,16 @@ const schemaStatements = [
     created_at TEXT NOT NULL DEFAULT (now()::text),
     updated_at TEXT NOT NULL DEFAULT (now()::text)
   )`,
+  `CREATE TABLE IF NOT EXISTS participant_profiles (
+    id TEXT PRIMARY KEY,
+    presentation_id TEXT NOT NULL REFERENCES presentations(id) ON DELETE CASCADE,
+    participant_id TEXT NOT NULL,
+    display_name TEXT NOT NULL,
+    is_anonymous BOOLEAN NOT NULL DEFAULT true,
+    display_index INTEGER NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (now()::text),
+    updated_at TEXT NOT NULL DEFAULT (now()::text)
+  )`,
   "ALTER TABLE presentations ADD COLUMN IF NOT EXISTS idle_screen_text TEXT",
   "ALTER TABLE presentations ADD COLUMN IF NOT EXISTS screen_view TEXT NOT NULL DEFAULT 'question'",
   "ALTER TABLE presentations ADD COLUMN IF NOT EXISTS screen_question_id TEXT",
@@ -231,6 +252,8 @@ const schemaStatements = [
   "CREATE INDEX IF NOT EXISTS responses_presentation_idx ON responses (presentation_id)",
   "CREATE INDEX IF NOT EXISTS responses_question_idx ON responses (question_id)",
   "CREATE UNIQUE INDEX IF NOT EXISTS responses_question_participant_idx ON responses (question_id, participant_id)",
+  "CREATE UNIQUE INDEX IF NOT EXISTS participant_profiles_presentation_participant_idx ON participant_profiles (presentation_id, participant_id)",
+  "CREATE INDEX IF NOT EXISTS participant_profiles_presentation_idx ON participant_profiles (presentation_id)",
 ];
 
 let client: Database | null = null;
@@ -435,28 +458,50 @@ function buildQuestions(
   });
 }
 
-function buildParticipantLabels(responseRows: ResponseRow[]) {
-  const firstSeen = new Map<string, string>();
+function profileDisplayName(profile: ParticipantProfileRow) {
+  return profile.display_name || `Deelnemer ${profile.display_index}`;
+}
+
+function buildParticipantLabels(responseRows: ResponseRow[], profileRows: ParticipantProfileRow[] = []) {
+  const participantLabels = new Map<string, string>();
+
+  for (const profile of [...profileRows].sort(
+    (left, right) => left.display_index - right.display_index || left.created_at.localeCompare(right.created_at)
+  )) {
+    participantLabels.set(profile.participant_id, profileDisplayName(profile));
+  }
+
+  const firstSeen = new Map<string, { createdAt: string; label: string }>();
 
   for (const response of [...responseRows].reverse()) {
-    if (!firstSeen.has(response.participant_id)) {
-      firstSeen.set(response.participant_id, response.created_at);
+    if (!participantLabels.has(response.participant_id) && !firstSeen.has(response.participant_id)) {
+      const responseName =
+        response.participant_name && response.participant_name !== "Anoniem" ? response.participant_name : "";
+      firstSeen.set(response.participant_id, {
+        createdAt: response.created_at,
+        label: responseName,
+      });
     }
   }
 
-  return new Map(
-    [...firstSeen.entries()]
-      .sort((left, right) => left[1].localeCompare(right[1]) || left[0].localeCompare(right[0]))
-      .map(([participantId], index) => [participantId, `Deelnemer ${index + 1}`])
-  );
+  const fallbackStart = participantLabels.size + 1;
+
+  [...firstSeen.entries()]
+    .sort((left, right) => left[1].createdAt.localeCompare(right[1].createdAt) || left[0].localeCompare(right[0]))
+    .forEach(([participantId, value], index) => {
+      participantLabels.set(participantId, value.label || `Deelnemer ${fallbackStart + index}`);
+    });
+
+  return participantLabels;
 }
 
 function buildLeaderboard(
   questionRows: QuestionRow[],
   optionRows: OptionRow[],
-  responseRows: ResponseRow[]
+  responseRows: ResponseRow[],
+  profileRows: ParticipantProfileRow[] = []
 ): { leaderboard: LeaderboardEntry[]; quizTotals: QuizTotals; participantLabels: Map<string, string> } {
-  const participantLabels = buildParticipantLabels(responseRows);
+  const participantLabels = buildParticipantLabels(responseRows, profileRows);
   const quizQuestionIds = new Set(questionRows.filter((question) => question.type === "quiz").map((question) => question.id));
   const finalizedQuizQuestionIds = new Set(
     questionRows
@@ -550,6 +595,102 @@ async function fetchQuestion(questionId: string) {
   const sql = getSql();
   const rows = await sql<QuestionRow[]>`SELECT * FROM questions WHERE id = ${questionId}`;
   return first(rows);
+}
+
+async function fetchParticipantProfile(presentationId: string, participantId: string) {
+  const rows = await getSql()<ParticipantProfileRow[]>`
+    SELECT *
+    FROM participant_profiles
+    WHERE presentation_id = ${presentationId} AND participant_id = ${participantId}
+  `;
+
+  return first(rows);
+}
+
+async function fetchParticipantProfiles(presentationId: string) {
+  return getSql()<ParticipantProfileRow[]>`
+    SELECT *
+    FROM participant_profiles
+    WHERE presentation_id = ${presentationId}
+    ORDER BY display_index ASC, created_at ASC
+  `;
+}
+
+async function getNextParticipantDisplayIndex(presentationId: string) {
+  const rows = await getSql()<{ next_index: number }[]>`
+    SELECT COALESCE(MAX(display_index), 0) + 1 AS next_index
+    FROM participant_profiles
+    WHERE presentation_id = ${presentationId}
+  `;
+
+  return numberFromDb(first(rows)?.next_index) || 1;
+}
+
+async function upsertParticipantProfile(
+  presentationId: string,
+  participantIdInput: unknown,
+  displayNameInput: unknown,
+  anonymousInput: unknown
+) {
+  const participantId = cleanText(participantIdInput, 80);
+  if (!participantId) {
+    throw new AppError(400, "Deelnemer kon niet worden herkend. Scan de QR-code opnieuw.");
+  }
+
+  const sql = getSql();
+  const existing = await fetchParticipantProfile(presentationId, participantId);
+  const isAnonymous = anonymousInput !== false;
+  const typedName = cleanText(displayNameInput, 60);
+
+  if (!isAnonymous && !typedName) {
+    throw new AppError(400, "Vul een naam in of kies voor anoniem deelnemen.");
+  }
+
+  const displayIndex = existing?.display_index ?? (await getNextParticipantDisplayIndex(presentationId));
+  const displayName = isAnonymous ? `Deelnemer ${displayIndex}` : typedName;
+  const timestamp = nowIso();
+  const rows = existing
+    ? await sql<ParticipantProfileRow[]>`
+        UPDATE participant_profiles
+        SET display_name = ${displayName},
+            is_anonymous = ${isAnonymous},
+            display_index = ${displayIndex},
+            updated_at = ${timestamp}
+        WHERE id = ${existing.id}
+        RETURNING *
+      `
+    : await sql<ParticipantProfileRow[]>`
+        INSERT INTO participant_profiles (
+          id,
+          presentation_id,
+          participant_id,
+          display_name,
+          is_anonymous,
+          display_index,
+          created_at,
+          updated_at
+        )
+        VALUES (
+          ${makeId("ptc")},
+          ${presentationId},
+          ${participantId},
+          ${displayName},
+          ${isAnonymous},
+          ${displayIndex},
+          ${timestamp},
+          ${timestamp}
+        )
+        RETURNING *
+      `;
+  const profile = first(rows);
+
+  await sql`
+    UPDATE responses
+    SET participant_name = ${displayName}, updated_at = ${timestamp}
+    WHERE presentation_id = ${presentationId} AND participant_id = ${participantId}
+  `;
+
+  return profile;
 }
 
 async function getNextPosition(presentationId: string) {
@@ -701,7 +842,7 @@ export async function getPresenterPayload(presentationId: string, presenterKey: 
   const presentation = await assertPresenter(presentationId, presenterKey);
   const sql = getSql();
 
-  const [questionRows, optionRows, responseRows, participantRows] = await Promise.all([
+  const [questionRows, optionRows, responseRows, participantRows, profileRows] = await Promise.all([
     sql<QuestionRow[]>`
       SELECT *
       FROM questions
@@ -727,10 +868,11 @@ export async function getPresenterPayload(presentationId: string, presenterKey: 
       FROM responses
       WHERE presentation_id = ${presentationId}
     `,
+    fetchParticipantProfiles(presentationId),
   ]);
 
   const questions = buildQuestions(questionRows, optionRows, responseRows);
-  const { leaderboard, quizTotals } = buildLeaderboard(questionRows, optionRows, responseRows);
+  const { leaderboard, quizTotals } = buildLeaderboard(questionRows, optionRows, responseRows, profileRows);
 
   return {
     presentation: mapPresentation(presentation),
@@ -743,7 +885,7 @@ export async function getPresenterPayload(presentationId: string, presenterKey: 
     totals: {
       questions: questions.length,
       answers: responseRows.length,
-      participants: numberFromDb(first(participantRows)?.count),
+      participants: Math.max(profileRows.length, numberFromDb(first(participantRows)?.count)),
     },
   };
 }
@@ -1125,7 +1267,7 @@ export async function getPublicSession(codeInput: string, participantIdInput?: u
   }
 
   const sql = getSql();
-  const [questionRows, optionRows, responseRows] = await Promise.all([
+  const [questionRows, optionRows, responseRows, profileRows] = await Promise.all([
     sql<QuestionRow[]>`
       SELECT *
       FROM questions
@@ -1146,10 +1288,16 @@ export async function getPublicSession(codeInput: string, participantIdInput?: u
       WHERE responses.presentation_id = ${presentation.id}
       ORDER BY responses.created_at DESC
     `,
+    fetchParticipantProfiles(presentation.id),
   ]);
 
   const questions = buildQuestions(questionRows, optionRows, responseRows);
-  const { leaderboard, quizTotals, participantLabels } = buildLeaderboard(questionRows, optionRows, responseRows);
+  const { leaderboard, quizTotals, participantLabels } = buildLeaderboard(
+    questionRows,
+    optionRows,
+    responseRows,
+    profileRows
+  );
   const activeQuestion =
     questions.find((question) => question.id === presentation.active_question_id && question.status === "open") ??
     null;
@@ -1205,6 +1353,32 @@ export async function getPublicSession(codeInput: string, participantIdInput?: u
   };
 }
 
+export async function registerParticipant(
+  codeInput: string,
+  payload: {
+    participantId?: unknown;
+    displayName?: unknown;
+    anonymous?: unknown;
+  }
+) {
+  await ensureSchema();
+
+  const presentation = await fetchPresentationByCode(codeInput);
+  if (!presentation) {
+    throw new AppError(404, "Sessie niet gevonden.");
+  }
+
+  const participantId = cleanText(payload.participantId, 80);
+  await upsertParticipantProfile(
+    presentation.id,
+    participantId,
+    payload.displayName,
+    payload.anonymous !== false
+  );
+
+  return getPublicSession(presentation.code, participantId);
+}
+
 export async function submitAnswer(
   codeInput: string,
   payload: {
@@ -1243,7 +1417,16 @@ export async function submitAnswer(
   }
 
   const participantId = cleanText(payload.participantId, 80) || makeId("guest");
-  const participantName = "Anoniem";
+  const fallbackName = cleanText(payload.participantName, 60);
+  const participantProfile =
+    (await fetchParticipantProfile(presentation.id, participantId)) ??
+    (await upsertParticipantProfile(
+      presentation.id,
+      participantId,
+      fallbackName,
+      fallbackName ? false : true
+    ));
+  const participantName = participantProfile?.display_name ?? (fallbackName || "Anoniem");
   let optionId: string | null = null;
   let textAnswer: string | null = null;
 
@@ -1304,10 +1487,17 @@ export async function listModeratorPresentations(): Promise<ModeratorPresentatio
       presentations.*,
       (SELECT COUNT(*)::int FROM questions WHERE questions.presentation_id = presentations.id) AS question_count,
       (SELECT COUNT(*)::int FROM responses WHERE responses.presentation_id = presentations.id) AS answer_count,
-      (
-        SELECT COUNT(DISTINCT participant_id)::int
-        FROM responses
-        WHERE responses.presentation_id = presentations.id
+      GREATEST(
+        (
+          SELECT COUNT(*)::int
+          FROM participant_profiles
+          WHERE participant_profiles.presentation_id = presentations.id
+        ),
+        (
+          SELECT COUNT(DISTINCT participant_id)::int
+          FROM responses
+          WHERE responses.presentation_id = presentations.id
+        )
       ) AS participant_count
     FROM presentations
     ORDER BY updated_at DESC, created_at DESC

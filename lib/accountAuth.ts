@@ -18,6 +18,7 @@ type SupabaseAuthResponse = {
   user?: SupabaseAuthUser;
   error?: string;
   error_description?: string;
+  message?: string;
   msg?: string;
 };
 
@@ -99,20 +100,55 @@ async function supabaseAuthRequest(path: string, body: Record<string, unknown>, 
     );
   }
 
-  const redirect = redirectTo ? `?redirect_to=${encodeURIComponent(redirectTo)}` : "";
-  const response = await fetch(`${supabaseUrl}/auth/v1/${path}${redirect}`, {
+  if (/^https?:\/\/db\./i.test(supabaseUrl)) {
+    throw new AppError(
+      500,
+      "SUPABASE_URL moet de Project URL zijn, niet de database host. Gebruik iets als https://jouw-project.supabase.co."
+    );
+  }
+
+  let authUrl: URL;
+  try {
+    authUrl = new URL(`${supabaseUrl}/auth/v1/${path}`);
+  } catch {
+    throw new AppError(500, "SUPABASE_URL is ongeldig. Gebruik de Project URL uit Supabase, bijvoorbeeld https://jouw-project.supabase.co.");
+  }
+
+  if (redirectTo) {
+    authUrl.searchParams.set("redirect_to", redirectTo);
+  }
+
+  const headers: Record<string, string> = {
+    apikey: anonKey,
+    "content-type": "application/json",
+  };
+
+  if (anonKey.split(".").length === 3) {
+    headers.authorization = `Bearer ${anonKey}`;
+  }
+
+  const response = await fetch(authUrl, {
     method: "POST",
-    headers: {
-      apikey: anonKey,
-      authorization: `Bearer ${anonKey}`,
-      "content-type": "application/json",
-    },
+    headers,
     body: JSON.stringify(body),
   });
-  const data = (await response.json().catch(() => ({}))) as SupabaseAuthResponse;
+  const responseText = await response.text();
+  let data: SupabaseAuthResponse = {};
+
+  try {
+    data = responseText ? (JSON.parse(responseText) as SupabaseAuthResponse) : {};
+  } catch {
+    data = {};
+  }
 
   if (!response.ok || data.error) {
-    const message = data.error_description || data.msg || data.error || "Authenticatie is mislukt.";
+    const message =
+      data.error_description ||
+      data.msg ||
+      data.message ||
+      data.error ||
+      responseText.slice(0, 180) ||
+      `Supabase Auth gaf status ${response.status}.`;
     throw new AppError(response.status || 400, message);
   }
 

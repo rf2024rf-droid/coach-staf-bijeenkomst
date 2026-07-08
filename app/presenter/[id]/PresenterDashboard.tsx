@@ -2,6 +2,7 @@
 
 import {
   ArrowDown,
+  ArrowLeft,
   ArrowUp,
   BarChart3,
   CheckCircle2,
@@ -541,6 +542,13 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
             <KeyRound aria-hidden className="h-5 w-5" />
             Open dashboard
           </button>
+          <a
+            className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-white px-4 py-3 font-bold text-zinc-800 hover:bg-zinc-50"
+            href="/moderator"
+          >
+            <ArrowLeft aria-hidden className="h-5 w-5" />
+            Terug naar moderatoromgeving
+          </a>
         </form>
       </main>
     );
@@ -605,6 +613,13 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
+            <a
+              className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-bold hover:bg-zinc-50"
+              href="/moderator"
+            >
+              <ArrowLeft aria-hidden className="h-4 w-4" />
+              Moderatoromgeving
+            </a>
             <button
               className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-bold hover:bg-zinc-50"
               onClick={() => copy(joinLink, "Deelnemerslink")}

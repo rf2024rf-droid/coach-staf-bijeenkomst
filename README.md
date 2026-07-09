@@ -30,11 +30,21 @@ Zet in Vercel minimaal deze environment variable:
 
 ```bash
 SUPABASE_DATABASE_URL=postgresql://...
+SUPABASE_URL=https://jouw-project.supabase.co
+SUPABASE_ANON_KEY=...
 MODERATOR_PASSWORD=kies-een-eigen-wachtwoord
 ```
 
 Gebruik bij voorkeur de Supabase pooler connection string met `sslmode=require`.
-`MODERATOR_SESSION_SECRET` is optioneel, maar aanbevolen. Gebruik daarvoor een lange willekeurige tekst.
+`MODERATOR_SESSION_SECRET` en `ACCOUNT_SESSION_SECRET` zijn optioneel, maar aanbevolen. Gebruik daarvoor lange willekeurige teksten.
+
+Voor definitief verwijderen van gebruikers uit Supabase Auth is deze extra geheime sleutel nodig:
+
+```bash
+SUPABASE_SERVICE_ROLE_KEY=...
+```
+
+Zonder `SUPABASE_SERVICE_ROLE_KEY` verwijdert de app accounts wel lokaal en blokkeert opnieuw inloggen, maar het Auth-account blijft dan technisch in Supabase bestaan.
 
 Daarna kan Vercel bouwen met:
 

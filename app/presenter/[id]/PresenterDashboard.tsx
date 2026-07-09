@@ -558,7 +558,14 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
             href="/moderator"
           >
             <ArrowLeft aria-hidden className="h-5 w-5" />
-            Terug naar moderatoromgeving
+            Naar gebruikersomgeving
+          </a>
+          <a
+            className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-white px-4 py-3 font-bold text-zinc-800 hover:bg-zinc-50"
+            href="/beheerder"
+          >
+            <ArrowLeft aria-hidden className="h-5 w-5" />
+            Naar beheerderomgeving
           </a>
         </form>
       </main>
@@ -604,7 +611,7 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-5 md:px-8">
         <header className="flex flex-col gap-4 border-b border-zinc-300 pb-5 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="text-sm font-semibold uppercase text-emerald-800">Coach Staf Bijeenkomst</p>
+            <p className="text-sm font-semibold uppercase text-emerald-800">Sessie Interactief</p>
             <h1 className="mt-2 text-3xl font-black md:text-4xl">{payload.presentation.title}</h1>
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <span className="rounded-lg bg-zinc-900 px-3 py-2 font-mono text-lg font-black text-white">
@@ -633,7 +640,13 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
               href="/moderator"
             >
               <ArrowLeft aria-hidden className="h-4 w-4" />
-              Moderatoromgeving
+              Gebruikersomgeving
+            </a>
+            <a
+              className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-bold hover:bg-zinc-50"
+              href="/beheerder"
+            >
+              Beheerder
             </a>
             <button
               className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-bold hover:bg-zinc-50"

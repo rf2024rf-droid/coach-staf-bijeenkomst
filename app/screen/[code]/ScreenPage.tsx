@@ -237,7 +237,7 @@ function LeaderboardScreen({ session }: { session: PublicSessionPayload }) {
       <div className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-6 px-6 py-6">
         <header className="flex flex-col gap-4 border-b border-zinc-700 pb-5 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="text-sm font-bold uppercase text-emerald-300">Coach Staf Bijeenkomst</p>
+            <p className="text-sm font-bold uppercase text-emerald-300">Sessie Interactief</p>
             <h1 className="mt-2 text-3xl font-black md:text-5xl">{session.presentation.title}</h1>
           </div>
           <span className="inline-flex items-center gap-2 rounded-lg bg-amber-300 px-5 py-3 text-xl font-black text-amber-950">
@@ -410,7 +410,7 @@ export default function ScreenPage({ code }: ScreenPageProps) {
 
   const activeQuestion = session.activeQuestion;
   const resultsQuestion = session.screenQuestion ?? activeQuestion;
-  const idleScreenText = session.presentation.idleScreenText || "Coach Staf Bijeenkomst";
+  const idleScreenText = session.presentation.idleScreenText || "Sessie Interactief";
   const compactOpenResults =
     resultsQuestion?.type === "open" &&
     resultsQuestion.responses.filter((response) => response.textAnswer).length > 16;
@@ -421,7 +421,7 @@ export default function ScreenPage({ code }: ScreenPageProps) {
         <div className="mx-auto grid min-h-screen w-full max-w-7xl grid-rows-[auto_1fr] gap-6 px-6 py-6">
           <header className="flex flex-col gap-4 border-b border-zinc-700 pb-5 lg:flex-row lg:items-end lg:justify-between">
             <div>
-              <p className="text-sm font-bold uppercase text-emerald-300">Coach Staf Bijeenkomst</p>
+              <p className="text-sm font-bold uppercase text-emerald-300">Sessie Interactief</p>
               <h1 className="mt-2 text-3xl font-black md:text-5xl">{session.presentation.title}</h1>
             </div>
             <span className="inline-flex items-center gap-2 rounded-lg bg-white px-5 py-3 font-mono text-3xl font-black text-zinc-950">
@@ -460,7 +460,7 @@ export default function ScreenPage({ code }: ScreenPageProps) {
         <div className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-6 px-6 py-6">
           <header className="flex flex-col gap-4 border-b border-zinc-700 pb-5 lg:flex-row lg:items-end lg:justify-between">
             <div>
-              <p className="text-sm font-bold uppercase text-emerald-300">Coach Staf Bijeenkomst</p>
+              <p className="text-sm font-bold uppercase text-emerald-300">Sessie Interactief</p>
               <h1 className="mt-2 text-3xl font-black md:text-5xl">{session.presentation.title}</h1>
             </div>
             <span className="inline-flex items-center gap-2 rounded-lg bg-white px-5 py-3 text-xl font-black text-zinc-950">
@@ -522,7 +522,7 @@ export default function ScreenPage({ code }: ScreenPageProps) {
         {activeQuestion ? (
           <header className="border-b border-zinc-700 pb-5">
             <div>
-              <p className="text-sm font-bold uppercase text-emerald-300">Coach Staf Bijeenkomst</p>
+              <p className="text-sm font-bold uppercase text-emerald-300">Sessie Interactief</p>
               <h1 className="mt-2 text-3xl font-black md:text-5xl">{session.presentation.title}</h1>
             </div>
           </header>

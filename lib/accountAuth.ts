@@ -2,7 +2,7 @@ import { createHmac, timingSafeEqual } from "crypto";
 import { AppError, type ModeratorActor } from "@/db/store";
 import { isModeratorRequest } from "@/lib/moderatorAuth";
 
-const accountCookieName = "coach-staf-account";
+const accountCookieName = "sessie-interactief-account";
 const maxAgeSeconds = 60 * 60 * 24 * 7;
 
 type SupabaseAuthUser = {
@@ -34,7 +34,7 @@ function getAuthSecret() {
     process.env.ACCOUNT_SESSION_SECRET ??
     process.env.MODERATOR_SESSION_SECRET ??
     process.env.SUPABASE_DATABASE_URL ??
-    "coach-staf-account-dev-secret"
+    "sessie-interactief-account-dev-secret"
   );
 }
 

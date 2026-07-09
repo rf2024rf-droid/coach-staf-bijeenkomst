@@ -1,7 +1,7 @@
 import { createHmac, timingSafeEqual } from "crypto";
 import { AppError } from "@/db/store";
 
-const cookieName = "coach-staf-moderator";
+const cookieName = "sessie-interactief-moderator";
 const maxAgeSeconds = 60 * 60 * 24 * 7;
 
 function getModeratorPassword() {
@@ -13,7 +13,7 @@ function getModeratorSecret() {
     process.env.MODERATOR_SESSION_SECRET ??
     process.env.MODERATOR_PASSWORD ??
     process.env.SUPABASE_DATABASE_URL ??
-    "coach-staf-bijeenkomst-dev-secret"
+    "sessie-interactief-dev-secret"
   );
 }
 

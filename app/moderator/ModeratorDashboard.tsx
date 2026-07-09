@@ -51,6 +51,11 @@ type AccountsResponse = {
 };
 
 type AuthMode = "login" | "signup" | "admin";
+type EntryMode = "users" | "admin";
+
+type ModeratorDashboardProps = {
+  entryMode?: EntryMode;
+};
 
 function formatDate(value: string | null) {
   if (!value) {
@@ -70,12 +75,12 @@ function statusLabel(status: ModeratorAccountSummary["status"]) {
   return status === "active" ? "Actief" : "Wacht op mailactivatie";
 }
 
-export default function ModeratorDashboard() {
+export default function ModeratorDashboard({ entryMode = "users" }: ModeratorDashboardProps) {
   const router = useRouter();
   const [session, setSession] = useState<SessionState | null>(null);
   const [presentations, setPresentations] = useState<ModeratorPresentationSummary[]>([]);
   const [accounts, setAccounts] = useState<ModeratorAccountSummary[]>([]);
-  const [authMode, setAuthMode] = useState<AuthMode>("login");
+  const [authMode, setAuthMode] = useState<AuthMode>(entryMode === "admin" ? "admin" : "login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [signupEmail, setSignupEmail] = useState("");
@@ -83,7 +88,7 @@ export default function ModeratorDashboard() {
   const [signupPasswordRepeat, setSignupPasswordRepeat] = useState("");
   const [signupCode, setSignupCode] = useState("");
   const [adminPassword, setAdminPassword] = useState("");
-  const [newTitle, setNewTitle] = useState("Coach Staf Bijeenkomst");
+  const [newTitle, setNewTitle] = useState("Sessie Interactief");
   const [newTemplate, setNewTemplate] = useState<"default" | "quiz">("default");
   const [query, setQuery] = useState("");
   const [editingId, setEditingId] = useState("");
@@ -150,7 +155,7 @@ export default function ModeratorDashboard() {
       const response = await fetch("/api/moderator/session", { cache: "no-store" });
       const data = (await response.json()) as SessionState | { error: string };
       if (!response.ok || "error" in data) {
-        throw new Error("error" in data ? data.error : "Moderatorstatus kon niet worden geladen.");
+        throw new Error("error" in data ? data.error : "Inlogstatus kon niet worden geladen.");
       }
 
       setSession(data);
@@ -164,7 +169,7 @@ export default function ModeratorDashboard() {
       }
       setError("");
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Moderatorstatus kon niet worden geladen.");
+      setError(caught instanceof Error ? caught.message : "Inlogstatus kon niet worden geladen.");
     } finally {
       setLoading(false);
     }
@@ -384,7 +389,7 @@ export default function ModeratorDashboard() {
       <main className="grid min-h-screen place-items-center bg-[#f5f5f0] text-zinc-800">
         <div className="flex items-center gap-3 font-bold">
           <Loader2 aria-hidden className="h-5 w-5 animate-spin" />
-          Moderator laden...
+          Omgeving laden...
         </div>
       </main>
     );
@@ -399,7 +404,7 @@ export default function ModeratorDashboard() {
           </div>
           <h1 className="text-2xl font-black">Login instellen</h1>
           <p className="mt-3 leading-7 text-zinc-700">
-            Zet in Vercel minimaal <code>SUPABASE_URL</code> en <code>SUPABASE_ANON_KEY</code> voor testeraccounts.
+            Zet in Vercel minimaal <code>SUPABASE_URL</code> en <code>SUPABASE_ANON_KEY</code> voor gebruikersaccounts.
             Voor beheerderlogin kun je <code>MODERATOR_PASSWORD</code> blijven gebruiken.
           </p>
         </section>
@@ -408,32 +413,30 @@ export default function ModeratorDashboard() {
   }
 
   if (!session.authenticated) {
-    return (
-      <main className="min-h-screen bg-[#f5f5f0] px-5 py-8 text-zinc-950">
-        <div className="mx-auto grid w-full max-w-5xl gap-5 lg:grid-cols-[0.9fr_1.1fr]">
-          <section className="rounded-lg border border-zinc-300 bg-white p-6 shadow-sm">
-            <p className="text-sm font-semibold uppercase text-emerald-800">Coach Staf Bijeenkomst</p>
-            <h1 className="mt-2 text-3xl font-black">Moderatoromgeving</h1>
-            <p className="mt-3 leading-7 text-zinc-700">
-              Testers kunnen met hun eigen e-mailadres inloggen en alleen hun eigen presentaties beheren.
-              Nieuwe accounts moeten eerst via e-mail worden geactiveerd.
-            </p>
-            <div className="mt-5 grid gap-3 text-sm font-semibold text-zinc-700">
-              <div className="rounded-lg bg-zinc-50 p-3">
-                Maximaal {session.limits.maxAccounts} testaccounts
-              </div>
-              <div className="rounded-lg bg-zinc-50 p-3">
-                Testers: maximaal {session.limits.maxPresentations ?? 2} presentaties en {session.limits.maxQuestions ?? 12} vragen per presentatie
-              </div>
-              <div className="rounded-lg bg-zinc-50 p-3">
-                Aangemaakt: {session.limits.accountCount}/{session.limits.maxAccounts} testaccounts
-              </div>
-            </div>
-          </section>
+    const availableModes: AuthMode[] = entryMode === "admin" ? ["admin"] : ["login", "signup"];
 
-          <section className="rounded-lg border border-zinc-300 bg-white p-6 shadow-sm">
-            <div className="mb-5 grid gap-2 sm:grid-cols-3">
-              {(["login", "signup", "admin"] as AuthMode[]).map((mode) => (
+    return (
+      <main className="grid min-h-screen place-items-center bg-[#f5f5f0] px-5 py-8 text-zinc-950">
+        <section className="w-full max-w-md rounded-lg border border-zinc-300 bg-white p-6 shadow-sm">
+          <div className="mb-5 flex items-center gap-3">
+            <div className="grid h-10 w-10 place-items-center rounded-lg bg-zinc-900 text-white">
+              {entryMode === "admin" ? (
+                <ShieldCheck aria-hidden className="h-5 w-5" />
+              ) : (
+                <KeyRound aria-hidden className="h-5 w-5" />
+              )}
+            </div>
+            <div>
+              <p className="text-xs font-black uppercase text-emerald-800">Sessie Interactief</p>
+              <h1 className="text-xl font-black">
+                {entryMode === "admin" ? "Beheerder login" : "Gebruikerslogin"}
+              </h1>
+            </div>
+          </div>
+
+          {availableModes.length > 1 ? (
+            <div className="mb-5 grid gap-2 sm:grid-cols-2">
+              {availableModes.map((mode) => (
                 <button
                   className={`rounded-lg px-3 py-3 text-sm font-black ${
                     authMode === mode ? "bg-zinc-950 text-white" : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200"
@@ -446,157 +449,178 @@ export default function ModeratorDashboard() {
                   }}
                   type="button"
                 >
-                  {mode === "login" ? "Inloggen" : mode === "signup" ? "Account aanvragen" : "Beheerder"}
+                  {mode === "login" ? "Inloggen" : "Account aanvragen"}
                 </button>
               ))}
             </div>
+          ) : null}
 
-            {notice || error ? (
-              <div
-                className={`mb-4 rounded-lg px-4 py-3 text-sm font-semibold ${
-                  error ? "bg-rose-50 text-rose-800" : "bg-emerald-50 text-emerald-900"
-                }`}
-              >
-                {error || notice}
+          {notice || error ? (
+            <div
+              className={`mb-4 rounded-lg px-4 py-3 text-sm font-semibold ${
+                error ? "bg-rose-50 text-rose-800" : "bg-emerald-50 text-emerald-900"
+              }`}
+            >
+              {error || notice}
+            </div>
+          ) : null}
+
+          {authMode === "signup" ? (
+            <form onSubmit={signup}>
+              <div className="mb-5 flex items-center gap-3">
+                <div className="grid h-10 w-10 place-items-center rounded-lg bg-emerald-800 text-white">
+                  <UserPlus aria-hidden className="h-5 w-5" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-black">Account aanvragen</h2>
+                  <p className="text-sm text-zinc-600">Na aanmelding ontvang je een activatielink per e-mail.</p>
+                </div>
               </div>
-            ) : null}
+              <label className="block text-sm font-semibold text-zinc-700" htmlFor="signup-email">
+                E-mailadres
+              </label>
+              <input
+                className="mt-2 w-full rounded-lg border border-zinc-300 px-4 py-3 outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
+                id="signup-email"
+                onChange={(event) => setSignupEmail(event.target.value)}
+                type="email"
+                value={signupEmail}
+              />
+              <label className="mt-4 block text-sm font-semibold text-zinc-700" htmlFor="signup-password">
+                Wachtwoord
+              </label>
+              <input
+                className="mt-2 w-full rounded-lg border border-zinc-300 px-4 py-3 outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
+                id="signup-password"
+                minLength={8}
+                onChange={(event) => setSignupPassword(event.target.value)}
+                type="password"
+                value={signupPassword}
+              />
+              <label className="mt-4 block text-sm font-semibold text-zinc-700" htmlFor="signup-password-repeat">
+                Herhaal wachtwoord
+              </label>
+              <input
+                className="mt-2 w-full rounded-lg border border-zinc-300 px-4 py-3 outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
+                id="signup-password-repeat"
+                minLength={8}
+                onChange={(event) => setSignupPasswordRepeat(event.target.value)}
+                type="password"
+                value={signupPasswordRepeat}
+              />
+              {session.signupCodeRequired ? (
+                <>
+                  <label className="mt-4 block text-sm font-semibold text-zinc-700" htmlFor="signup-code">
+                    Uitnodigingscode
+                  </label>
+                  <input
+                    className="mt-2 w-full rounded-lg border border-zinc-300 px-4 py-3 outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
+                    id="signup-code"
+                    onChange={(event) => setSignupCode(event.target.value)}
+                    value={signupCode}
+                  />
+                </>
+              ) : null}
+              <button
+                className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-800 px-4 py-3 font-bold text-white hover:bg-emerald-900 disabled:opacity-60"
+                disabled={busy === "signup" || !session.accountAuthConfigured}
+                type="submit"
+              >
+                <MailCheck aria-hidden className="h-5 w-5" />
+                {busy === "signup" ? "Aanvragen..." : "Maak account aan"}
+              </button>
+              {!session.accountAuthConfigured ? (
+                <p className="mt-3 text-sm font-semibold text-rose-800">
+                  Supabase Auth staat nog niet ingesteld in Vercel.
+                </p>
+              ) : null}
+            </form>
+          ) : (
+            <form onSubmit={login}>
+              {authMode === "admin" ? (
+                <>
+                  <label className="block text-sm font-semibold text-zinc-700" htmlFor="admin-password">
+                    Beheerwachtwoord
+                  </label>
+                  <input
+                    className="mt-2 w-full rounded-lg border border-zinc-300 px-4 py-3 outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
+                    id="admin-password"
+                    onChange={(event) => setAdminPassword(event.target.value)}
+                    type="password"
+                    value={adminPassword}
+                  />
+                </>
+              ) : (
+                <>
+                  <label className="block text-sm font-semibold text-zinc-700" htmlFor="account-email">
+                    E-mailadres
+                  </label>
+                  <input
+                    className="mt-2 w-full rounded-lg border border-zinc-300 px-4 py-3 outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
+                    id="account-email"
+                    onChange={(event) => setEmail(event.target.value)}
+                    type="email"
+                    value={email}
+                  />
+                  <label className="mt-4 block text-sm font-semibold text-zinc-700" htmlFor="account-password">
+                    Wachtwoord
+                  </label>
+                  <input
+                    className="mt-2 w-full rounded-lg border border-zinc-300 px-4 py-3 outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
+                    id="account-password"
+                    onChange={(event) => setPassword(event.target.value)}
+                    type="password"
+                    value={password}
+                  />
+                </>
+              )}
+              <button
+                className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-800 px-4 py-3 font-bold text-white hover:bg-emerald-900 disabled:opacity-60"
+                disabled={busy === authMode || (authMode === "login" && !session.accountAuthConfigured)}
+                type="submit"
+              >
+                <KeyRound aria-hidden className="h-5 w-5" />
+                {busy === authMode ? "Inloggen..." : "Inloggen"}
+              </button>
+            </form>
+          )}
 
-            {authMode === "signup" ? (
-              <form onSubmit={signup}>
-                <div className="mb-5 flex items-center gap-3">
-                  <div className="grid h-10 w-10 place-items-center rounded-lg bg-emerald-800 text-white">
-                    <UserPlus aria-hidden className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <h2 className="text-xl font-black">Account aanvragen</h2>
-                    <p className="text-sm text-zinc-600">Na aanmelding ontvang je een activatielink per e-mail.</p>
-                  </div>
-                </div>
-                <label className="block text-sm font-semibold text-zinc-700" htmlFor="signup-email">
-                  E-mailadres
-                </label>
-                <input
-                  className="mt-2 w-full rounded-lg border border-zinc-300 px-4 py-3 outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
-                  id="signup-email"
-                  onChange={(event) => setSignupEmail(event.target.value)}
-                  type="email"
-                  value={signupEmail}
-                />
-                <label className="mt-4 block text-sm font-semibold text-zinc-700" htmlFor="signup-password">
-                  Wachtwoord
-                </label>
-                <input
-                  className="mt-2 w-full rounded-lg border border-zinc-300 px-4 py-3 outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
-                  id="signup-password"
-                  minLength={8}
-                  onChange={(event) => setSignupPassword(event.target.value)}
-                  type="password"
-                  value={signupPassword}
-                />
-                <label className="mt-4 block text-sm font-semibold text-zinc-700" htmlFor="signup-password-repeat">
-                  Herhaal wachtwoord
-                </label>
-                <input
-                  className="mt-2 w-full rounded-lg border border-zinc-300 px-4 py-3 outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
-                  id="signup-password-repeat"
-                  minLength={8}
-                  onChange={(event) => setSignupPasswordRepeat(event.target.value)}
-                  type="password"
-                  value={signupPasswordRepeat}
-                />
-                {session.signupCodeRequired ? (
-                  <>
-                    <label className="mt-4 block text-sm font-semibold text-zinc-700" htmlFor="signup-code">
-                      Uitnodigingscode
-                    </label>
-                    <input
-                      className="mt-2 w-full rounded-lg border border-zinc-300 px-4 py-3 outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
-                      id="signup-code"
-                      onChange={(event) => setSignupCode(event.target.value)}
-                      value={signupCode}
-                    />
-                  </>
-                ) : null}
-                <button
-                  className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-800 px-4 py-3 font-bold text-white hover:bg-emerald-900 disabled:opacity-60"
-                  disabled={busy === "signup" || !session.accountAuthConfigured}
-                  type="submit"
-                >
-                  <MailCheck aria-hidden className="h-5 w-5" />
-                  {busy === "signup" ? "Aanvragen..." : "Maak account aan"}
-                </button>
-                {!session.accountAuthConfigured ? (
-                  <p className="mt-3 text-sm font-semibold text-rose-800">
-                    Supabase Auth staat nog niet ingesteld in Vercel.
-                  </p>
-                ) : null}
-              </form>
-            ) : (
-              <form onSubmit={login}>
-                <div className="mb-5 flex items-center gap-3">
-                  <div className="grid h-10 w-10 place-items-center rounded-lg bg-zinc-900 text-white">
-                    {authMode === "admin" ? <ShieldCheck aria-hidden className="h-5 w-5" /> : <KeyRound aria-hidden className="h-5 w-5" />}
-                  </div>
-                  <div>
-                    <h2 className="text-xl font-black">
-                      {authMode === "admin" ? "Beheerder login" : "Tester login"}
-                    </h2>
-                    <p className="text-sm text-zinc-600">
-                      {authMode === "admin"
-                        ? "Voor de maker van het platform."
-                        : "Log in met je geactiveerde account."}
-                    </p>
-                  </div>
-                </div>
-                {authMode === "admin" ? (
-                  <>
-                    <label className="block text-sm font-semibold text-zinc-700" htmlFor="admin-password">
-                      Beheerwachtwoord
-                    </label>
-                    <input
-                      className="mt-2 w-full rounded-lg border border-zinc-300 px-4 py-3 outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
-                      id="admin-password"
-                      onChange={(event) => setAdminPassword(event.target.value)}
-                      type="password"
-                      value={adminPassword}
-                    />
-                  </>
-                ) : (
-                  <>
-                    <label className="block text-sm font-semibold text-zinc-700" htmlFor="account-email">
-                      E-mailadres
-                    </label>
-                    <input
-                      className="mt-2 w-full rounded-lg border border-zinc-300 px-4 py-3 outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
-                      id="account-email"
-                      onChange={(event) => setEmail(event.target.value)}
-                      type="email"
-                      value={email}
-                    />
-                    <label className="mt-4 block text-sm font-semibold text-zinc-700" htmlFor="account-password">
-                      Wachtwoord
-                    </label>
-                    <input
-                      className="mt-2 w-full rounded-lg border border-zinc-300 px-4 py-3 outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
-                      id="account-password"
-                      onChange={(event) => setPassword(event.target.value)}
-                      type="password"
-                      value={password}
-                    />
-                  </>
-                )}
-                <button
-                  className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-800 px-4 py-3 font-bold text-white hover:bg-emerald-900 disabled:opacity-60"
-                  disabled={busy === authMode || (authMode === "login" && !session.accountAuthConfigured)}
-                  type="submit"
-                >
-                  <KeyRound aria-hidden className="h-5 w-5" />
-                  {busy === authMode ? "Inloggen..." : "Inloggen"}
-                </button>
-              </form>
-            )}
-          </section>
-        </div>
+          <a
+            className="mt-4 inline-flex w-full items-center justify-center rounded-lg border border-zinc-300 bg-white px-4 py-3 text-sm font-bold text-zinc-700 hover:bg-zinc-50"
+            href={entryMode === "admin" ? "/moderator" : "/beheerder"}
+          >
+            {entryMode === "admin" ? "Naar gebruikerslogin" : "Naar beheerderlogin"}
+          </a>
+        </section>
+      </main>
+    );
+  }
+
+  if ((entryMode === "admin" && session.role !== "admin") || (entryMode === "users" && session.role === "admin")) {
+    return (
+      <main className="grid min-h-screen place-items-center bg-[#f5f5f0] px-5 text-zinc-950">
+        <section className="w-full max-w-md rounded-lg border border-zinc-300 bg-white p-6 text-center shadow-sm">
+          <p className="text-sm font-semibold uppercase text-emerald-800">Sessie Interactief</p>
+          <h1 className="mt-2 text-2xl font-black">Andere ingang nodig</h1>
+          <p className="mt-3 leading-7 text-zinc-700">
+            Je bent al ingelogd. Gebruik de juiste ingang voor dit account of log uit.
+          </p>
+          <div className="mt-5 grid gap-2">
+            <a
+              className="inline-flex items-center justify-center rounded-lg bg-zinc-900 px-4 py-3 font-bold text-white hover:bg-zinc-700"
+              href={session.role === "admin" ? "/beheerder" : "/moderator"}
+            >
+              Open juiste omgeving
+            </a>
+            <button
+              className="inline-flex items-center justify-center rounded-lg border border-zinc-300 bg-white px-4 py-3 font-bold text-zinc-700 hover:bg-zinc-50"
+              onClick={logout}
+              type="button"
+            >
+              Uitloggen
+            </button>
+          </div>
+        </section>
       </main>
     );
   }
@@ -606,9 +630,9 @@ export default function ModeratorDashboard() {
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-5 py-6 md:px-8">
         <header className="flex flex-col gap-4 border-b border-zinc-300 pb-5 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="text-sm font-semibold uppercase text-emerald-800">Coach Staf Bijeenkomst</p>
+            <p className="text-sm font-semibold uppercase text-emerald-800">Sessie Interactief</p>
             <h1 className="mt-2 text-3xl font-black md:text-4xl">
-              {session.role === "admin" ? "Platformbeheer" : "Mijn moderatoromgeving"}
+              {session.role === "admin" ? "Platformbeheer" : "Mijn omgeving"}
             </h1>
             <p className="mt-2 max-w-2xl text-zinc-700">
               {session.role === "admin"
@@ -644,7 +668,7 @@ export default function ModeratorDashboard() {
             <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-600">
               {session.role === "tester"
                 ? `Je kunt maximaal ${session.limits.maxPresentations} presentaties of quizzen maken met maximaal ${session.limits.maxQuestions} vragen per presentatie.`
-                : "Maak hier een presentatie aan. Beheerderpresentaties hebben geen testaccountlimiet."}
+                : "Maak hier een presentatie aan. Beheerderspresentaties hebben geen gebruikerslimiet."}
             </p>
           </div>
           <form className="grid gap-3 sm:grid-cols-[minmax(220px,340px)_minmax(180px,240px)] lg:grid-cols-[minmax(220px,340px)_minmax(180px,240px)_auto]" onSubmit={createPresentation}>
@@ -699,7 +723,7 @@ export default function ModeratorDashboard() {
           </article>
           <article className="rounded-lg border border-zinc-300 bg-white p-4 shadow-sm">
             <p className="text-sm font-semibold text-zinc-600">
-              {session.role === "admin" ? "Testaccounts" : "Deelnemers"}
+              {session.role === "admin" ? "Gebruikersaccounts" : "Deelnemers"}
             </p>
             <p className="mt-2 text-3xl font-black">
               {session.role === "admin"
@@ -717,12 +741,12 @@ export default function ModeratorDashboard() {
                 <h2 className="text-lg font-black">Aangemelde accounts</h2>
               </div>
               <span className="rounded-md bg-zinc-100 px-3 py-2 text-sm font-bold text-zinc-700">
-                {accounts.length}/{session.limits.maxAccounts} testaccounts
+                {accounts.length}/{session.limits.maxAccounts} gebruikersaccounts
               </span>
             </div>
             {!accounts.length ? (
               <div className="rounded-lg border border-dashed border-zinc-300 p-6 text-center text-zinc-600">
-                Nog geen testaccounts aangemaakt.
+                Nog geen gebruikersaccounts aangemaakt.
               </div>
             ) : (
               <div className="grid gap-3">

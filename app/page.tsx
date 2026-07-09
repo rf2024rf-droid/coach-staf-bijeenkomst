@@ -21,19 +21,27 @@ export default function Home() {
       <div className="mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-6 px-5 py-6 md:px-8">
         <header className="flex flex-col gap-4 border-b border-zinc-300 pb-6 md:flex-row md:items-end md:justify-between">
           <div>
-            <p className="text-sm font-semibold uppercase text-emerald-800">Coach Staf Bijeenkomst</p>
+            <p className="text-sm font-semibold uppercase text-emerald-800">Sessie Interactief</p>
             <h1 className="mt-2 text-3xl font-black md:text-5xl">Startpunt voor sessies</h1>
             <p className="mt-3 max-w-2xl leading-7 text-zinc-700">
-              Moderators beheren presentaties met hun eigen account. Deelnemers gebruiken alleen de sessiecode of QR-code.
+              Gebruikers beheren presentaties met hun eigen account. Deelnemers gebruiken alleen de sessiecode of QR-code.
             </p>
           </div>
-          <a
-            className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-800 px-4 py-3 font-bold text-white hover:bg-emerald-900"
-            href="/moderator"
-          >
-            <ShieldCheck aria-hidden className="h-5 w-5" />
-            Moderator login
-          </a>
+          <div className="flex flex-wrap gap-2">
+            <a
+              className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-800 px-4 py-3 font-bold text-white hover:bg-emerald-900"
+              href="/moderator"
+            >
+              <ShieldCheck aria-hidden className="h-5 w-5" />
+              Gebruiker login
+            </a>
+            <a
+              className="inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-white px-4 py-3 font-bold text-zinc-800 hover:bg-zinc-50"
+              href="/beheerder"
+            >
+              Beheerder login
+            </a>
+          </div>
         </header>
 
         <section className="grid flex-1 items-start gap-6 lg:grid-cols-[1fr_0.9fr]">
@@ -43,19 +51,19 @@ export default function Home() {
                 <ShieldCheck aria-hidden className="h-6 w-6" />
               </div>
               <div>
-                <p className="text-xs font-black uppercase text-emerald-800">Moderator</p>
-                <h2 className="text-xl font-black">Centrale beheeromgeving</h2>
+                <p className="text-xs font-black uppercase text-emerald-800">Gebruikers</p>
+                <h2 className="text-xl font-black">Eigen sessies beheren</h2>
               </div>
             </div>
             <p className="leading-7 text-zinc-700">
-              Log in als beheerder of tester om presentaties aan te maken, bestaande sessies te openen, QR-codes te
+              Log in om presentaties aan te maken, bestaande sessies te openen, QR-codes te
               behouden en het grote scherm te bedienen.
             </p>
             <a
               className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-zinc-900 px-4 py-3 font-bold text-white hover:bg-zinc-700 sm:w-auto"
               href="/moderator"
             >
-              Open moderatoromgeving
+              Open gebruikersomgeving
               <ArrowRight aria-hidden className="h-5 w-5" />
             </a>
           </article>

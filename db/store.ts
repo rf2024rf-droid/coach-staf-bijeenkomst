@@ -480,7 +480,7 @@ function mapPresentation(row: PresentationRow) {
     title: row.title,
     code: row.code,
     presenterKey: row.presenter_key,
-    idleScreenText: row.idle_screen_text || "Coach Staf Bijeenkomst",
+    idleScreenText: row.idle_screen_text || "Sessie Interactief",
     activeQuestionId: row.active_question_id,
     screenQuestionId: row.screen_question_id,
     screenView: row.screen_view ?? "question",
@@ -710,7 +710,7 @@ export async function createPendingAccount(emailInput: unknown, supabaseUserIdIn
   const accountCount = await countTesterAccounts();
   const maxAccounts = betaMaxAccounts();
   if (accountCount >= maxAccounts) {
-    throw new AppError(403, `Het maximum van ${maxAccounts} testaccounts is bereikt.`);
+    throw new AppError(403, `Het maximum van ${maxAccounts} gebruikersaccounts is bereikt.`);
   }
 
   const supabaseUserId = cleanText(supabaseUserIdInput, 120) || null;
@@ -773,7 +773,7 @@ export async function activateAccount(emailInput: unknown, supabaseUserIdInput: 
     const accountCount = await countTesterAccounts();
     const maxAccounts = betaMaxAccounts();
     if (accountCount >= maxAccounts) {
-      throw new AppError(403, `Het maximum van ${maxAccounts} testaccounts is bereikt.`);
+      throw new AppError(403, `Het maximum van ${maxAccounts} gebruikersaccounts is bereikt.`);
     }
   }
 
@@ -1059,7 +1059,7 @@ export async function createPresentation(
   await ensureSchema();
 
   const sql = getSql();
-  const title = cleanText(titleInput, 90) || "Coach Staf Bijeenkomst";
+  const title = cleanText(titleInput, 90) || "Sessie Interactief";
   const template: PresentationTemplate = templateInput === "quiz" ? "quiz" : "default";
   const id = makeId("prs");
   const presenterKey = makePresenterKey();
@@ -1672,7 +1672,7 @@ export async function getPublicSession(codeInput: string, participantIdInput?: u
       id: presentation.id,
       title: presentation.title,
       code: presentation.code,
-      idleScreenText: presentation.idle_screen_text || "Coach Staf Bijeenkomst",
+      idleScreenText: presentation.idle_screen_text || "Sessie Interactief",
     },
     screenView: presentation.screen_view ?? "question",
     activeQuestion: hideCorrectAnswers(activeQuestion),

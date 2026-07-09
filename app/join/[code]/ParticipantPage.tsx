@@ -56,7 +56,7 @@ function readStoredIdentity(storageKey: string): { mode: IdentityMode; displayNa
 export default function ParticipantPage({ code }: ParticipantPageProps) {
   const normalizedCode = useMemo(() => code.replace(/[^a-z0-9]/gi, "").toUpperCase(), [code]);
   const identityStorageKey = useMemo(
-    () => `coach-staf-participant-profile-${normalizedCode}`,
+    () => `sessie-interactief-participant-profile-${normalizedCode}`,
     [normalizedCode]
   );
   const storedIdentity = useMemo(() => readStoredIdentity(identityStorageKey), [identityStorageKey]);
@@ -66,7 +66,7 @@ export default function ParticipantPage({ code }: ParticipantPageProps) {
       return "";
     }
 
-    const storageKey = `coach-staf-participant-id-${normalizedCode}`;
+    const storageKey = `sessie-interactief-participant-id-${normalizedCode}`;
     const storedId = window.localStorage.getItem(storageKey) ?? createParticipantId();
     window.localStorage.setItem(storageKey, storedId);
     return storedId;
@@ -262,7 +262,7 @@ export default function ParticipantPage({ code }: ParticipantPageProps) {
       <main className="min-h-screen bg-zinc-950 px-4 py-5 text-white">
         <div className="mx-auto flex w-full max-w-2xl flex-col gap-5">
           <header className="rounded-lg border border-zinc-700 bg-zinc-900 p-4 shadow-sm">
-            <p className="text-sm font-semibold uppercase text-emerald-300">Coach Staf Bijeenkomst</p>
+            <p className="text-sm font-semibold uppercase text-emerald-300">Sessie Interactief</p>
             <h1 className="mt-1 text-2xl font-black">{session.presentation.title}</h1>
             <div className="mt-3 flex flex-wrap gap-2">
               <span className="rounded-md bg-zinc-950 px-2 py-1 font-mono text-sm font-bold text-zinc-300">
@@ -356,7 +356,7 @@ export default function ParticipantPage({ code }: ParticipantPageProps) {
     <main className="min-h-screen bg-zinc-950 px-4 py-5 text-white">
       <div className="mx-auto flex w-full max-w-2xl flex-col gap-5">
         <header className="rounded-lg border border-zinc-700 bg-zinc-900 p-4 shadow-sm">
-          <p className="text-sm font-semibold uppercase text-emerald-300">Coach Staf Bijeenkomst</p>
+          <p className="text-sm font-semibold uppercase text-emerald-300">Sessie Interactief</p>
           <h1 className="mt-1 text-2xl font-black">{session.presentation.title}</h1>
           <div className="mt-3 flex flex-wrap gap-2">
             <span className="rounded-md bg-zinc-950 px-2 py-1 font-mono text-sm font-bold text-zinc-300">

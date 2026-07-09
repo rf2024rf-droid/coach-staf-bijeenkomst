@@ -24,7 +24,7 @@ export default function JoinPage() {
             <LogIn aria-hidden className="h-5 w-5" />
           </div>
           <div>
-            <p className="text-sm font-semibold uppercase text-emerald-300">Coach Staf Bijeenkomst</p>
+            <p className="text-sm font-semibold uppercase text-emerald-300">Sessie Interactief</p>
             <h1 className="text-2xl font-black">Meedoen</h1>
           </div>
         </div>

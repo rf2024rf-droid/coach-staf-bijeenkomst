@@ -49,6 +49,8 @@ type QuestionEditForm = {
   quizOptions: OptionDraft[];
 };
 
+type PresenterTab = "regie" | "vragen" | "resultaten" | "instellingen";
+
 function makeOptionDraft(label = "", isCorrect = false): OptionDraft {
   return {
     id: `draft_${Date.now()}_${Math.random().toString(16).slice(2)}`,
@@ -198,6 +200,7 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
   const [payload, setPayload] = useState<PresenterPayload | null>(null);
   const [origin] = useState(() => (typeof window === "undefined" ? "" : window.location.origin));
   const [form, setForm] = useState<QuestionForm>(() => createDefaultQuestionForm());
+  const [presenterTab, setPresenterTab] = useState<PresenterTab>("regie");
   const [editingQuestionId, setEditingQuestionId] = useState("");
   const [editForm, setEditForm] = useState<QuestionEditForm>(() => ({
     prompt: "",
@@ -351,6 +354,7 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
   }
 
   function startEditing(question: QuestionResult) {
+    setPresenterTab("vragen");
     setEditingQuestionId(question.id);
     setEditForm({
       prompt: question.prompt,
@@ -605,11 +609,27 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
     payload.quizTotals.total > 0 && payload.quizTotals.finalized >= payload.quizTotals.total
       ? "Eindklassering"
       : "Tussenstand";
+  const editingQuestion = payload.questions.find((question) => question.id === editingQuestionId) ?? null;
+  const tabs: Array<{ id: PresenterTab; label: string; meta: string }> = [
+    { id: "regie", label: "Regie", meta: activeQuestion ? "live" : "stand-by" },
+    { id: "vragen", label: "Vragen", meta: `${payload.questions.length}` },
+    { id: "resultaten", label: "Resultaten", meta: `${payload.totals.answers}` },
+    { id: "instellingen", label: "Instellingen", meta: payload.presentation.code },
+  ];
+
+  function tabClassName(tab: PresenterTab) {
+    return `rounded-lg px-4 py-3 text-left text-sm font-black transition ${
+      presenterTab === tab
+        ? "bg-zinc-950 text-white shadow-sm"
+        : "bg-white text-zinc-700 hover:bg-zinc-100"
+    }`;
+  }
 
   return (
-    <main className={`min-h-screen bg-[#f5f5f0] text-zinc-950 ${activeQuestion ? "pb-72 md:pb-36" : ""}`}>
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-5 md:px-8">
-        <header className="flex flex-col gap-4 border-b border-zinc-300 pb-5 lg:flex-row lg:items-end lg:justify-between">
+    <main className={`min-h-screen bg-[#f4f4ef] text-zinc-950 ${activeQuestion ? "pb-72 md:pb-36" : ""}`}>
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-4 py-5 md:px-8">
+        <header className="rounded-lg border border-zinc-300 bg-white p-5 shadow-sm">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="text-sm font-semibold uppercase text-emerald-800">Sessie Interactief</p>
             <h1 className="mt-2 text-3xl font-black md:text-4xl">{payload.presentation.title}</h1>
@@ -674,6 +694,7 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
               Groot scherm
             </a>
           </div>
+          </div>
         </header>
 
         {notice || error ? (
@@ -686,9 +707,232 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
           </div>
         ) : null}
 
-        <section className="grid gap-6 xl:grid-cols-[360px_1fr]">
+        <nav className="grid gap-2 rounded-lg border border-zinc-300 bg-zinc-100 p-2 sm:grid-cols-4">
+          {tabs.map((tab) => (
+            <button className={tabClassName(tab.id)} key={tab.id} onClick={() => setPresenterTab(tab.id)} type="button">
+              <span className="block">{tab.label}</span>
+              <span className={`mt-1 block text-xs ${presenterTab === tab.id ? "text-zinc-300" : "text-zinc-500"}`}>
+                {tab.meta}
+              </span>
+            </button>
+          ))}
+        </nav>
+
+        {presenterTab === "regie" ? (
+          <section className="grid gap-6 xl:grid-cols-[1fr_360px]">
+            <div className="flex flex-col gap-6">
+              <article
+                className={`rounded-lg border p-5 shadow-sm ${
+                  activeQuestion ? "border-emerald-400 bg-emerald-50" : "border-zinc-300 bg-white"
+                }`}
+              >
+                <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+                  <div className="min-w-0">
+                    <p className={`inline-flex items-center gap-2 text-xs font-black uppercase ${activeQuestion ? "text-emerald-900" : "text-zinc-500"}`}>
+                      <span className={`h-2.5 w-2.5 rounded-full ${activeQuestion ? "bg-emerald-700" : "bg-zinc-400"}`} />
+                      {activeQuestion ? "Nu live" : "Regie stand-by"}
+                    </p>
+                    <h2 className="mt-3 text-2xl font-black leading-tight md:text-3xl">
+                      {activeQuestion ? activeQuestion.prompt : "Kies een vraag om live te zetten"}
+                    </h2>
+                    <p className="mt-3 text-sm font-semibold text-zinc-600">
+                      {activeQuestion
+                        ? `${activeQuestion.answerCount} antwoorden binnen / groot scherm toont ${screenViewLabel(payload.presentation.screenView)}`
+                        : "Zet de QR groot, open een vraag en toon resultaten pas wanneer jij dat wilt."}
+                    </p>
+                  </div>
+                  <div className="grid gap-2 sm:grid-cols-2 lg:w-[360px]">
+                    <button
+                      className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-800 px-4 py-3 font-black text-white hover:bg-emerald-900 disabled:opacity-40"
+                      disabled={saving || !nextQuestion}
+                      onClick={() => nextQuestion && activate(nextQuestion.id)}
+                      type="button"
+                    >
+                      <ArrowDown aria-hidden className="h-4 w-4" />
+                      Volgende
+                    </button>
+                    <button
+                      className={`inline-flex items-center justify-center gap-2 rounded-lg px-4 py-3 font-black disabled:opacity-60 ${
+                        activeResultsVisible ? "bg-zinc-950 text-white hover:bg-zinc-800" : "bg-sky-800 text-white hover:bg-sky-900"
+                      }`}
+                      disabled={saving || !activeQuestion}
+                      onClick={() => activeQuestion && toggleResults(activeQuestion.id)}
+                      type="button"
+                    >
+                      <BarChart3 aria-hidden className="h-4 w-4" />
+                      {activeResultsVisible ? "Sluit resultaten" : "Resultaten"}
+                    </button>
+                    <button
+                      className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-700 px-4 py-3 font-black text-white hover:bg-emerald-800 disabled:opacity-60"
+                      disabled={saving}
+                      onClick={() => updateScreenView("qr")}
+                      type="button"
+                    >
+                      <QrCodeIcon aria-hidden className="h-4 w-4" />
+                      QR tonen
+                    </button>
+                    <button
+                      className="inline-flex items-center justify-center gap-2 rounded-lg bg-amber-700 px-4 py-3 font-black text-white hover:bg-amber-800 disabled:opacity-60"
+                      disabled={saving || !activeQuestion}
+                      onClick={() => activate(null)}
+                      type="button"
+                    >
+                      <Square aria-hidden className="h-4 w-4" />
+                      Stop live
+                    </button>
+                  </div>
+                </div>
+              </article>
+
+              <article className="rounded-lg border border-zinc-300 bg-white p-5 shadow-sm">
+                <div className="mb-5 flex flex-col gap-3 border-b border-zinc-200 pb-4 md:flex-row md:items-end md:justify-between">
+                  <div>
+                    <p className="text-xs font-black uppercase text-emerald-800">Presentatieflow</p>
+                    <h2 className="mt-1 text-xl font-black">Vragen live bedienen</h2>
+                  </div>
+                  <span className="rounded-md bg-zinc-100 px-3 py-2 text-sm font-bold text-zinc-700">
+                    {payload.questions.length} vragen
+                  </span>
+                </div>
+                <div className="grid gap-3">
+                  {payload.questions.map((question, index) => {
+                    const isActive = question.id === payload.presentation.activeQuestionId;
+                    const showingResults =
+                      payload.presentation.screenView === "results" && payload.presentation.screenQuestionId === question.id;
+
+                    return (
+                      <article
+                        className={`rounded-lg border p-4 ${
+                          isActive ? "border-emerald-500 bg-emerald-50 ring-2 ring-emerald-100" : "border-zinc-200 bg-zinc-50"
+                        }`}
+                        key={question.id}
+                      >
+                        <div className="grid gap-4 lg:grid-cols-[auto_1fr_auto] lg:items-center">
+                          <div className="grid h-11 w-11 place-items-center rounded-lg bg-zinc-950 font-black text-white">
+                            {question.position}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="rounded-md bg-white px-2 py-1 text-xs font-bold uppercase text-zinc-600">
+                                {questionTypeLabel(question.type)}
+                              </span>
+                              {isActive ? <span className="rounded-md bg-emerald-800 px-2 py-1 text-xs font-black uppercase text-white">Live</span> : null}
+                              {question.type === "quiz" && question.finalized ? (
+                                <span className="rounded-md bg-amber-100 px-2 py-1 text-xs font-black uppercase text-amber-900">
+                                  Afgesloten
+                                </span>
+                              ) : null}
+                              <span className="rounded-md bg-white px-2 py-1 text-xs font-bold text-zinc-600">
+                                {question.answerCount} antwoorden
+                              </span>
+                            </div>
+                            <h3 className="mt-2 font-black leading-snug">{question.prompt}</h3>
+                          </div>
+                          <div className="flex flex-wrap gap-2 lg:justify-end">
+                            <button
+                              aria-label="Vraag omhoog"
+                              className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-zinc-300 bg-white hover:bg-zinc-100 disabled:opacity-40"
+                              disabled={saving || index === 0}
+                              onClick={() => moveQuestion(question.id, "up")}
+                              type="button"
+                            >
+                              <ArrowUp aria-hidden className="h-4 w-4" />
+                            </button>
+                            <button
+                              aria-label="Vraag omlaag"
+                              className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-zinc-300 bg-white hover:bg-zinc-100 disabled:opacity-40"
+                              disabled={saving || index === payload.questions.length - 1}
+                              onClick={() => moveQuestion(question.id, "down")}
+                              type="button"
+                            >
+                              <ArrowDown aria-hidden className="h-4 w-4" />
+                            </button>
+                            <button
+                              className={`inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-black disabled:opacity-60 ${
+                                showingResults ? "bg-zinc-950 text-white" : "bg-sky-800 text-white hover:bg-sky-900"
+                              }`}
+                              disabled={saving}
+                              onClick={() => toggleResults(question.id)}
+                              type="button"
+                            >
+                              <BarChart3 aria-hidden className="h-4 w-4" />
+                              {showingResults ? "Sluit" : "Resultaten"}
+                            </button>
+                            <button
+                              className={`inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-black text-white disabled:opacity-60 ${
+                                isActive ? "bg-amber-700 hover:bg-amber-800" : "bg-emerald-800 hover:bg-emerald-900"
+                              }`}
+                              disabled={saving || question.finalized}
+                              onClick={() => activate(isActive ? null : question.id)}
+                              type="button"
+                            >
+                              {isActive ? <Square aria-hidden className="h-4 w-4" /> : <Play aria-hidden className="h-4 w-4" />}
+                              {question.finalized ? "Afgesloten" : isActive ? "Stop" : "Live"}
+                            </button>
+                          </div>
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              </article>
+            </div>
+
+            <aside className="flex flex-col gap-6">
+              <article className="rounded-lg border border-zinc-800 bg-zinc-950 p-5 text-white shadow-sm">
+                <p className="text-xs font-black uppercase text-emerald-300">Preview groot scherm</p>
+                <div className="mt-4 rounded-lg border border-zinc-700 bg-zinc-900 p-4">
+                  <p className="text-sm font-bold text-zinc-400">Nu zichtbaar</p>
+                  <h2 className="mt-2 text-2xl font-black">{screenViewLabel(payload.presentation.screenView)}</h2>
+                  <p className="mt-3 line-clamp-4 text-sm leading-6 text-zinc-300">
+                    {payload.presentation.screenView === "qr"
+                      ? `QR-code en sessiecode ${payload.presentation.code}`
+                      : payload.presentation.screenView === "results"
+                        ? payload.questions.find((question) => question.id === payload.presentation.screenQuestionId)?.prompt ?? "Resultaten"
+                        : payload.presentation.screenView === "ranking"
+                          ? rankingLabel
+                          : activeQuestion?.prompt ?? payload.presentation.idleScreenText}
+                  </p>
+                </div>
+                <div className="mt-4 grid grid-cols-2 gap-2">
+                  <button className="rounded-lg bg-white px-3 py-3 text-sm font-black text-zinc-950 hover:bg-zinc-100" disabled={saving} onClick={() => updateScreenView("question")} type="button">
+                    Vraag
+                  </button>
+                  <button className="rounded-lg bg-emerald-700 px-3 py-3 text-sm font-black text-white hover:bg-emerald-800" disabled={saving} onClick={() => updateScreenView("qr")} type="button">
+                    QR
+                  </button>
+                  <button className="rounded-lg bg-sky-700 px-3 py-3 text-sm font-black text-white hover:bg-sky-800 disabled:opacity-60" disabled={saving || !activeQuestion} onClick={() => activeQuestion && toggleResults(activeQuestion.id)} type="button">
+                    Resultaten
+                  </button>
+                  <button className="rounded-lg bg-amber-700 px-3 py-3 text-sm font-black text-white hover:bg-amber-800 disabled:opacity-60" disabled={saving || !payload.quizTotals.finalized} onClick={toggleRanking} type="button">
+                    Stand
+                  </button>
+                </div>
+              </article>
+
+              <article className="rounded-lg border border-zinc-300 bg-white p-5 shadow-sm">
+                <h2 className="text-lg font-black">Deelnemers</h2>
+                <div className="mt-4 grid gap-4 sm:grid-cols-[140px_1fr] xl:grid-cols-1">
+                  <QrCode label={joinLink || payload.presentation.code} value={joinLink || payload.presentation.code} />
+                  <div>
+                    <p className="rounded-lg bg-zinc-100 px-3 py-2 font-mono text-2xl font-black">
+                      {payload.presentation.code}
+                    </p>
+                    <button className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-bold hover:bg-zinc-50" onClick={() => copy(joinLink, "Deelnemerslink")} type="button">
+                      <Copy aria-hidden className="h-4 w-4" />
+                      Link kopieren
+                    </button>
+                  </div>
+                </div>
+              </article>
+            </aside>
+          </section>
+        ) : null}
+
+        {presenterTab !== "regie" ? (
+        <section className={`grid gap-6 ${presenterTab === "vragen" ? "xl:grid-cols-[360px_1fr]" : "xl:grid-cols-1"}`}>
           <aside className="flex flex-col gap-6">
-            <article className="rounded-lg border border-zinc-300 bg-white p-5 shadow-sm">
+            <article className={`${presenterTab === "instellingen" ? "" : "hidden"} rounded-lg border border-zinc-300 bg-white p-5 shadow-sm`}>
               <h2 className="mb-2 text-lg font-bold">Groot scherm bediening</h2>
               <p className="mb-4 text-sm text-zinc-600">
                 Open deze vaste URL op de laptop bij de beamer en stuur de inhoud vanaf hier.
@@ -771,7 +1015,7 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
               </div>
             </article>
 
-            <article className="rounded-lg border border-zinc-300 bg-white p-5 shadow-sm">
+            <article className={`${presenterTab === "instellingen" ? "" : "hidden"} rounded-lg border border-zinc-300 bg-white p-5 shadow-sm`}>
               <h2 className="mb-4 text-lg font-bold">QR voor deelnemers</h2>
               <QrCode label={joinLink || payload.presentation.code} value={joinLink || payload.presentation.code} />
               <div className="mt-4 rounded-lg bg-zinc-100 px-3 py-2 font-mono text-lg font-black">
@@ -779,7 +1023,7 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
               </div>
             </article>
 
-            <form className="rounded-lg border border-zinc-300 bg-white p-5 shadow-sm" onSubmit={createQuestion}>
+            <form className={`${presenterTab === "vragen" ? "" : "hidden"} rounded-lg border border-zinc-300 bg-white p-5 shadow-sm`} onSubmit={createQuestion}>
               <h2 className="mb-4 text-lg font-bold">Vraag toevoegen</h2>
               <label className="block text-sm font-semibold text-zinc-700" htmlFor="question-type">
                 Type
@@ -840,7 +1084,7 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
           </aside>
 
           <section className="flex flex-col gap-6">
-            <article className="rounded-lg border border-zinc-300 bg-white p-5 shadow-sm">
+            <article className={`${presenterTab === "vragen" ? "" : "hidden"} rounded-lg border border-zinc-300 bg-white p-5 shadow-sm`}>
               <div className="mb-5 flex flex-col gap-3 border-b border-zinc-200 pb-4 md:flex-row md:items-start md:justify-between">
                 <div>
                   <p className="text-xs font-black uppercase text-emerald-800">Bediening</p>
@@ -989,7 +1233,7 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
                           </div>
                         </div>
                       </div>
-                    {editingQuestionId === question.id ? (
+                    {presenterTab === "resultaten" && editingQuestionId === question.id ? (
                       <div className="mt-4 rounded-lg border border-emerald-200 bg-white p-4">
                         <label className="block text-sm font-semibold text-zinc-700" htmlFor={`edit-prompt-${question.id}`}>
                           Vraagtekst
@@ -1053,7 +1297,7 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
               </div>
             </article>
 
-            <section className="rounded-lg border border-zinc-300 bg-white p-5 shadow-sm">
+            <section className={`${presenterTab === "resultaten" ? "" : "hidden"} rounded-lg border border-zinc-300 bg-white p-5 shadow-sm`}>
               <div className="mb-5 border-b border-zinc-200 pb-4">
                 <p className="text-xs font-black uppercase text-sky-800">Overzicht</p>
                 <h2 className="mt-1 text-xl font-black">Vragen en antwoorden</h2>
@@ -1082,7 +1326,83 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
             </section>
           </section>
         </section>
+        ) : null}
       </div>
+
+      {editingQuestion ? (
+        <div className="fixed inset-0 z-[60] flex justify-end bg-zinc-950/35 p-3">
+          <section className="flex h-full w-full max-w-xl flex-col overflow-y-auto rounded-lg border border-zinc-300 bg-white p-5 shadow-2xl">
+            <div className="flex items-start justify-between gap-4 border-b border-zinc-200 pb-4">
+              <div>
+                <p className="text-xs font-black uppercase text-emerald-800">{questionTypeLabel(editingQuestion.type)}</p>
+                <h2 className="mt-1 text-xl font-black">Vraag bewerken</h2>
+              </div>
+              <button
+                aria-label="Sluit bewerken"
+                className="rounded-lg border border-zinc-300 bg-white p-2 hover:bg-zinc-100"
+                onClick={() => setEditingQuestionId("")}
+                type="button"
+              >
+                <X aria-hidden className="h-5 w-5" />
+              </button>
+            </div>
+
+            <label className="mt-5 block text-sm font-semibold text-zinc-700" htmlFor={`edit-prompt-${editingQuestion.id}`}>
+              Vraagtekst
+            </label>
+            <textarea
+              className="mt-2 min-h-32 w-full resize-y rounded-lg border border-zinc-300 px-3 py-3 outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
+              id={`edit-prompt-${editingQuestion.id}`}
+              maxLength={180}
+              onChange={(event) => setEditForm((current) => ({ ...current, prompt: event.target.value }))}
+              value={editForm.prompt}
+            />
+
+            {editingQuestion.type === "multiple" ? (
+              <>
+                <label className="mt-4 block text-sm font-semibold text-zinc-700" htmlFor={`edit-options-${editingQuestion.id}`}>
+                  Opties
+                </label>
+                <textarea
+                  className="mt-2 min-h-32 w-full resize-y rounded-lg border border-zinc-300 px-3 py-3 outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
+                  id={`edit-options-${editingQuestion.id}`}
+                  onChange={(event) => setEditForm((current) => ({ ...current, options: event.target.value }))}
+                  value={editForm.options}
+                />
+              </>
+            ) : null}
+
+            {editingQuestion.type === "quiz" ? (
+              <QuizOptionsEditor
+                onChange={(quizOptions) => setEditForm((current) => ({ ...current, quizOptions }))}
+                options={editForm.quizOptions}
+              />
+            ) : null}
+
+            <div className="mt-5 flex flex-wrap gap-2">
+              <button
+                className="inline-flex items-center gap-2 rounded-lg bg-emerald-800 px-4 py-3 text-sm font-bold text-white hover:bg-emerald-900 disabled:opacity-60"
+                disabled={saving}
+                onClick={() => saveQuestionEdit(editingQuestion)}
+                type="button"
+              >
+                <Save aria-hidden className="h-4 w-4" />
+                Opslaan
+              </button>
+              <button
+                className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 bg-white px-4 py-3 text-sm font-bold hover:bg-zinc-100"
+                onClick={() => {
+                  setEditingQuestionId("");
+                  setEditForm({ prompt: "", options: "", quizOptions: defaultQuizOptions() });
+                }}
+                type="button"
+              >
+                Annuleer
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
 
       {activeQuestion ? (
         <section
@@ -1107,7 +1427,7 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-5 lg:flex lg:shrink-0">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-6 lg:flex lg:shrink-0">
               <button
                 className="inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-3 text-sm font-bold text-white hover:bg-zinc-800 disabled:opacity-40"
                 disabled={saving || !previousQuestion}
@@ -1138,6 +1458,19 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
               >
                 <BarChart3 aria-hidden className="h-4 w-4" />
                 {activeResultsVisible ? "Sluit resultaten" : "Resultaten"}
+              </button>
+              <button
+                className={`inline-flex items-center justify-center gap-2 rounded-lg px-3 py-3 text-sm font-bold disabled:opacity-60 ${
+                  payload.presentation.screenView === "qr"
+                    ? "bg-white text-zinc-950 hover:bg-zinc-100"
+                    : "bg-emerald-700 text-white hover:bg-emerald-800"
+                }`}
+                disabled={saving}
+                onClick={() => updateScreenView(payload.presentation.screenView === "qr" ? "question" : "qr")}
+                type="button"
+              >
+                <QrCodeIcon aria-hidden className="h-4 w-4" />
+                QR
               </button>
               <button
                 className={`inline-flex items-center justify-center gap-2 rounded-lg px-3 py-3 text-sm font-bold disabled:opacity-60 ${

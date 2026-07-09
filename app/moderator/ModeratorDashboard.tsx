@@ -59,6 +59,7 @@ type AccountActionResponse = AccountsResponse & {
 
 type AuthMode = "login" | "signup" | "admin";
 type EntryMode = "users" | "admin";
+type ModeratorTab = "presentations" | "accounts";
 
 type ModeratorDashboardProps = {
   entryMode?: EntryMode;
@@ -104,6 +105,12 @@ function statusClassName(status: ModeratorAccountSummary["status"]) {
   return "bg-amber-100 text-amber-900";
 }
 
+function moderatorTabClassName(active: boolean) {
+  return `rounded-lg px-4 py-3 text-left text-sm font-black transition ${
+    active ? "bg-zinc-950 text-white shadow-sm" : "bg-white text-zinc-700 hover:bg-zinc-100"
+  }`;
+}
+
 export default function ModeratorDashboard({ entryMode = "users" }: ModeratorDashboardProps) {
   const router = useRouter();
   const [session, setSession] = useState<SessionState | null>(null);
@@ -120,6 +127,7 @@ export default function ModeratorDashboard({ entryMode = "users" }: ModeratorDas
   const [newTitle, setNewTitle] = useState("Sessie Interactief");
   const [newTemplate, setNewTemplate] = useState<"default" | "quiz">("default");
   const [query, setQuery] = useState("");
+  const [moderatorTab, setModeratorTab] = useState<ModeratorTab>("presentations");
   const [editingId, setEditingId] = useState("");
   const [titleDraft, setTitleDraft] = useState("");
   const [origin] = useState(() => (typeof window === "undefined" ? "" : window.location.origin));
@@ -813,7 +821,32 @@ export default function ModeratorDashboard({ entryMode = "users" }: ModeratorDas
           </div>
         ) : null}
 
-        <section className="grid gap-4 rounded-lg border border-zinc-300 bg-white p-5 shadow-sm lg:grid-cols-[1fr_auto] lg:items-end">
+        {session.role === "admin" ? (
+          <nav className="grid gap-2 rounded-lg border border-zinc-300 bg-zinc-100 p-2 sm:grid-cols-2">
+            <button
+              className={moderatorTabClassName(moderatorTab === "presentations")}
+              onClick={() => setModeratorTab("presentations")}
+              type="button"
+            >
+              <span className="block">Presentaties</span>
+              <span className={`mt-1 block text-xs ${moderatorTab === "presentations" ? "text-zinc-300" : "text-zinc-500"}`}>
+                {presentations.length} sessies
+              </span>
+            </button>
+            <button
+              className={moderatorTabClassName(moderatorTab === "accounts")}
+              onClick={() => setModeratorTab("accounts")}
+              type="button"
+            >
+              <span className="block">Gebruikers</span>
+              <span className={`mt-1 block text-xs ${moderatorTab === "accounts" ? "text-zinc-300" : "text-zinc-500"}`}>
+                {accounts.length}/{session.limits.maxAccounts} accounts
+              </span>
+            </button>
+          </nav>
+        ) : null}
+
+        <section className={`${session.role === "admin" && moderatorTab !== "presentations" ? "hidden" : ""} grid gap-4 rounded-lg border border-zinc-300 bg-white p-5 shadow-sm lg:grid-cols-[1fr_auto] lg:items-end`}>
           <div>
             <p className="text-xs font-black uppercase text-emerald-800">Nieuwe sessie</p>
             <h2 className="mt-1 text-xl font-black">Presentatie aanmaken</h2>
@@ -857,27 +890,27 @@ export default function ModeratorDashboard({ entryMode = "users" }: ModeratorDas
           </form>
         </section>
 
-        <section className="grid gap-4 md:grid-cols-4">
-          <article className="rounded-lg border border-zinc-300 bg-white p-4 shadow-sm">
+        <section className={`${session.role === "admin" && moderatorTab !== "presentations" ? "hidden" : ""} grid gap-2 rounded-lg border border-zinc-300 bg-white/80 p-2 md:grid-cols-4`}>
+          <article className="rounded-lg bg-zinc-50 px-4 py-3">
             <p className="text-sm font-semibold text-zinc-600">Presentaties</p>
-            <p className="mt-2 text-3xl font-black">
+            <p className="mt-1 text-2xl font-black">
               {presentations.length}
               {session.role === "tester" && session.limits.maxPresentations ? `/${session.limits.maxPresentations}` : ""}
             </p>
           </article>
-          <article className="rounded-lg border border-zinc-300 bg-white p-4 shadow-sm">
+          <article className="rounded-lg bg-zinc-50 px-4 py-3">
             <p className="text-sm font-semibold text-zinc-600">Vragen</p>
-            <p className="mt-2 text-3xl font-black">{totals.questions}</p>
+            <p className="mt-1 text-2xl font-black">{totals.questions}</p>
           </article>
-          <article className="rounded-lg border border-zinc-300 bg-white p-4 shadow-sm">
+          <article className="rounded-lg bg-zinc-50 px-4 py-3">
             <p className="text-sm font-semibold text-zinc-600">Antwoorden</p>
-            <p className="mt-2 text-3xl font-black">{totals.answers}</p>
+            <p className="mt-1 text-2xl font-black">{totals.answers}</p>
           </article>
-          <article className="rounded-lg border border-zinc-300 bg-white p-4 shadow-sm">
+          <article className="rounded-lg bg-zinc-50 px-4 py-3">
             <p className="text-sm font-semibold text-zinc-600">
               {session.role === "admin" ? "Gebruikersaccounts" : "Deelnemers"}
             </p>
-            <p className="mt-2 text-3xl font-black">
+            <p className="mt-1 text-2xl font-black">
               {session.role === "admin"
                 ? `${session.limits.accountCount}/${session.limits.maxAccounts}`
                 : totals.participants}
@@ -885,7 +918,7 @@ export default function ModeratorDashboard({ entryMode = "users" }: ModeratorDas
           </article>
         </section>
 
-        {session.role === "admin" ? (
+        {session.role === "admin" && moderatorTab === "accounts" ? (
           <section className="rounded-lg border border-zinc-300 bg-white p-5 shadow-sm">
             <div className="mb-5 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
               <div>
@@ -960,7 +993,7 @@ export default function ModeratorDashboard({ entryMode = "users" }: ModeratorDas
           </section>
         ) : null}
 
-        <section className="rounded-lg border border-zinc-300 bg-white p-5 shadow-sm">
+        <section className={`${session.role === "admin" && moderatorTab !== "presentations" ? "hidden" : ""} rounded-lg border border-zinc-300 bg-white p-5 shadow-sm`}>
           <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <h2 className="text-lg font-black">
               {session.role === "admin" ? "Aangemaakte presentaties" : "Mijn presentaties"}

@@ -2,6 +2,8 @@
 
 import {
   ArrowRight,
+  Ban,
+  CheckCircle2,
   Copy,
   ExternalLink,
   KeyRound,
@@ -50,6 +52,11 @@ type AccountsResponse = {
   accounts: ModeratorAccountSummary[];
 };
 
+type AccountActionResponse = AccountsResponse & {
+  authCleanupWarning?: string | null;
+  presentationsDeleted?: number;
+};
+
 type AuthMode = "login" | "signup" | "admin";
 type EntryMode = "users" | "admin";
 
@@ -72,7 +79,29 @@ function formatDate(value: string | null) {
 }
 
 function statusLabel(status: ModeratorAccountSummary["status"]) {
-  return status === "active" ? "Actief" : "Wacht op mailactivatie";
+  if (status === "active") {
+    return "Actief";
+  }
+  if (status === "deactivated") {
+    return "Gedeactiveerd";
+  }
+  if (status === "deleted") {
+    return "Verwijderd";
+  }
+  return "Wacht op mailactivatie";
+}
+
+function statusClassName(status: ModeratorAccountSummary["status"]) {
+  if (status === "active") {
+    return "bg-emerald-100 text-emerald-900";
+  }
+  if (status === "deactivated") {
+    return "bg-rose-100 text-rose-900";
+  }
+  if (status === "deleted") {
+    return "bg-zinc-200 text-zinc-700";
+  }
+  return "bg-amber-100 text-amber-900";
 }
 
 export default function ModeratorDashboard({ entryMode = "users" }: ModeratorDashboardProps) {
@@ -189,6 +218,14 @@ export default function ModeratorDashboard({ entryMode = "users" }: ModeratorDas
     setPresentations(data.presentations);
   }
 
+  function applyAccounts(data: AccountActionResponse | { error: string }) {
+    if ("error" in data) {
+      throw new Error(data.error);
+    }
+    setAccounts(data.accounts);
+    return data;
+  }
+
   async function login(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setBusy(authMode);
@@ -266,6 +303,108 @@ export default function ModeratorDashboard({ entryMode = "users" }: ModeratorDas
     setPresentations([]);
     setAccounts([]);
     setBusy("");
+  }
+
+  async function deleteOwnAccount() {
+    const confirmed = window.confirm(
+      "Je account verwijderen?\n\nDit verwijdert ook je presentaties, vragen en antwoorden. Dit kun je niet ongedaan maken."
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    const confirmedAgain = window.confirm("Weet je zeker dat je je gebruikersaccount definitief wilt verwijderen?");
+    if (!confirmedAgain) {
+      return;
+    }
+
+    setBusy("delete-own-account");
+    setError("");
+
+    try {
+      const response = await fetch("/api/accounts/me", { method: "DELETE" });
+      const data = (await response.json()) as { ok: true; authCleanupWarning?: string | null } | { error: string };
+      if (!response.ok || "error" in data) {
+        throw new Error("error" in data ? data.error : "Account kon niet worden verwijderd.");
+      }
+
+      setSession((current) =>
+        current
+          ? { ...current, authenticated: false, role: null, email: null }
+          : current
+      );
+      setPresentations([]);
+      setAccounts([]);
+      setNotice(
+        data.authCleanupWarning
+          ? "Account lokaal verwijderd. Controleer Supabase Auth handmatig."
+          : "Account verwijderd."
+      );
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Account kon niet worden verwijderd.");
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function updateAccountStatus(account: ModeratorAccountSummary, action: "activate" | "deactivate") {
+    if (action === "deactivate") {
+      const confirmed = window.confirm(
+        `Account tijdelijk deactiveren?\n\n${account.email}\n\nDe gebruiker kan dan niet meer inloggen of presentaties beheren.`
+      );
+      if (!confirmed) {
+        return;
+      }
+    }
+
+    setBusy(`${action}-account-${account.id}`);
+    setError("");
+
+    try {
+      const response = await fetch(`/api/moderator/accounts/${account.id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+      applyAccounts((await response.json()) as AccountActionResponse | { error: string });
+      setNotice(action === "activate" ? "Account opnieuw geactiveerd" : "Account gedeactiveerd");
+      window.setTimeout(() => setNotice(""), 1800);
+      void loadSession();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Accountstatus kon niet worden bijgewerkt.");
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function deleteAccount(account: ModeratorAccountSummary) {
+    const confirmed = window.confirm(
+      `Account verwijderen?\n\n${account.email}\n\nDit verwijdert ook alle presentaties, vragen en antwoorden van dit account.`
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    setBusy(`delete-account-${account.id}`);
+    setError("");
+
+    try {
+      const response = await fetch(`/api/moderator/accounts/${account.id}`, {
+        method: "DELETE",
+      });
+      const data = applyAccounts((await response.json()) as AccountActionResponse | { error: string });
+      setNotice(
+        data.authCleanupWarning
+          ? "Account lokaal verwijderd. Controleer Supabase Auth handmatig."
+          : "Account verwijderd."
+      );
+      window.setTimeout(() => setNotice(""), 2400);
+      void loadSession();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Account kon niet worden verwijderd.");
+    } finally {
+      setBusy("");
+    }
   }
 
   async function copyValue(value: string, label: string) {
@@ -640,15 +779,28 @@ export default function ModeratorDashboard({ entryMode = "users" }: ModeratorDas
                 : `Ingelogd als ${session.email}. Je presentaties en quizzen blijven bewaard.`}
             </p>
           </div>
-          <button
-            className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 bg-white px-4 py-3 text-sm font-bold hover:bg-zinc-50"
-            disabled={busy === "logout"}
-            onClick={logout}
-            type="button"
-          >
-            <LogOut aria-hidden className="h-4 w-4" />
-            Uitloggen
-          </button>
+          <div className="flex flex-col items-start gap-2 lg:items-end">
+            <button
+              className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 bg-white px-4 py-3 text-sm font-bold hover:bg-zinc-50"
+              disabled={busy === "logout"}
+              onClick={logout}
+              type="button"
+            >
+              <LogOut aria-hidden className="h-4 w-4" />
+              Uitloggen
+            </button>
+            {session.role === "tester" ? (
+              <button
+                className="inline-flex items-center gap-1 text-xs font-bold text-zinc-500 underline-offset-4 hover:text-rose-700 hover:underline disabled:opacity-60"
+                disabled={busy === "delete-own-account"}
+                onClick={deleteOwnAccount}
+                type="button"
+              >
+                <Trash2 aria-hidden className="h-3.5 w-3.5" />
+                {busy === "delete-own-account" ? "Verwijderen..." : "Account verwijderen"}
+              </button>
+            ) : null}
+          </div>
         </header>
 
         {notice || error ? (
@@ -751,11 +903,11 @@ export default function ModeratorDashboard({ entryMode = "users" }: ModeratorDas
             ) : (
               <div className="grid gap-3">
                 {accounts.map((account) => (
-                  <article className="grid gap-3 rounded-lg border border-zinc-200 bg-zinc-50 p-4 md:grid-cols-[1fr_auto]" key={account.id}>
+                  <article className="grid gap-4 rounded-lg border border-zinc-200 bg-zinc-50 p-4 md:grid-cols-[1fr_auto]" key={account.id}>
                     <div>
                       <h3 className="font-black">{account.email}</h3>
                       <div className="mt-2 flex flex-wrap gap-2 text-sm">
-                        <span className={`rounded-md px-2 py-1 font-bold ${account.status === "active" ? "bg-emerald-100 text-emerald-900" : "bg-amber-100 text-amber-900"}`}>
+                        <span className={`rounded-md px-2 py-1 font-bold ${statusClassName(account.status)}`}>
                           {statusLabel(account.status)}
                         </span>
                         <span className="rounded-md bg-white px-2 py-1 text-zinc-700">
@@ -763,9 +915,43 @@ export default function ModeratorDashboard({ entryMode = "users" }: ModeratorDas
                         </span>
                       </div>
                     </div>
-                    <div className="text-sm text-zinc-600 md:text-right">
-                      <p>Aangemaakt {formatDate(account.createdAt)}</p>
-                      <p>Laatst ingelogd {formatDate(account.lastLoginAt)}</p>
+                    <div className="flex flex-col gap-3 md:items-end">
+                      <div className="text-sm text-zinc-600 md:text-right">
+                        <p>Aangemaakt {formatDate(account.createdAt)}</p>
+                        <p>Laatst ingelogd {formatDate(account.lastLoginAt)}</p>
+                      </div>
+                      <div className="flex flex-wrap gap-2 md:justify-end">
+                        {account.status === "deactivated" ? (
+                          <button
+                            className="inline-flex items-center gap-2 rounded-lg bg-emerald-800 px-3 py-2 text-sm font-bold text-white hover:bg-emerald-900 disabled:opacity-60"
+                            disabled={busy === `activate-account-${account.id}`}
+                            onClick={() => updateAccountStatus(account, "activate")}
+                            type="button"
+                          >
+                            <CheckCircle2 aria-hidden className="h-4 w-4" />
+                            Activeer
+                          </button>
+                        ) : (
+                          <button
+                            className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-bold hover:bg-zinc-100 disabled:opacity-60"
+                            disabled={busy === `deactivate-account-${account.id}`}
+                            onClick={() => updateAccountStatus(account, "deactivate")}
+                            type="button"
+                          >
+                            <Ban aria-hidden className="h-4 w-4" />
+                            Deactiveer
+                          </button>
+                        )}
+                        <button
+                          className="inline-flex items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-bold text-rose-800 hover:bg-rose-100 disabled:opacity-60"
+                          disabled={busy === `delete-account-${account.id}`}
+                          onClick={() => deleteAccount(account)}
+                          type="button"
+                        >
+                          <Trash2 aria-hidden className="h-4 w-4" />
+                          Verwijder
+                        </button>
+                      </div>
                     </div>
                   </article>
                 ))}

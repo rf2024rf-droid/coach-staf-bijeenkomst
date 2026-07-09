@@ -1,4 +1,4 @@
-import { errorPayload, getModeratorUsage } from "@/db/store";
+import { assertActorAccountActive, errorPayload, getModeratorUsage } from "@/db/store";
 import {
   getModeratorActor,
   isAccountAuthConfigured,
@@ -8,7 +8,19 @@ import { isModeratorConfigured } from "@/lib/moderatorAuth";
 
 export async function GET(request: Request) {
   try {
-    const actor = getModeratorActor(request);
+    let actor = getModeratorActor(request);
+    if (actor) {
+      try {
+        actor = await assertActorAccountActive(actor);
+      } catch (accountError) {
+        const { status } = errorPayload(accountError);
+        if (status === 401 || status === 403) {
+          actor = null;
+        } else {
+          throw accountError;
+        }
+      }
+    }
     const usage = await getModeratorUsage(actor);
 
     return Response.json({

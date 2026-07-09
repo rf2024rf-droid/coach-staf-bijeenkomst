@@ -46,6 +46,10 @@ function getSupabaseAnonKey() {
   return process.env.SUPABASE_ANON_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
 }
 
+function getSupabaseServiceRoleKey() {
+  return process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+}
+
 function safeCompare(left: string, right: string) {
   const leftBuffer = Buffer.from(left);
   const rightBuffer = Buffer.from(right);
@@ -207,6 +211,40 @@ export async function loginWithSupabase(email: string, password: string) {
     userId: user.id,
     email: normalizeEmail(user.email),
   };
+}
+
+export async function deleteSupabaseAuthUser(userId: string | null) {
+  const supabaseUrl = getSupabaseUrl();
+  const serviceRoleKey = getSupabaseServiceRoleKey();
+
+  if (!userId || !supabaseUrl || !serviceRoleKey) {
+    return { deleted: false, skipped: true };
+  }
+
+  if (/^https?:\/\/db\./i.test(supabaseUrl)) {
+    throw new AppError(
+      500,
+      "SUPABASE_URL moet de Project URL zijn, niet de database host. Gebruik iets als https://jouw-project.supabase.co."
+    );
+  }
+
+  const response = await fetch(`${supabaseUrl}/auth/v1/admin/users/${encodeURIComponent(userId)}`, {
+    method: "DELETE",
+    headers: {
+      apikey: serviceRoleKey,
+      authorization: `Bearer ${serviceRoleKey}`,
+    },
+  });
+
+  if (!response.ok && response.status !== 404) {
+    const text = await response.text();
+    throw new AppError(
+      response.status || 500,
+      text.slice(0, 180) || "Supabase Auth-account kon niet worden verwijderd."
+    );
+  }
+
+  return { deleted: response.status !== 404, skipped: false };
 }
 
 export function createAccountToken(userId: string, email: string) {

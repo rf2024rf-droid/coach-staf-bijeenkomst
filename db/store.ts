@@ -4,6 +4,7 @@ export type QuestionType = "open" | "multiple" | "quiz";
 export type QuestionStatus = "open" | "closed";
 export type ScreenView = "question" | "qr" | "results" | "ranking";
 export type ModeratorRole = "admin" | "tester";
+export type AppAccountStatus = "pending" | "active" | "deactivated" | "deleted";
 
 export type PresentationRow = {
   id: string;
@@ -68,7 +69,7 @@ type AppAccountRow = {
   id: string;
   email: string;
   role: ModeratorRole;
-  status: "pending" | "active";
+  status: AppAccountStatus;
   supabase_user_id: string | null;
   created_at: string;
   updated_at: string;
@@ -195,7 +196,7 @@ export type ModeratorAccountSummary = {
   id: string;
   email: string;
   role: ModeratorRole;
-  status: "pending" | "active";
+  status: AppAccountStatus;
   supabaseUserId: string | null;
   createdAt: string;
   updatedAt: string;
@@ -684,14 +685,83 @@ async function fetchAccountByEmail(emailInput: unknown) {
   return first(rows);
 }
 
+async function fetchAccountBySupabaseUserId(supabaseUserIdInput: unknown) {
+  const supabaseUserId = cleanText(supabaseUserIdInput, 120);
+  if (!supabaseUserId) {
+    return null;
+  }
+
+  const rows = await getSql()<AppAccountRow[]>`
+    SELECT *
+    FROM app_accounts
+    WHERE supabase_user_id = ${supabaseUserId}
+    LIMIT 1
+  `;
+  return first(rows);
+}
+
+async function fetchAccountById(accountIdInput: unknown) {
+  const accountId = cleanText(accountIdInput, 120);
+  if (!accountId) {
+    return null;
+  }
+
+  const rows = await getSql()<AppAccountRow[]>`
+    SELECT *
+    FROM app_accounts
+    WHERE id = ${accountId}
+  `;
+  return first(rows);
+}
+
+async function fetchAccountForActor(actor: ModeratorActor) {
+  if (!actor.userId && !actor.email) {
+    return null;
+  }
+
+  const accountByUserId = await fetchAccountBySupabaseUserId(actor.userId);
+  if (accountByUserId) {
+    return accountByUserId;
+  }
+
+  return fetchAccountByEmail(actor.email);
+}
+
+function deletedAccountEmail(accountId: string) {
+  return `deleted-${accountId}@deleted.local`;
+}
+
 async function countTesterAccounts() {
   const rows = await getSql()<{ count: number }[]>`
     SELECT COUNT(*)::int AS count
     FROM app_accounts
-    WHERE role = 'tester'
+    WHERE role = 'tester' AND status <> 'deleted'
   `;
 
   return numberFromDb(first(rows)?.count);
+}
+
+export async function assertActorAccountActive(actor: ModeratorActor) {
+  await ensureSchema();
+
+  if (isAdminActor(actor)) {
+    return actor;
+  }
+
+  const account = await fetchAccountForActor(actor);
+  if (!account || account.status === "deleted") {
+    throw new AppError(401, "Dit gebruikersaccount bestaat niet meer.");
+  }
+
+  if (account.status === "deactivated") {
+    throw new AppError(403, "Dit gebruikersaccount is tijdelijk gedeactiveerd door de beheerder.");
+  }
+
+  if (account.status !== "active") {
+    throw new AppError(403, "Activeer eerst je account via de link in je e-mail.");
+  }
+
+  return actor;
 }
 
 export async function createPendingAccount(emailInput: unknown, supabaseUserIdInput?: unknown) {
@@ -704,6 +774,14 @@ export async function createPendingAccount(emailInput: unknown, supabaseUserIdIn
 
   const existing = await fetchAccountByEmail(email);
   if (existing) {
+    if (existing.status === "deleted") {
+      throw new AppError(403, "Dit account is verwijderd. Neem contact op met de beheerder.");
+    }
+
+    if (existing.status === "deactivated") {
+      throw new AppError(403, "Dit account is tijdelijk gedeactiveerd door de beheerder.");
+    }
+
     throw new AppError(409, "Er bestaat al een account met dit e-mailadres.");
   }
 
@@ -768,7 +846,21 @@ export async function activateAccount(emailInput: unknown, supabaseUserIdInput: 
     throw new AppError(400, "Account kon niet worden geactiveerd.");
   }
 
-  const existing = await fetchAccountByEmail(email);
+  const existingByEmail = await fetchAccountByEmail(email);
+  const existingByUserId = await fetchAccountBySupabaseUserId(supabaseUserId);
+  const blockedAccount = [existingByEmail, existingByUserId].find(
+    (account) => account?.status === "deleted" || account?.status === "deactivated"
+  );
+
+  if (blockedAccount?.status === "deleted") {
+    throw new AppError(403, "Dit account is verwijderd. Neem contact op met de beheerder.");
+  }
+
+  if (blockedAccount?.status === "deactivated") {
+    throw new AppError(403, "Dit gebruikersaccount is tijdelijk gedeactiveerd door de beheerder.");
+  }
+
+  const existing = existingByEmail ?? existingByUserId;
   if (!existing) {
     const accountCount = await countTesterAccounts();
     const maxAccounts = betaMaxAccounts();
@@ -782,6 +874,7 @@ export async function activateAccount(emailInput: unknown, supabaseUserIdInput: 
     ? await getSql()<AppAccountRow[]>`
         UPDATE app_accounts
         SET status = 'active',
+            email = ${email},
             supabase_user_id = ${supabaseUserId},
             updated_at = ${timestamp},
             last_login_at = ${timestamp}
@@ -815,6 +908,7 @@ export async function listModeratorAccounts(): Promise<ModeratorAccountSummary[]
         WHERE presentations.owner_user_id = app_accounts.supabase_user_id
       ) AS presentation_count
     FROM app_accounts
+    WHERE app_accounts.status <> 'deleted'
     ORDER BY created_at DESC
   `;
 
@@ -831,6 +925,106 @@ export async function listModeratorAccounts(): Promise<ModeratorAccountSummary[]
       presentations: numberFromDb(row.presentation_count),
     },
   }));
+}
+
+export async function setModeratorAccountStatus(accountIdInput: unknown, status: Exclude<AppAccountStatus, "deleted">) {
+  await ensureSchema();
+
+  if (status !== "active" && status !== "deactivated" && status !== "pending") {
+    throw new AppError(400, "Accountstatus is ongeldig.");
+  }
+
+  const accountId = cleanText(accountIdInput, 120);
+  const account = await fetchAccountById(accountId);
+  if (!account || account.status === "deleted") {
+    throw new AppError(404, "Account niet gevonden.");
+  }
+
+  const rows = await getSql()<AppAccountRow[]>`
+    UPDATE app_accounts
+    SET status = ${status}, updated_at = ${nowIso()}
+    WHERE id = ${account.id}
+    RETURNING *
+  `;
+
+  return first(rows);
+}
+
+async function deletePresentationsForOwner(ownerUserId: string | null) {
+  if (!ownerUserId) {
+    return 0;
+  }
+
+  const sql = getSql();
+  const rows = await sql<{ id: string }[]>`
+    SELECT id
+    FROM presentations
+    WHERE owner_user_id = ${ownerUserId}
+  `;
+
+  if (!rows.length) {
+    return 0;
+  }
+
+  await sql.begin(async (tx) => {
+    for (const row of rows) {
+      await tx`DELETE FROM responses WHERE presentation_id = ${row.id}`;
+      await tx`
+        DELETE FROM question_options
+        WHERE question_id IN (
+          SELECT id
+          FROM questions
+          WHERE presentation_id = ${row.id}
+        )
+      `;
+      await tx`DELETE FROM questions WHERE presentation_id = ${row.id}`;
+      await tx`DELETE FROM presentations WHERE id = ${row.id}`;
+    }
+  });
+
+  return rows.length;
+}
+
+export async function deleteModeratorAccount(accountIdInput: unknown) {
+  await ensureSchema();
+
+  const account = await fetchAccountById(accountIdInput);
+  if (!account || account.status === "deleted") {
+    throw new AppError(404, "Account niet gevonden.");
+  }
+
+  const presentationsDeleted = await deletePresentationsForOwner(account.supabase_user_id);
+
+  await getSql()`
+    UPDATE app_accounts
+    SET email = ${deletedAccountEmail(account.id)}, status = 'deleted', updated_at = ${nowIso()}
+    WHERE id = ${account.id}
+  `;
+
+  return { account, presentationsDeleted };
+}
+
+export async function deleteOwnAccount(actor: ModeratorActor) {
+  await ensureSchema();
+
+  if (isAdminActor(actor)) {
+    throw new AppError(403, "Het beheerderaccount kan hier niet worden verwijderd.");
+  }
+
+  const account = await fetchAccountForActor(actor);
+  if (!account || account.status === "deleted") {
+    throw new AppError(404, "Account niet gevonden.");
+  }
+
+  const presentationsDeleted = await deletePresentationsForOwner(account.supabase_user_id);
+
+  await getSql()`
+    UPDATE app_accounts
+    SET email = ${deletedAccountEmail(account.id)}, status = 'deleted', updated_at = ${nowIso()}
+    WHERE id = ${account.id}
+  `;
+
+  return { account, presentationsDeleted };
 }
 
 export async function getModeratorUsage(actor: ModeratorActor | null) {

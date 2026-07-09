@@ -1,4 +1,4 @@
-import { getPresenterKeyForModerator } from "@/db/store";
+import { assertActorAccountActive, getPresenterKeyForModerator } from "@/db/store";
 import { getModeratorActor } from "@/lib/accountAuth";
 
 export async function resolvePresenterKey(request: Request, presentationId: string) {
@@ -9,6 +9,7 @@ export async function resolvePresenterKey(request: Request, presentationId: stri
 
   const actor = getModeratorActor(request);
   if (actor) {
+    await assertActorAccountActive(actor);
     return getPresenterKeyForModerator(presentationId, actor);
   }
 

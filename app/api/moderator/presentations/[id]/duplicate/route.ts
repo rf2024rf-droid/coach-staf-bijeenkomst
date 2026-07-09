@@ -1,5 +1,5 @@
 import { duplicatePresentation, errorPayload, listModeratorPresentations } from "@/db/store";
-import { assertModeratorActor } from "@/lib/accountAuth";
+import { assertActiveModeratorActor } from "@/lib/accountAccess";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -7,7 +7,7 @@ type RouteContext = {
 
 export async function POST(request: Request, context: RouteContext) {
   try {
-    const actor = assertModeratorActor(request);
+    const actor = await assertActiveModeratorActor(request);
     const { id } = await context.params;
     const presentation = await duplicatePresentation(id, actor);
     const presentations = await listModeratorPresentations(actor);

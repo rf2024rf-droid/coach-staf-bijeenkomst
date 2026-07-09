@@ -1,6 +1,7 @@
 export type QuestionType = "open" | "multiple" | "quiz";
 export type ScreenView = "question" | "qr" | "results" | "ranking";
 export type ModeratorRole = "admin" | "tester";
+export type AppAccountStatus = "pending" | "active" | "deactivated" | "deleted";
 
 export type LeaderboardEntry = {
   participantId: string;
@@ -116,7 +117,7 @@ export type ModeratorAccountSummary = {
   id: string;
   email: string;
   role: ModeratorRole;
-  status: "pending" | "active";
+  status: AppAccountStatus;
   supabaseUserId: string | null;
   createdAt: string;
   updatedAt: string;

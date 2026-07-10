@@ -31,9 +31,19 @@ import { ResultView } from "@/app/components/ResultView";
 import type { PresenterPayload, QuestionResult, QuestionType, ScreenView } from "@/app/types";
 import {
   DEFAULT_GENERAL_SCREEN_BACKGROUND_COLOR,
+  DEFAULT_GENERAL_SCREEN_FONT_FAMILY,
+  DEFAULT_GENERAL_SCREEN_FONT_SIZE,
+  GENERAL_SCREEN_FONT_OPTIONS,
+  MAX_GENERAL_SCREEN_FONT_SIZE,
+  MIN_GENERAL_SCREEN_FONT_SIZE,
+  getGeneralScreenFontOption,
   getGeneralScreenPalette,
   normalizeGeneralScreenBackgroundColor,
+  normalizeGeneralScreenFontFamily,
+  normalizeGeneralScreenFontSize,
   normalizeHexColor,
+  resolveGeneralScreenFontFamily,
+  resolveGeneralScreenFontSize,
 } from "@/lib/generalScreenAppearance";
 
 type PresenterDashboardProps = {
@@ -229,7 +239,16 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
   const [generalBackgroundDirty, setGeneralBackgroundDirty] = useState(false);
   const [generalBackgroundSaving, setGeneralBackgroundSaving] = useState(false);
   const [generalBackgroundError, setGeneralBackgroundError] = useState("");
+  const [generalTypographyDraft, setGeneralTypographyDraft] = useState({
+    fontFamily: DEFAULT_GENERAL_SCREEN_FONT_FAMILY,
+    fontSize: String(DEFAULT_GENERAL_SCREEN_FONT_SIZE),
+  });
+  const [generalTypographyDirty, setGeneralTypographyDirty] = useState(false);
+  const [generalTypographySaving, setGeneralTypographySaving] = useState(false);
+  const [generalTypographyError, setGeneralTypographyError] = useState("");
   const persistedGeneralScreenBackgroundColor = payload?.presentation.generalScreenBackgroundColor ?? null;
+  const persistedGeneralScreenFontFamily = payload?.presentation.generalScreenFontFamily ?? null;
+  const persistedGeneralScreenFontSize = payload?.presentation.generalScreenFontSize ?? null;
   const loadedPresentationId = payload?.presentation.id ?? "";
 
   const joinLink = useMemo(() => {
@@ -359,6 +378,60 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
     persistedGeneralScreenBackgroundColor,
   ]);
 
+  useEffect(() => {
+    if (!loadedPresentationId || !generalTypographyDirty) {
+      return;
+    }
+
+    const nextFontFamily = normalizeGeneralScreenFontFamily(generalTypographyDraft.fontFamily);
+    const nextFontSize = normalizeGeneralScreenFontSize(generalTypographyDraft.fontSize);
+
+    if (
+      nextFontFamily === persistedGeneralScreenFontFamily &&
+      nextFontSize === persistedGeneralScreenFontSize
+    ) {
+      const timer = window.setTimeout(() => setGeneralTypographyDirty(false), 0);
+      return () => window.clearTimeout(timer);
+    }
+
+    const timer = window.setTimeout(async () => {
+      setGeneralTypographySaving(true);
+      setGeneralTypographyError("");
+
+      try {
+        const response = await fetch(apiPath(`/api/presentations/${id}`), {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            generalScreenFontFamily: nextFontFamily,
+            generalScreenFontSize: nextFontSize,
+          }),
+        });
+        const data = (await response.json()) as PresenterPayload | { error: string };
+        if (!response.ok || "error" in data) {
+          throw new Error("error" in data ? data.error : "Lettertype kon niet worden opgeslagen.");
+        }
+
+        setPayload(data);
+        setGeneralTypographyDirty(false);
+      } catch (caught) {
+        setGeneralTypographyError(caught instanceof Error ? caught.message : "Lettertype kon niet worden opgeslagen.");
+      } finally {
+        setGeneralTypographySaving(false);
+      }
+    }, 700);
+
+    return () => window.clearTimeout(timer);
+  }, [
+    apiPath,
+    generalTypographyDirty,
+    generalTypographyDraft,
+    id,
+    loadedPresentationId,
+    persistedGeneralScreenFontFamily,
+    persistedGeneralScreenFontSize,
+  ]);
+
   function updateGeneralBackgroundDraft(value: string) {
     setGeneralBackgroundDraft(value.toUpperCase());
     setGeneralBackgroundDirty(true);
@@ -369,6 +442,22 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
     setGeneralBackgroundDraft(DEFAULT_GENERAL_SCREEN_BACKGROUND_COLOR);
     setGeneralBackgroundDirty(true);
     setGeneralBackgroundError("");
+  }
+
+  function updateGeneralTypographyDraft(next: { fontFamily?: string; fontSize?: string }) {
+    const currentFontFamily = generalTypographyDirty
+      ? generalTypographyDraft.fontFamily
+      : persistedGeneralScreenFontFamily ?? DEFAULT_GENERAL_SCREEN_FONT_FAMILY;
+    const currentFontSize = generalTypographyDirty
+      ? generalTypographyDraft.fontSize
+      : String(persistedGeneralScreenFontSize ?? DEFAULT_GENERAL_SCREEN_FONT_SIZE);
+
+    setGeneralTypographyDraft({
+      fontFamily: next.fontFamily ?? currentFontFamily,
+      fontSize: next.fontSize ?? currentFontSize,
+    });
+    setGeneralTypographyDirty(true);
+    setGeneralTypographyError("");
   }
 
   function applyKey(event: FormEvent<HTMLFormElement>) {
@@ -814,6 +903,22 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
   const generalBackgroundDefault =
     Boolean(normalizedGeneralBackgroundDraft) &&
     normalizeGeneralScreenBackgroundColor(normalizedGeneralBackgroundDraft) === null;
+  const generalFontFamilyInputValue = resolveGeneralScreenFontFamily(
+    generalTypographyDirty
+      ? generalTypographyDraft.fontFamily
+      : persistedGeneralScreenFontFamily ?? DEFAULT_GENERAL_SCREEN_FONT_FAMILY
+  );
+  const generalFontSizeInputValue = resolveGeneralScreenFontSize(
+    generalTypographyDirty
+      ? generalTypographyDraft.fontSize
+      : persistedGeneralScreenFontSize ?? DEFAULT_GENERAL_SCREEN_FONT_SIZE
+  );
+  const generalFontOption = getGeneralScreenFontOption(generalFontFamilyInputValue);
+  const generalPreviewHeadingSize = Math.max(18, Math.round(generalFontSizeInputValue / 4));
+  const generalPreviewMetaSize = Math.max(10, Math.round(generalFontSizeInputValue / 10));
+  const generalTypographyDefault =
+    normalizeGeneralScreenFontFamily(generalFontFamilyInputValue) === null &&
+    normalizeGeneralScreenFontSize(generalFontSizeInputValue) === null;
 
   return (
     <main className={`min-h-screen bg-[#f4f4ef] text-zinc-950 ${activeQuestion ? "pb-72 md:pb-36" : ""}`}>
@@ -1219,29 +1324,6 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
                 <span className="block font-semibold">Scherm-URL</span>
                 <span className="block break-all font-mono text-xs">{screenLink}</span>
               </div>
-              <form className="mb-4 rounded-lg border border-zinc-200 bg-zinc-50 p-3" onSubmit={saveIdleScreenText}>
-                <label className="block text-sm font-semibold text-zinc-700" htmlFor="idle-screen-text">
-                  Tekst op leeg scherm
-                </label>
-                <div className="mt-2 flex flex-col gap-2 sm:flex-row">
-                  <input
-                    className="min-w-0 flex-1 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-bold outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
-                    defaultValue={payload.presentation.idleScreenText}
-                    id="idle-screen-text"
-                    key={payload.presentation.idleScreenText}
-                    maxLength={90}
-                    name="idleScreenText"
-                  />
-                  <button
-                    className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-800 px-3 py-2 text-sm font-bold text-white hover:bg-emerald-900 disabled:opacity-60"
-                    disabled={saving}
-                    type="submit"
-                  >
-                    <Save aria-hidden className="h-4 w-4" />
-                    Opslaan
-                  </button>
-                </div>
-              </form>
               <div className="grid gap-2">
                 <button
                   className={`inline-flex w-full items-center justify-center gap-2 rounded-lg px-4 py-3 font-bold transition disabled:opacity-60 ${
@@ -1310,8 +1392,35 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
                 </span>
               </div>
 
+              <form className="mt-4 rounded-lg border border-zinc-200 bg-zinc-50 p-4" onSubmit={saveIdleScreenText}>
+                <label className="block text-sm font-black text-zinc-800" htmlFor="idle-screen-text">
+                  Naam op algemeen scherm
+                </label>
+                <p className="mt-1 text-sm font-semibold text-zinc-600">
+                  Deze tekst staat op het algemene scherm wanneer er geen vraag live is.
+                </p>
+                <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                  <input
+                    className="min-w-0 flex-1 rounded-lg border border-zinc-300 bg-white px-3 py-3 text-sm font-bold outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
+                    defaultValue={payload.presentation.idleScreenText}
+                    id="idle-screen-text"
+                    key={payload.presentation.idleScreenText}
+                    maxLength={90}
+                    name="idleScreenText"
+                  />
+                  <button
+                    className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-800 px-3 py-3 text-sm font-bold text-white hover:bg-emerald-900 disabled:opacity-60"
+                    disabled={saving}
+                    type="submit"
+                  >
+                    <Save aria-hidden className="h-4 w-4" />
+                    Opslaan
+                  </button>
+                </div>
+              </form>
+
               <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_320px]">
-                <section className="rounded-lg border border-zinc-200 bg-zinc-50 p-4">
+                <section className="grid gap-4 rounded-lg border border-zinc-200 bg-zinc-50 p-4">
                   <label className="text-sm font-black text-zinc-800" htmlFor="general-screen-background">
                     Achtergrondkleur
                   </label>
@@ -1373,6 +1482,57 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
                       Standaard herstellen
                     </button>
                   </div>
+
+                  <div className="border-t border-zinc-200 pt-4">
+                    <label className="text-sm font-black text-zinc-800" htmlFor="general-screen-font-family">
+                      Lettertype
+                    </label>
+                    <select
+                      className="mt-2 w-full rounded-lg border border-zinc-300 bg-white px-3 py-3 text-sm font-bold outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
+                      id="general-screen-font-family"
+                      onChange={(event) => updateGeneralTypographyDraft({ fontFamily: event.target.value })}
+                      value={generalFontFamilyInputValue}
+                    >
+                      {GENERAL_SCREEN_FONT_OPTIONS.map((option) => (
+                        <option key={option.id} value={option.id}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between gap-3">
+                      <label className="text-sm font-black text-zinc-800" htmlFor="general-screen-font-size">
+                        Lettergrootte
+                      </label>
+                      <span className="rounded-md bg-white px-2 py-1 font-mono text-xs font-black text-zinc-700">
+                        {generalFontSizeInputValue}px
+                      </span>
+                    </div>
+                    <input
+                      className="mt-3 w-full accent-emerald-800"
+                      id="general-screen-font-size"
+                      max={MAX_GENERAL_SCREEN_FONT_SIZE}
+                      min={MIN_GENERAL_SCREEN_FONT_SIZE}
+                      onChange={(event) => updateGeneralTypographyDraft({ fontSize: event.target.value })}
+                      step={4}
+                      type="range"
+                      value={generalFontSizeInputValue}
+                    />
+                    <div className="mt-1 flex justify-between text-xs font-bold text-zinc-500">
+                      <span>Kleiner</span>
+                      <span>Groter</span>
+                    </div>
+                    <p className="mt-3 text-sm font-semibold text-zinc-600">
+                      {generalTypographyError ||
+                        (generalTypographySaving
+                          ? "Lettertype opslaan..."
+                          : generalTypographyDefault
+                            ? "Standaard lettertype en grootte actief."
+                            : "Lettertype opgeslagen.")}
+                    </p>
+                  </div>
                 </section>
 
                 <section className="rounded-lg border border-zinc-200 bg-white p-3">
@@ -1383,16 +1543,32 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
                       backgroundColor: generalBackgroundPalette.background,
                       borderColor: generalBackgroundPalette.border,
                       color: generalBackgroundPalette.foreground,
+                      fontFamily: generalFontOption.css,
                     }}
                   >
                     <div>
-                      <p className="text-[10px] font-black uppercase" style={{ color: generalBackgroundPalette.subtle }}>
+                      <p
+                        className="font-black uppercase"
+                        style={{
+                          color: generalBackgroundPalette.subtle,
+                          fontSize: `${generalPreviewMetaSize}px`,
+                        }}
+                      >
                         Sessie Interactief
                       </p>
-                      <h3 className="mt-2 text-xl font-black leading-tight">
+                      <h3
+                        className="mt-2 font-black leading-tight"
+                        style={{ fontSize: `${generalPreviewHeadingSize}px` }}
+                      >
                         {payload.presentation.idleScreenText || payload.presentation.title}
                       </h3>
-                      <p className="mt-2 text-xs font-semibold" style={{ color: generalBackgroundPalette.muted }}>
+                      <p
+                        className="mt-2 font-semibold"
+                        style={{
+                          color: generalBackgroundPalette.muted,
+                          fontSize: `${generalPreviewMetaSize}px`,
+                        }}
+                      >
                         {payload.presentation.code}
                       </p>
                     </div>

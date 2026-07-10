@@ -1,4 +1,26 @@
 export const DEFAULT_GENERAL_SCREEN_BACKGROUND_COLOR = "#09090B";
+export const DEFAULT_GENERAL_SCREEN_FONT_FAMILY = "system";
+export const DEFAULT_GENERAL_SCREEN_FONT_SIZE = 96;
+export const MIN_GENERAL_SCREEN_FONT_SIZE = 56;
+export const MAX_GENERAL_SCREEN_FONT_SIZE = 132;
+
+export const GENERAL_SCREEN_FONT_OPTIONS = [
+  {
+    id: "system",
+    label: "Standaard",
+    css: 'ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  { id: "arial", label: "Arial", css: "Arial, Helvetica, sans-serif" },
+  { id: "verdana", label: "Verdana", css: "Verdana, Geneva, sans-serif" },
+  { id: "tahoma", label: "Tahoma", css: "Tahoma, Geneva, sans-serif" },
+  { id: "trebuchet", label: "Trebuchet MS", css: '"Trebuchet MS", Arial, sans-serif' },
+  { id: "georgia", label: "Georgia", css: "Georgia, serif" },
+  { id: "times", label: "Times New Roman", css: '"Times New Roman", Times, serif' },
+  { id: "courier", label: "Courier New", css: '"Courier New", Courier, monospace' },
+  { id: "impact", label: "Impact", css: "Impact, Haettenschweiler, sans-serif" },
+] as const;
+
+export type GeneralScreenFontFamily = (typeof GENERAL_SCREEN_FONT_OPTIONS)[number]["id"];
 
 const HEX_COLOR_PATTERN = /^#?[0-9a-f]{6}$/i;
 
@@ -31,6 +53,86 @@ export function normalizeGeneralScreenBackgroundColor(value: unknown) {
 
 export function resolveGeneralScreenBackgroundColor(value: unknown) {
   return normalizeHexColor(value) ?? DEFAULT_GENERAL_SCREEN_BACKGROUND_COLOR;
+}
+
+export function resolveGeneralScreenFontFamily(value: unknown): GeneralScreenFontFamily {
+  if (typeof value !== "string") {
+    return DEFAULT_GENERAL_SCREEN_FONT_FAMILY;
+  }
+
+  return GENERAL_SCREEN_FONT_OPTIONS.some((option) => option.id === value)
+    ? (value as GeneralScreenFontFamily)
+    : DEFAULT_GENERAL_SCREEN_FONT_FAMILY;
+}
+
+export function normalizeGeneralScreenFontFamily(value: unknown) {
+  const resolved = resolveGeneralScreenFontFamily(value);
+  return resolved === DEFAULT_GENERAL_SCREEN_FONT_FAMILY ? null : resolved;
+}
+
+export function getGeneralScreenFontOption(value: unknown) {
+  const resolved = resolveGeneralScreenFontFamily(value);
+  return (
+    GENERAL_SCREEN_FONT_OPTIONS.find((option) => option.id === resolved) ??
+    GENERAL_SCREEN_FONT_OPTIONS[0]
+  );
+}
+
+export function resolveGeneralScreenFontSize(value: unknown) {
+  const numeric =
+    typeof value === "number"
+      ? value
+      : typeof value === "string" && value.trim()
+        ? Number(value)
+        : DEFAULT_GENERAL_SCREEN_FONT_SIZE;
+
+  if (!Number.isFinite(numeric)) {
+    return DEFAULT_GENERAL_SCREEN_FONT_SIZE;
+  }
+
+  return Math.min(
+    Math.max(Math.round(numeric), MIN_GENERAL_SCREEN_FONT_SIZE),
+    MAX_GENERAL_SCREEN_FONT_SIZE
+  );
+}
+
+export function normalizeGeneralScreenFontSize(value: unknown) {
+  const numeric =
+    typeof value === "number"
+      ? value
+      : typeof value === "string" && value.trim()
+        ? Number(value)
+        : NaN;
+
+  if (
+    !Number.isFinite(numeric) ||
+    numeric < MIN_GENERAL_SCREEN_FONT_SIZE ||
+    numeric > MAX_GENERAL_SCREEN_FONT_SIZE
+  ) {
+    return null;
+  }
+
+  const rounded = Math.round(numeric);
+  return rounded === DEFAULT_GENERAL_SCREEN_FONT_SIZE ? null : rounded;
+}
+
+export function isValidGeneralScreenFontSize(value: unknown) {
+  if (value === null || value === undefined || value === "") {
+    return true;
+  }
+
+  const numeric =
+    typeof value === "number"
+      ? value
+      : typeof value === "string" && value.trim()
+        ? Number(value)
+        : NaN;
+
+  return (
+    Number.isFinite(numeric) &&
+    numeric >= MIN_GENERAL_SCREEN_FONT_SIZE &&
+    numeric <= MAX_GENERAL_SCREEN_FONT_SIZE
+  );
 }
 
 function hexToRgb(hex: string) {

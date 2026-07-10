@@ -1,7 +1,11 @@
 import postgres from "postgres";
 import {
+  isValidGeneralScreenFontSize,
   normalizeGeneralScreenBackgroundColor,
+  normalizeGeneralScreenFontFamily,
+  normalizeGeneralScreenFontSize,
   normalizeHexColor,
+  resolveGeneralScreenFontFamily,
 } from "@/lib/generalScreenAppearance";
 
 export type QuestionType = "open" | "multiple" | "quiz" | "slide";
@@ -24,6 +28,8 @@ export type PresentationRow = {
   published_at: string | null;
   idle_screen_text: string | null;
   general_screen_background_color: string | null;
+  general_screen_font_family: string | null;
+  general_screen_font_size: number | null;
   active_question_id: string | null;
   screen_question_id: string | null;
   screen_view: ScreenView;
@@ -149,6 +155,8 @@ export type PresenterPayload = {
     publishedAt: string | null;
     idleScreenText: string;
     generalScreenBackgroundColor: string | null;
+    generalScreenFontFamily: ReturnType<typeof resolveGeneralScreenFontFamily> | null;
+    generalScreenFontSize: number | null;
     activeQuestionId: string | null;
     screenQuestionId: string | null;
     screenView: ScreenView;
@@ -175,6 +183,8 @@ export type PublicSessionPayload = {
     workflowStatus: PresentationWorkflowStatus;
     idleScreenText: string;
     generalScreenBackgroundColor: string | null;
+    generalScreenFontFamily: ReturnType<typeof resolveGeneralScreenFontFamily> | null;
+    generalScreenFontSize: number | null;
   };
   screenView: ScreenView;
   activeQuestion: QuestionResult | null;
@@ -280,6 +290,8 @@ const schemaStatements = [
     published_at TEXT,
     idle_screen_text TEXT,
     general_screen_background_color TEXT,
+    general_screen_font_family TEXT,
+    general_screen_font_size INTEGER,
     active_question_id TEXT,
     screen_question_id TEXT,
     screen_view TEXT NOT NULL DEFAULT 'question',
@@ -343,6 +355,8 @@ const schemaStatements = [
   "ALTER TABLE presentations ADD COLUMN IF NOT EXISTS published_at TEXT",
   "ALTER TABLE presentations ADD COLUMN IF NOT EXISTS idle_screen_text TEXT",
   "ALTER TABLE presentations ADD COLUMN IF NOT EXISTS general_screen_background_color TEXT",
+  "ALTER TABLE presentations ADD COLUMN IF NOT EXISTS general_screen_font_family TEXT",
+  "ALTER TABLE presentations ADD COLUMN IF NOT EXISTS general_screen_font_size INTEGER",
   "ALTER TABLE presentations ADD COLUMN IF NOT EXISTS screen_view TEXT NOT NULL DEFAULT 'question'",
   "ALTER TABLE presentations ADD COLUMN IF NOT EXISTS screen_question_id TEXT",
   "ALTER TABLE questions ADD COLUMN IF NOT EXISTS finalized_at TEXT",
@@ -614,6 +628,8 @@ function mapPresentation(row: PresentationRow) {
     publishedAt: row.published_at,
     idleScreenText: row.idle_screen_text || "Sessie Interactief",
     generalScreenBackgroundColor: normalizeHexColor(row.general_screen_background_color),
+    generalScreenFontFamily: normalizeGeneralScreenFontFamily(row.general_screen_font_family),
+    generalScreenFontSize: normalizeGeneralScreenFontSize(row.general_screen_font_size),
     activeQuestionId: row.active_question_id,
     screenQuestionId: row.screen_question_id,
     screenView: row.screen_view ?? "question",
@@ -1581,6 +1597,8 @@ export async function updatePresentationSettings(
   payload: {
     idleScreenText?: unknown;
     generalScreenBackgroundColor?: unknown;
+    generalScreenFontFamily?: unknown;
+    generalScreenFontSize?: unknown;
     title?: unknown;
     presentationType?: unknown;
     workflowStatus?: unknown;
@@ -1609,6 +1627,25 @@ export async function updatePresentationSettings(
     throw new AppError(400, "Gebruik een geldige HEX-kleur, bijvoorbeeld #00963E.");
   }
   generalScreenBackgroundColor ??= null;
+  const generalScreenFontFamily =
+    payload.generalScreenFontFamily === undefined
+      ? normalizeGeneralScreenFontFamily(presentation.general_screen_font_family)
+      : normalizeGeneralScreenFontFamily(payload.generalScreenFontFamily);
+  if (
+    payload.generalScreenFontFamily !== undefined &&
+    payload.generalScreenFontFamily !== null &&
+    String(payload.generalScreenFontFamily).trim() &&
+    resolveGeneralScreenFontFamily(payload.generalScreenFontFamily) !== payload.generalScreenFontFamily
+  ) {
+    throw new AppError(400, "Kies een bekend lettertype uit de lijst.");
+  }
+  const generalScreenFontSize =
+    payload.generalScreenFontSize === undefined
+      ? normalizeGeneralScreenFontSize(presentation.general_screen_font_size)
+      : normalizeGeneralScreenFontSize(payload.generalScreenFontSize);
+  if (!isValidGeneralScreenFontSize(payload.generalScreenFontSize)) {
+    throw new AppError(400, "Kies een geldige lettergrootte.");
+  }
   const presentationType =
     payload.presentationType === undefined
       ? presentation.presentation_type ?? "interactive"
@@ -1630,6 +1667,8 @@ export async function updatePresentationSettings(
       title = ${title},
       idle_screen_text = ${idleScreenText},
       general_screen_background_color = ${generalScreenBackgroundColor},
+      general_screen_font_family = ${generalScreenFontFamily},
+      general_screen_font_size = ${generalScreenFontSize},
       presentation_type = ${presentationType},
       workflow_status = ${workflowStatus},
       published_at = ${publishedAt},
@@ -2113,6 +2152,8 @@ export async function getPublicSession(codeInput: string, participantIdInput?: u
       workflowStatus: presentation.workflow_status ?? "concept",
       idleScreenText: presentation.idle_screen_text || "Sessie Interactief",
       generalScreenBackgroundColor: normalizeHexColor(presentation.general_screen_background_color),
+      generalScreenFontFamily: normalizeGeneralScreenFontFamily(presentation.general_screen_font_family),
+      generalScreenFontSize: normalizeGeneralScreenFontSize(presentation.general_screen_font_size),
     },
     screenView: presentation.screen_view ?? "question",
     activeQuestion: hideCorrectAnswers(activeQuestion),
@@ -2445,6 +2486,8 @@ export async function duplicatePresentation(
         published_at,
         idle_screen_text,
         general_screen_background_color,
+        general_screen_font_family,
+        general_screen_font_size,
         active_question_id,
         screen_question_id,
         screen_view,
@@ -2463,6 +2506,8 @@ export async function duplicatePresentation(
         ${original.published_at},
         ${original.idle_screen_text},
         ${normalizeHexColor(original.general_screen_background_color)},
+        ${normalizeGeneralScreenFontFamily(original.general_screen_font_family)},
+        ${normalizeGeneralScreenFontSize(original.general_screen_font_size)},
         NULL,
         NULL,
         'question',

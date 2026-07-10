@@ -4,6 +4,16 @@ export type ModeratorRole = "admin" | "tester";
 export type AppAccountStatus = "pending" | "active" | "deactivated" | "deleted";
 export type PresentationKind = "quiz" | "interactive" | "combined";
 export type PresentationWorkflowStatus = "concept" | "completed" | "published";
+export type GeneralScreenFontFamily =
+  | "system"
+  | "arial"
+  | "verdana"
+  | "tahoma"
+  | "trebuchet"
+  | "georgia"
+  | "times"
+  | "courier"
+  | "impact";
 
 export type LeaderboardEntry = {
   participantId: string;
@@ -61,6 +71,8 @@ export type PresenterPayload = {
     publishedAt: string | null;
     idleScreenText: string;
     generalScreenBackgroundColor: string | null;
+    generalScreenFontFamily: GeneralScreenFontFamily | null;
+    generalScreenFontSize: number | null;
     activeQuestionId: string | null;
     screenQuestionId: string | null;
     screenView: ScreenView;
@@ -87,6 +99,8 @@ export type PublicSessionPayload = {
     workflowStatus: PresentationWorkflowStatus;
     idleScreenText: string;
     generalScreenBackgroundColor: string | null;
+    generalScreenFontFamily: GeneralScreenFontFamily | null;
+    generalScreenFontSize: number | null;
   };
   screenView: ScreenView;
   activeQuestion: QuestionResult | null;

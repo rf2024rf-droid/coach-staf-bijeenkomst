@@ -24,6 +24,8 @@ export async function PATCH(request: Request, context: RouteContext) {
     const payload = (await request.json().catch(() => ({}))) as {
       idleScreenText?: unknown;
       generalScreenBackgroundColor?: unknown;
+      generalScreenFontFamily?: unknown;
+      generalScreenFontSize?: unknown;
       title?: unknown;
       presentationType?: unknown;
       workflowStatus?: unknown;

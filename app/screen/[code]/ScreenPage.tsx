@@ -4,7 +4,11 @@ import { BarChart3, CheckCircle2, Loader2, QrCode as QrCodeIcon, Trophy, Users }
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { QrCode } from "@/app/components/QrCode";
 import type { PublicSessionPayload, QuestionResult } from "@/app/types";
-import { getGeneralScreenPalette } from "@/lib/generalScreenAppearance";
+import {
+  getGeneralScreenFontOption,
+  getGeneralScreenPalette,
+  resolveGeneralScreenFontSize,
+} from "@/lib/generalScreenAppearance";
 
 type ScreenPageProps = {
   code: string;
@@ -424,11 +428,26 @@ export default function ScreenPage({ code }: ScreenPageProps) {
     resultsQuestion?.type === "open" &&
     resultsQuestion.responses.filter((response) => response.textAnswer).length > 16;
   const generalScreenPalette = getGeneralScreenPalette(session.presentation.generalScreenBackgroundColor);
+  const generalScreenFont = getGeneralScreenFontOption(session.presentation.generalScreenFontFamily);
+  const generalScreenFontSize = resolveGeneralScreenFontSize(session.presentation.generalScreenFontSize);
   const generalScreenStyle = {
     backgroundColor: generalScreenPalette.background,
     color: generalScreenPalette.foreground,
+    fontFamily: generalScreenFont.css,
   };
   const generalBorderStyle = { borderColor: generalScreenPalette.border };
+  const generalScreenHeadingStyle = {
+    color: generalScreenPalette.foreground,
+    fontSize: `${generalScreenFontSize}px`,
+  };
+  const generalScreenTitleStyle = {
+    color: generalScreenPalette.foreground,
+    fontSize: `${Math.max(34, Math.round(generalScreenFontSize * 0.52))}px`,
+  };
+  const generalScreenSlideHeadingStyle = {
+    color: generalScreenPalette.foreground,
+    fontSize: `${Math.max(44, Math.round(generalScreenFontSize * 0.78))}px`,
+  };
 
   if (session.screenView === "qr") {
     return (
@@ -442,7 +461,7 @@ export default function ScreenPage({ code }: ScreenPageProps) {
               <p className="text-sm font-bold uppercase" style={{ color: generalScreenPalette.subtle }}>
                 Sessie Interactief
               </p>
-              <h1 className="mt-2 text-3xl font-black md:text-5xl" style={{ color: generalScreenPalette.foreground }}>
+              <h1 className="mt-2 font-black" style={generalScreenTitleStyle}>
                 {session.presentation.title}
               </h1>
             </div>
@@ -458,8 +477,8 @@ export default function ScreenPage({ code }: ScreenPageProps) {
                 Meedoen met de sessie
               </p>
               <h2
-                className="mt-5 max-w-4xl text-6xl font-black leading-tight md:text-8xl"
-                style={{ color: generalScreenPalette.foreground }}
+                className="mt-5 max-w-4xl font-black leading-tight"
+                style={generalScreenHeadingStyle}
               >
                 Scan de QR-code
               </h2>
@@ -567,8 +586,8 @@ export default function ScreenPage({ code }: ScreenPageProps) {
                 Sessie Interactief
               </p>
               <h1
-                className="mt-2 text-3xl font-black md:text-5xl"
-                style={isGeneralQuestionScreen ? { color: generalScreenPalette.foreground } : undefined}
+                className={`mt-2 font-black ${isGeneralQuestionScreen ? "" : "text-3xl md:text-5xl"}`}
+                style={isGeneralQuestionScreen ? generalScreenTitleStyle : undefined}
               >
                 {session.presentation.title}
               </h1>
@@ -579,8 +598,8 @@ export default function ScreenPage({ code }: ScreenPageProps) {
         {!activeQuestion ? (
           <section className="grid flex-1 place-items-center text-center">
             <h2
-              className="max-w-5xl text-6xl font-black leading-tight md:text-8xl"
-              style={{ color: generalScreenPalette.foreground }}
+              className="max-w-5xl break-words font-black leading-tight"
+              style={generalScreenHeadingStyle}
             >
               {idleScreenText}
             </h2>
@@ -624,8 +643,10 @@ export default function ScreenPage({ code }: ScreenPageProps) {
                   {screenQuestionLabel(activeQuestion)}
                 </span>
                 <h2
-                  className="mt-5 text-5xl font-black leading-tight md:text-7xl"
-                  style={activeQuestion.type === "slide" ? { color: generalScreenPalette.foreground } : undefined}
+                  className={`mt-5 font-black leading-tight ${
+                    activeQuestion.type === "slide" ? "" : "text-5xl md:text-7xl"
+                  }`}
+                  style={activeQuestion.type === "slide" ? generalScreenSlideHeadingStyle : undefined}
                 >
                   {activeQuestion.prompt}
                 </h2>

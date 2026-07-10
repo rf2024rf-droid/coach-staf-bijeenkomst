@@ -1561,6 +1561,13 @@ export default function PresentationWizard() {
                   <Eye aria-hidden className="h-4 w-4" />
                   Voorbeeld bekijken
                 </button>
+                <a
+                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-zinc-950 px-4 py-3 font-black text-white hover:bg-zinc-800"
+                  href={`/presenter/${payload.presentation.id}`}
+                >
+                  <Monitor aria-hidden className="h-4 w-4" />
+                  Naar regie
+                </a>
                 <button
                   className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-800 px-4 py-3 font-black text-white hover:bg-emerald-900 disabled:opacity-60"
                   disabled={busy === "publish"}

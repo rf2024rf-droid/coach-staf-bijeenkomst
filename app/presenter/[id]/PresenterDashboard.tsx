@@ -8,6 +8,7 @@ import {
   CheckCircle2,
   Copy,
   KeyRound,
+  ListChecks,
   Monitor,
   Pencil,
   Play,
@@ -15,6 +16,8 @@ import {
   QrCode as QrCodeIcon,
   RotateCcw,
   Save,
+  Settings,
+  SlidersHorizontal,
   Square,
   Trash2,
   Trophy,
@@ -653,6 +656,24 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
     }`;
   }
 
+  function tabIcon(tab: PresenterTab) {
+    const className = "h-5 w-5";
+
+    if (tab === "regie") {
+      return <SlidersHorizontal aria-hidden className={className} />;
+    }
+
+    if (tab === "vragen") {
+      return <ListChecks aria-hidden className={className} />;
+    }
+
+    if (tab === "resultaten") {
+      return <BarChart3 aria-hidden className={className} />;
+    }
+
+    return <Settings aria-hidden className={className} />;
+  }
+
   async function showGeneralScreen() {
     await activate(null);
   }
@@ -791,9 +812,20 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
         <nav className="grid gap-2 rounded-lg border border-zinc-300 bg-zinc-100 p-2 sm:grid-cols-4">
           {tabs.map((tab) => (
             <button className={tabClassName(tab.id)} key={tab.id} onClick={() => setPresenterTab(tab.id)} type="button">
-              <span className="block">{tab.label}</span>
-              <span className={`mt-1 block text-xs ${presenterTab === tab.id ? "text-zinc-300" : "text-zinc-500"}`}>
-                {tab.meta}
+              <span className="flex items-center gap-3">
+                <span
+                  className={`grid h-10 w-10 shrink-0 place-items-center rounded-lg ${
+                    presenterTab === tab.id ? "bg-white/10 text-white" : "bg-zinc-100 text-zinc-700"
+                  }`}
+                >
+                  {tabIcon(tab.id)}
+                </span>
+                <span className="min-w-0">
+                  <span className="block">{tab.label}</span>
+                  <span className={`mt-1 block text-xs ${presenterTab === tab.id ? "text-zinc-300" : "text-zinc-500"}`}>
+                    {tab.meta}
+                  </span>
+                </span>
               </span>
             </button>
           ))}

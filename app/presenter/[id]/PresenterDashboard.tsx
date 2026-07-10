@@ -195,22 +195,6 @@ function screenViewLabel(screenView: ScreenView) {
   return "live vraag";
 }
 
-function screenViewTitle(screenView: ScreenView) {
-  if (screenView === "qr") {
-    return "QR-code op beeld";
-  }
-
-  if (screenView === "results") {
-    return "Resultaten op beeld";
-  }
-
-  if (screenView === "ranking") {
-    return "Stand op beeld";
-  }
-
-  return "Vraag of algemeen scherm";
-}
-
 export default function PresenterDashboard({ id }: PresenterDashboardProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -1050,27 +1034,33 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
 
             <aside className="flex flex-col gap-6">
               <article className="rounded-lg border border-zinc-800 bg-zinc-950 p-5 text-white shadow-sm">
-                <p className="text-xs font-black uppercase text-emerald-300">Preview groot scherm</p>
-                <div className="mt-4 rounded-lg border border-zinc-700 bg-zinc-900 p-4">
-                  <p className="text-sm font-bold text-zinc-400">Nu zichtbaar</p>
-                  <h2 className="mt-2 text-2xl font-black">{screenViewTitle(payload.presentation.screenView)}</h2>
-                  <p className="mt-3 line-clamp-4 text-sm leading-6 text-zinc-300">
-                    {screenState.detail}
-                  </p>
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-black uppercase text-emerald-300">Live preview groot scherm</p>
+                    <p className="mt-1 text-sm font-semibold text-zinc-400">
+                      Zelfde beeld als in de zaal
+                    </p>
+                  </div>
+                  <a
+                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm font-bold text-white hover:bg-zinc-800"
+                    href={screenLink}
+                    rel="noreferrer"
+                    target="_blank"
+                  >
+                    <Monitor aria-hidden className="h-4 w-4" />
+                    Open
+                  </a>
                 </div>
-                <div className="mt-4 grid grid-cols-2 gap-2">
-                  <button className="rounded-lg bg-white px-3 py-3 text-sm font-black text-zinc-950 hover:bg-zinc-100 disabled:opacity-60" disabled={saving || !activeQuestion} onClick={() => updateScreenView("question")} type="button">
-                    Vraag
-                  </button>
-                  <button className="rounded-lg bg-sky-700 px-3 py-3 text-sm font-black text-white hover:bg-sky-800 disabled:opacity-60" disabled={saving || !activeQuestion} onClick={() => activeQuestion && toggleResults(activeQuestion.id)} type="button">
-                    Resultaten
-                  </button>
-                  <button className="rounded-lg bg-amber-700 px-3 py-3 text-sm font-black text-white hover:bg-amber-800 disabled:opacity-60" disabled={saving || !payload.quizTotals.finalized} onClick={toggleRanking} type="button">
-                    Stand
-                  </button>
-                  <button className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-3 text-sm font-black text-white hover:bg-zinc-800 disabled:opacity-60" disabled={saving || isGeneralScreenVisible} onClick={showGeneralScreen} type="button">
-                    Algemeen
-                  </button>
+                <div className="mt-4 overflow-hidden rounded-lg border border-zinc-700 bg-black shadow-inner">
+                  <div className="relative aspect-video w-full overflow-hidden">
+                    <iframe
+                      className="pointer-events-none absolute left-0 top-0 h-[400%] w-[400%] origin-top-left border-0"
+                      key={payload.presentation.code}
+                      src={screenLink}
+                      style={{ transform: "scale(0.25)" }}
+                      title="Live preview van het grote scherm"
+                    />
+                  </div>
                 </div>
               </article>
 

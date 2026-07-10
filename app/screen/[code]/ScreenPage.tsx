@@ -338,16 +338,16 @@ function ResponsePulse({ count, questionType }: { count: number; questionType: Q
   const label = questionType === "open" ? answerLabel(count) : voteLabel(count);
 
   return (
-    <section className="grid flex-1 place-items-center rounded-lg border border-zinc-700 bg-zinc-900 p-8 text-center md:p-10">
-      <div>
-        <p className="inline-flex items-center gap-3 text-lg font-black uppercase tracking-wide text-emerald-300">
-          <Users aria-hidden className="h-6 w-6" />
+    <section className="rounded-lg border border-zinc-800 bg-zinc-900/70 px-5 py-4 text-center shadow-xl shadow-black/20 md:px-6 md:py-5">
+      <div className="flex flex-col items-center justify-center gap-2 sm:flex-row sm:gap-4">
+        <p className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-wide text-emerald-300/90 md:text-sm">
+          <Users aria-hidden className="h-4 w-4" />
           Reacties komen binnen
         </p>
-        <div className="mt-8 flex items-end justify-center gap-5">
-          <span className="text-8xl font-black leading-none text-white md:text-9xl">{count}</span>
-          <span className="pb-4 text-3xl font-black text-zinc-300">{label}</span>
-        </div>
+        <p className="flex items-baseline justify-center gap-2 text-zinc-300">
+          <span className="text-3xl font-black leading-none text-white md:text-4xl">{count}</span>
+          <span className="text-base font-black md:text-lg">{label}</span>
+        </p>
       </div>
     </section>
   );
@@ -548,15 +548,21 @@ export default function ScreenPage({ code }: ScreenPageProps) {
             </h2>
           </section>
         ) : (
-          <section className="flex flex-1 flex-col gap-6">
-            <div className="rounded-lg border border-zinc-700 bg-zinc-900 p-7 md:p-9">
+          <section
+            className={
+              activeQuestion.type === "slide"
+                ? "grid flex-1 place-items-center"
+                : "grid flex-1 grid-rows-[1fr_auto] gap-5"
+            }
+          >
+            <div className="grid min-h-[56vh] place-items-center rounded-lg border border-zinc-700 bg-zinc-900 p-8 text-center md:min-h-[62vh] md:p-12">
               <div className="mx-auto max-w-6xl">
-                  <span className="rounded-md bg-emerald-300 px-2 py-1 text-xs font-black uppercase text-emerald-950">
+                <span className="rounded-md bg-emerald-300 px-2 py-1 text-xs font-black uppercase text-emerald-950">
                   {screenQuestionLabel(activeQuestion)}
                 </span>
                 <h2 className="mt-5 text-5xl font-black leading-tight md:text-7xl">{activeQuestion.prompt}</h2>
                 {activeQuestion.description ? (
-                  <p className="mt-6 max-w-4xl whitespace-pre-line text-2xl font-semibold leading-10 text-zinc-200">
+                  <p className="mx-auto mt-6 max-w-4xl whitespace-pre-line text-2xl font-semibold leading-10 text-zinc-200">
                     {activeQuestion.description}
                   </p>
                 ) : null}

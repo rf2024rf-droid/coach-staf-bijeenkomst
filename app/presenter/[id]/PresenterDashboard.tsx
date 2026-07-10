@@ -191,6 +191,22 @@ function screenViewLabel(screenView: ScreenView) {
   return "live vraag";
 }
 
+function screenViewTitle(screenView: ScreenView) {
+  if (screenView === "qr") {
+    return "QR-code op beeld";
+  }
+
+  if (screenView === "results") {
+    return "Resultaten op beeld";
+  }
+
+  if (screenView === "ranking") {
+    return "Stand op beeld";
+  }
+
+  return "Vraag of algemeen scherm";
+}
+
 export default function PresenterDashboard({ id }: PresenterDashboardProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -592,26 +608,30 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
   }
 
   const activeQuestion = payload.activeQuestion;
-  const activeQuestionIndex = activeQuestion
-    ? payload.questions.findIndex((question) => question.id === activeQuestion.id)
+  const screenQuestion =
+    payload.questions.find((question) => question.id === payload.presentation.screenQuestionId) ?? null;
+  const currentFlowQuestion = activeQuestion ?? screenQuestion;
+  const currentFlowQuestionIndex = currentFlowQuestion
+    ? payload.questions.findIndex((question) => question.id === currentFlowQuestion.id)
     : -1;
-  const previousQuestion = activeQuestionIndex > 0 ? payload.questions[activeQuestionIndex - 1] : null;
+  const previousQuestion = currentFlowQuestionIndex > 0 ? payload.questions[currentFlowQuestionIndex - 1] : null;
   const nextQuestion =
-    activeQuestionIndex >= 0 && activeQuestionIndex < payload.questions.length - 1
-      ? payload.questions[activeQuestionIndex + 1]
+    currentFlowQuestionIndex >= 0 && currentFlowQuestionIndex < payload.questions.length - 1
+      ? payload.questions[currentFlowQuestionIndex + 1]
       : null;
   const activeResultsVisible = Boolean(
     activeQuestion &&
       payload.presentation.screenView === "results" &&
       payload.presentation.screenQuestionId === activeQuestion.id
   );
+  const isGeneralScreenVisible = payload.presentation.screenView === "question" && !activeQuestion;
   const rankingLabel =
     payload.quizTotals.total > 0 && payload.quizTotals.finalized >= payload.quizTotals.total
       ? "Eindklassering"
       : "Tussenstand";
   const editingQuestion = payload.questions.find((question) => question.id === editingQuestionId) ?? null;
   const tabs: Array<{ id: PresenterTab; label: string; meta: string }> = [
-    { id: "regie", label: "Regie", meta: activeQuestion ? "live" : "stand-by" },
+    { id: "regie", label: "Regie", meta: isGeneralScreenVisible ? "algemeen" : "op beeld" },
     { id: "vragen", label: "Vragen", meta: `${payload.questions.length}` },
     { id: "resultaten", label: "Resultaten", meta: `${payload.totals.answers}` },
     { id: "instellingen", label: "Instellingen", meta: payload.presentation.code },
@@ -625,6 +645,59 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
     }`;
   }
 
+  async function showGeneralScreen() {
+    await activate(null);
+  }
+
+  const screenState = (() => {
+    if (payload.presentation.screenView === "qr") {
+      return {
+        label: "QR-code staat live op het grote scherm",
+        detail: `Deelnemers kunnen binnenkomen met code ${payload.presentation.code}.`,
+        tone: "emerald",
+      };
+    }
+
+    if (payload.presentation.screenView === "results") {
+      return {
+        label: "Resultaten staan live op het grote scherm",
+        detail: screenQuestion?.prompt ?? "Er worden resultaten getoond.",
+        tone: "sky",
+      };
+    }
+
+    if (payload.presentation.screenView === "ranking") {
+      return {
+        label: `${rankingLabel} staat live op het grote scherm`,
+        detail: "De scorelijst is zichtbaar voor de zaal.",
+        tone: "amber",
+      };
+    }
+
+    if (activeQuestion) {
+      return {
+        label: "Vraag staat live op het grote scherm",
+        detail: activeQuestion.prompt,
+        tone: "emerald",
+      };
+    }
+
+    return {
+      label: "Algemeen scherm staat live",
+      detail: payload.presentation.idleScreenText || payload.presentation.title,
+      tone: "zinc",
+    };
+  })();
+
+  const screenToneClass =
+    screenState.tone === "emerald"
+      ? "border-emerald-400 bg-emerald-50 text-emerald-950"
+      : screenState.tone === "sky"
+        ? "border-sky-300 bg-sky-50 text-sky-950"
+        : screenState.tone === "amber"
+          ? "border-amber-300 bg-amber-50 text-amber-950"
+          : "border-zinc-300 bg-white text-zinc-950";
+
   return (
     <main className={`min-h-screen bg-[#f4f4ef] text-zinc-950 ${activeQuestion ? "pb-72 md:pb-36" : ""}`}>
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-4 py-5 md:px-8">
@@ -637,8 +710,8 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
               <span className="rounded-lg bg-zinc-900 px-3 py-2 font-mono text-lg font-black text-white">
                 {payload.presentation.code}
               </span>
-              <span className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-700">
-                {payload.activeQuestion ? "Live vraag open" : "Geen vraag live"}
+              <span className={`rounded-lg border px-3 py-2 text-sm font-bold ${screenToneClass}`}>
+                {screenState.label}
               </span>
               <span className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-700">
                 Groot scherm: {screenViewLabel(payload.presentation.screenView)}
@@ -722,64 +795,126 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
           <section className="grid gap-6 xl:grid-cols-[1fr_360px]">
             <div className="flex flex-col gap-6">
               <article
-                className={`rounded-lg border p-5 shadow-sm ${
-                  activeQuestion ? "border-emerald-400 bg-emerald-50" : "border-zinc-300 bg-white"
-                }`}
+                className={`rounded-lg border p-5 shadow-sm ${screenToneClass}`}
               >
-                <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+                <div className="grid gap-5 lg:grid-cols-[1fr_420px] lg:items-start">
                   <div className="min-w-0">
-                    <p className={`inline-flex items-center gap-2 text-xs font-black uppercase ${activeQuestion ? "text-emerald-900" : "text-zinc-500"}`}>
-                      <span className={`h-2.5 w-2.5 rounded-full ${activeQuestion ? "bg-emerald-700" : "bg-zinc-400"}`} />
-                      {activeQuestion ? "Nu live" : "Regie stand-by"}
+                    <p className="inline-flex items-center gap-2 text-xs font-black uppercase">
+                      <span className="h-2.5 w-2.5 rounded-full bg-current" />
+                      Live op groot scherm
                     </p>
                     <h2 className="mt-3 text-2xl font-black leading-tight md:text-3xl">
-                      {activeQuestion ? activeQuestion.prompt : "Kies een vraag om live te zetten"}
+                      {screenState.label}
                     </h2>
-                    <p className="mt-3 text-sm font-semibold text-zinc-600">
-                      {activeQuestion
-                        ? `${activeQuestion.answerCount} antwoorden binnen / groot scherm toont ${screenViewLabel(payload.presentation.screenView)}`
-                        : "Zet de QR groot, open een vraag en toon resultaten pas wanneer jij dat wilt."}
+                    <p className="mt-3 text-sm font-semibold opacity-80">
+                      {screenState.detail}
                     </p>
+                    <div className="mt-5 grid gap-3 md:grid-cols-3">
+                      <div
+                        className={`rounded-lg border px-3 py-3 ${
+                          activeQuestion && payload.presentation.screenView === "question"
+                            ? "border-emerald-700 bg-white"
+                            : "border-black/10 bg-white/70"
+                        }`}
+                      >
+                        <p className="text-xs font-black uppercase opacity-60">Stap 1</p>
+                        <p className="mt-1 text-sm font-black">Vraag live</p>
+                      </div>
+                      <div
+                        className={`rounded-lg border px-3 py-3 ${
+                          payload.presentation.screenView === "results"
+                            ? "border-sky-700 bg-white"
+                            : activeQuestion
+                              ? "border-sky-400 bg-white"
+                              : "border-black/10 bg-white/70"
+                        }`}
+                      >
+                        <p className="text-xs font-black uppercase opacity-60">Stap 2</p>
+                        <p className="mt-1 text-sm font-black">Resultaten tonen</p>
+                      </div>
+                      <div
+                        className={`rounded-lg border px-3 py-3 ${
+                          payload.presentation.screenView === "results"
+                            ? "border-amber-500 bg-white"
+                            : "border-black/10 bg-white/70"
+                        }`}
+                      >
+                        <p className="text-xs font-black uppercase opacity-60">Stap 3</p>
+                        <p className="mt-1 text-sm font-black">Volgende of algemeen</p>
+                      </div>
+                    </div>
                   </div>
-                  <div className="grid gap-2 sm:grid-cols-2 lg:w-[360px]">
+                  <div className="rounded-lg border border-black/10 bg-white p-4 text-zinc-950 shadow-sm">
+                    <p className="text-xs font-black uppercase text-zinc-500">Aanbevolen volgende actie</p>
                     <button
-                      className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-800 px-4 py-3 font-black text-white hover:bg-emerald-900 disabled:opacity-40"
-                      disabled={saving || !nextQuestion}
-                      onClick={() => nextQuestion && activate(nextQuestion.id)}
-                      type="button"
-                    >
-                      <ArrowDown aria-hidden className="h-4 w-4" />
-                      Volgende
-                    </button>
-                    <button
-                      className={`inline-flex items-center justify-center gap-2 rounded-lg px-4 py-3 font-black disabled:opacity-60 ${
-                        activeResultsVisible ? "bg-zinc-950 text-white hover:bg-zinc-800" : "bg-sky-800 text-white hover:bg-sky-900"
+                      className={`mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg px-4 py-4 text-base font-black text-white disabled:opacity-50 ${
+                        payload.presentation.screenView === "results"
+                          ? "bg-emerald-800 hover:bg-emerald-900"
+                          : "bg-sky-800 hover:bg-sky-900"
                       }`}
-                      disabled={saving || !activeQuestion}
-                      onClick={() => activeQuestion && toggleResults(activeQuestion.id)}
+                      disabled={
+                        saving ||
+                        (payload.presentation.screenView !== "results" && !activeQuestion) ||
+                        (payload.presentation.screenView === "results" && !nextQuestion && isGeneralScreenVisible)
+                      }
+                      onClick={() =>
+                        payload.presentation.screenView === "results"
+                          ? nextQuestion
+                            ? activate(nextQuestion.id)
+                            : showGeneralScreen()
+                          : activeQuestion && toggleResults(activeQuestion.id)
+                      }
                       type="button"
                     >
-                      <BarChart3 aria-hidden className="h-4 w-4" />
-                      {activeResultsVisible ? "Sluit resultaten" : "Resultaten"}
+                      {payload.presentation.screenView === "results" ? (
+                        <ArrowDown aria-hidden className="h-5 w-5" />
+                      ) : (
+                        <BarChart3 aria-hidden className="h-5 w-5" />
+                      )}
+                      {payload.presentation.screenView === "results"
+                        ? nextQuestion
+                          ? "Volgende vraag live"
+                          : "Algemeen scherm tonen"
+                        : "Resultaten tonen"}
                     </button>
-                    <button
-                      className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-700 px-4 py-3 font-black text-white hover:bg-emerald-800 disabled:opacity-60"
-                      disabled={saving}
-                      onClick={() => updateScreenView("qr")}
-                      type="button"
-                    >
-                      <QrCodeIcon aria-hidden className="h-4 w-4" />
-                      QR tonen
-                    </button>
-                    <button
-                      className="inline-flex items-center justify-center gap-2 rounded-lg bg-amber-700 px-4 py-3 font-black text-white hover:bg-amber-800 disabled:opacity-60"
-                      disabled={saving || !activeQuestion}
-                      onClick={() => activate(null)}
-                      type="button"
-                    >
-                      <Square aria-hidden className="h-4 w-4" />
-                      Stop live
-                    </button>
+                    <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                      <button
+                        className="inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-white px-3 py-3 text-sm font-bold hover:bg-zinc-50 disabled:opacity-50"
+                        disabled={saving || payload.presentation.screenView !== "results" || !nextQuestion}
+                        onClick={() => nextQuestion && activate(nextQuestion.id)}
+                        type="button"
+                      >
+                        <ArrowDown aria-hidden className="h-4 w-4" />
+                        Volgende
+                      </button>
+                      <button
+                        className="inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-white px-3 py-3 text-sm font-bold hover:bg-zinc-50 disabled:opacity-50"
+                        disabled={saving || isGeneralScreenVisible}
+                        onClick={showGeneralScreen}
+                        type="button"
+                      >
+                        <Monitor aria-hidden className="h-4 w-4" />
+                        Algemeen scherm
+                      </button>
+                      <button
+                        className="inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-white px-3 py-3 text-sm font-bold hover:bg-zinc-50 disabled:opacity-50"
+                        disabled={saving || !activeQuestion || payload.presentation.screenView === "question"}
+                        onClick={() => updateScreenView("question")}
+                        type="button"
+                      >
+                        <Play aria-hidden className="h-4 w-4" />
+                        Terug naar vraag
+                      </button>
+                      <button
+                        className="inline-flex items-center justify-center gap-2 rounded-lg bg-amber-700 px-3 py-3 text-sm font-bold text-white hover:bg-amber-800 disabled:opacity-50"
+                        disabled={saving || !activeQuestion}
+                        onClick={() => activate(null)}
+                        type="button"
+                      >
+                        <Square aria-hidden className="h-4 w-4" />
+                        Stop live
+                      </button>
+                    </div>
                   </div>
                 </div>
               </article>
@@ -883,29 +1018,23 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
                 <p className="text-xs font-black uppercase text-emerald-300">Preview groot scherm</p>
                 <div className="mt-4 rounded-lg border border-zinc-700 bg-zinc-900 p-4">
                   <p className="text-sm font-bold text-zinc-400">Nu zichtbaar</p>
-                  <h2 className="mt-2 text-2xl font-black">{screenViewLabel(payload.presentation.screenView)}</h2>
+                  <h2 className="mt-2 text-2xl font-black">{screenViewTitle(payload.presentation.screenView)}</h2>
                   <p className="mt-3 line-clamp-4 text-sm leading-6 text-zinc-300">
-                    {payload.presentation.screenView === "qr"
-                      ? `QR-code en sessiecode ${payload.presentation.code}`
-                      : payload.presentation.screenView === "results"
-                        ? payload.questions.find((question) => question.id === payload.presentation.screenQuestionId)?.prompt ?? "Resultaten"
-                        : payload.presentation.screenView === "ranking"
-                          ? rankingLabel
-                          : activeQuestion?.prompt ?? payload.presentation.idleScreenText}
+                    {screenState.detail}
                   </p>
                 </div>
                 <div className="mt-4 grid grid-cols-2 gap-2">
-                  <button className="rounded-lg bg-white px-3 py-3 text-sm font-black text-zinc-950 hover:bg-zinc-100" disabled={saving} onClick={() => updateScreenView("question")} type="button">
+                  <button className="rounded-lg bg-white px-3 py-3 text-sm font-black text-zinc-950 hover:bg-zinc-100 disabled:opacity-60" disabled={saving || !activeQuestion} onClick={() => updateScreenView("question")} type="button">
                     Vraag
-                  </button>
-                  <button className="rounded-lg bg-emerald-700 px-3 py-3 text-sm font-black text-white hover:bg-emerald-800" disabled={saving} onClick={() => updateScreenView("qr")} type="button">
-                    QR
                   </button>
                   <button className="rounded-lg bg-sky-700 px-3 py-3 text-sm font-black text-white hover:bg-sky-800 disabled:opacity-60" disabled={saving || !activeQuestion} onClick={() => activeQuestion && toggleResults(activeQuestion.id)} type="button">
                     Resultaten
                   </button>
                   <button className="rounded-lg bg-amber-700 px-3 py-3 text-sm font-black text-white hover:bg-amber-800 disabled:opacity-60" disabled={saving || !payload.quizTotals.finalized} onClick={toggleRanking} type="button">
                     Stand
+                  </button>
+                  <button className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-3 text-sm font-black text-white hover:bg-zinc-800 disabled:opacity-60" disabled={saving || isGeneralScreenVisible} onClick={showGeneralScreen} type="button">
+                    Algemeen
                   </button>
                 </div>
               </article>
@@ -921,6 +1050,10 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
                     <button className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-bold hover:bg-zinc-50" onClick={() => copy(joinLink, "Deelnemerslink")} type="button">
                       <Copy aria-hidden className="h-4 w-4" />
                       Link kopieren
+                    </button>
+                    <button className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-800 px-3 py-3 text-sm font-black text-white hover:bg-emerald-900 disabled:opacity-60" disabled={saving} onClick={() => updateScreenView("qr")} type="button">
+                      <QrCodeIcon aria-hidden className="h-4 w-4" />
+                      Toon QR op groot scherm
                     </button>
                   </div>
                 </div>
@@ -1460,17 +1593,13 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
                 {activeResultsVisible ? "Sluit resultaten" : "Resultaten"}
               </button>
               <button
-                className={`inline-flex items-center justify-center gap-2 rounded-lg px-3 py-3 text-sm font-bold disabled:opacity-60 ${
-                  payload.presentation.screenView === "qr"
-                    ? "bg-white text-zinc-950 hover:bg-zinc-100"
-                    : "bg-emerald-700 text-white hover:bg-emerald-800"
-                }`}
+                className="inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-3 text-sm font-bold text-white hover:bg-zinc-800 disabled:opacity-60"
                 disabled={saving}
-                onClick={() => updateScreenView(payload.presentation.screenView === "qr" ? "question" : "qr")}
+                onClick={showGeneralScreen}
                 type="button"
               >
-                <QrCodeIcon aria-hidden className="h-4 w-4" />
-                QR
+                <Monitor aria-hidden className="h-4 w-4" />
+                Algemeen
               </button>
               <button
                 className={`inline-flex items-center justify-center gap-2 rounded-lg px-3 py-3 text-sm font-bold disabled:opacity-60 ${

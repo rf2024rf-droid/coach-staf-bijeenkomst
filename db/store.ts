@@ -1,4 +1,8 @@
 import postgres from "postgres";
+import {
+  normalizeGeneralScreenBackgroundColor,
+  normalizeHexColor,
+} from "@/lib/generalScreenAppearance";
 
 export type QuestionType = "open" | "multiple" | "quiz" | "slide";
 export type QuestionStatus = "open" | "closed";
@@ -19,6 +23,7 @@ export type PresentationRow = {
   workflow_status: PresentationWorkflowStatus | null;
   published_at: string | null;
   idle_screen_text: string | null;
+  general_screen_background_color: string | null;
   active_question_id: string | null;
   screen_question_id: string | null;
   screen_view: ScreenView;
@@ -143,6 +148,7 @@ export type PresenterPayload = {
     workflowStatus: PresentationWorkflowStatus;
     publishedAt: string | null;
     idleScreenText: string;
+    generalScreenBackgroundColor: string | null;
     activeQuestionId: string | null;
     screenQuestionId: string | null;
     screenView: ScreenView;
@@ -168,6 +174,7 @@ export type PublicSessionPayload = {
     presentationType: PresentationKind;
     workflowStatus: PresentationWorkflowStatus;
     idleScreenText: string;
+    generalScreenBackgroundColor: string | null;
   };
   screenView: ScreenView;
   activeQuestion: QuestionResult | null;
@@ -272,6 +279,7 @@ const schemaStatements = [
     workflow_status TEXT NOT NULL DEFAULT 'concept',
     published_at TEXT,
     idle_screen_text TEXT,
+    general_screen_background_color TEXT,
     active_question_id TEXT,
     screen_question_id TEXT,
     screen_view TEXT NOT NULL DEFAULT 'question',
@@ -334,6 +342,7 @@ const schemaStatements = [
   "ALTER TABLE presentations ADD COLUMN IF NOT EXISTS workflow_status TEXT NOT NULL DEFAULT 'concept'",
   "ALTER TABLE presentations ADD COLUMN IF NOT EXISTS published_at TEXT",
   "ALTER TABLE presentations ADD COLUMN IF NOT EXISTS idle_screen_text TEXT",
+  "ALTER TABLE presentations ADD COLUMN IF NOT EXISTS general_screen_background_color TEXT",
   "ALTER TABLE presentations ADD COLUMN IF NOT EXISTS screen_view TEXT NOT NULL DEFAULT 'question'",
   "ALTER TABLE presentations ADD COLUMN IF NOT EXISTS screen_question_id TEXT",
   "ALTER TABLE questions ADD COLUMN IF NOT EXISTS finalized_at TEXT",
@@ -604,6 +613,7 @@ function mapPresentation(row: PresentationRow) {
     workflowStatus: row.workflow_status ?? "concept",
     publishedAt: row.published_at,
     idleScreenText: row.idle_screen_text || "Sessie Interactief",
+    generalScreenBackgroundColor: normalizeHexColor(row.general_screen_background_color),
     activeQuestionId: row.active_question_id,
     screenQuestionId: row.screen_question_id,
     screenView: row.screen_view ?? "question",
@@ -1570,6 +1580,7 @@ export async function updatePresentationSettings(
   presenterKey: string,
   payload: {
     idleScreenText?: unknown;
+    generalScreenBackgroundColor?: unknown;
     title?: unknown;
     presentationType?: unknown;
     workflowStatus?: unknown;
@@ -1585,6 +1596,19 @@ export async function updatePresentationSettings(
     payload.idleScreenText === undefined
       ? presentation.idle_screen_text
       : cleanText(payload.idleScreenText, 90) || null;
+  let generalScreenBackgroundColor =
+    payload.generalScreenBackgroundColor === undefined
+      ? normalizeHexColor(presentation.general_screen_background_color)
+      : normalizeGeneralScreenBackgroundColor(payload.generalScreenBackgroundColor);
+  if (
+    payload.generalScreenBackgroundColor !== undefined &&
+    payload.generalScreenBackgroundColor !== null &&
+    String(payload.generalScreenBackgroundColor).trim() &&
+    !normalizeHexColor(payload.generalScreenBackgroundColor)
+  ) {
+    throw new AppError(400, "Gebruik een geldige HEX-kleur, bijvoorbeeld #00963E.");
+  }
+  generalScreenBackgroundColor ??= null;
   const presentationType =
     payload.presentationType === undefined
       ? presentation.presentation_type ?? "interactive"
@@ -1605,6 +1629,7 @@ export async function updatePresentationSettings(
     SET
       title = ${title},
       idle_screen_text = ${idleScreenText},
+      general_screen_background_color = ${generalScreenBackgroundColor},
       presentation_type = ${presentationType},
       workflow_status = ${workflowStatus},
       published_at = ${publishedAt},
@@ -2087,6 +2112,7 @@ export async function getPublicSession(codeInput: string, participantIdInput?: u
       presentationType: presentation.presentation_type ?? "interactive",
       workflowStatus: presentation.workflow_status ?? "concept",
       idleScreenText: presentation.idle_screen_text || "Sessie Interactief",
+      generalScreenBackgroundColor: normalizeHexColor(presentation.general_screen_background_color),
     },
     screenView: presentation.screen_view ?? "question",
     activeQuestion: hideCorrectAnswers(activeQuestion),
@@ -2418,6 +2444,7 @@ export async function duplicatePresentation(
         workflow_status,
         published_at,
         idle_screen_text,
+        general_screen_background_color,
         active_question_id,
         screen_question_id,
         screen_view,
@@ -2435,6 +2462,7 @@ export async function duplicatePresentation(
         ${original.workflow_status ?? "concept"},
         ${original.published_at},
         ${original.idle_screen_text},
+        ${normalizeHexColor(original.general_screen_background_color)},
         NULL,
         NULL,
         'question',

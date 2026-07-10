@@ -9,6 +9,7 @@ create table if not exists presentations (
   workflow_status text not null default 'concept',
   published_at text,
   idle_screen_text text,
+  general_screen_background_color text,
   active_question_id text,
   screen_question_id text,
   screen_view text not null default 'question',
@@ -77,6 +78,7 @@ alter table presentations add column if not exists presentation_type text not nu
 alter table presentations add column if not exists workflow_status text not null default 'concept';
 alter table presentations add column if not exists published_at text;
 alter table presentations add column if not exists idle_screen_text text;
+alter table presentations add column if not exists general_screen_background_color text;
 alter table presentations add column if not exists screen_view text not null default 'question';
 alter table presentations add column if not exists screen_question_id text;
 alter table questions add column if not exists finalized_at text;

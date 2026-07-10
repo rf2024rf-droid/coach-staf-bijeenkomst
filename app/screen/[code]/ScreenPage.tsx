@@ -4,14 +4,10 @@ import { BarChart3, CheckCircle2, Loader2, QrCode as QrCodeIcon, Trophy, Users }
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { QrCode } from "@/app/components/QrCode";
 import type { PublicSessionPayload, QuestionResult } from "@/app/types";
+import { getGeneralScreenPalette } from "@/lib/generalScreenAppearance";
 
 type ScreenPageProps = {
   code: string;
-};
-
-const idleScreenBackground = {
-  background:
-    "radial-gradient(circle at 22% 30%, #00963E 0%, rgba(0, 150, 62, 0.28) 18%, transparent 42%), radial-gradient(circle at 78% 68%, #00963E 0%, rgba(0, 150, 62, 0.22) 20%, transparent 44%), #000000",
 };
 
 function optionLetter(position: number, fallbackIndex: number) {
@@ -427,15 +423,28 @@ export default function ScreenPage({ code }: ScreenPageProps) {
   const compactOpenResults =
     resultsQuestion?.type === "open" &&
     resultsQuestion.responses.filter((response) => response.textAnswer).length > 16;
+  const generalScreenPalette = getGeneralScreenPalette(session.presentation.generalScreenBackgroundColor);
+  const generalScreenStyle = {
+    backgroundColor: generalScreenPalette.background,
+    color: generalScreenPalette.foreground,
+  };
+  const generalBorderStyle = { borderColor: generalScreenPalette.border };
 
   if (session.screenView === "qr") {
     return (
-      <main className="min-h-screen bg-zinc-950 text-white">
+      <main className="min-h-screen" style={generalScreenStyle}>
         <div className="mx-auto grid min-h-screen w-full max-w-7xl grid-rows-[auto_1fr] gap-6 px-6 py-6">
-          <header className="flex flex-col gap-4 border-b border-zinc-700 pb-5 lg:flex-row lg:items-end lg:justify-between">
+          <header
+            className="flex flex-col gap-4 border-b pb-5 lg:flex-row lg:items-end lg:justify-between"
+            style={generalBorderStyle}
+          >
             <div>
-              <p className="text-sm font-bold uppercase text-emerald-300">Sessie Interactief</p>
-              <h1 className="mt-2 text-3xl font-black md:text-5xl">{session.presentation.title}</h1>
+              <p className="text-sm font-bold uppercase" style={{ color: generalScreenPalette.subtle }}>
+                Sessie Interactief
+              </p>
+              <h1 className="mt-2 text-3xl font-black md:text-5xl" style={{ color: generalScreenPalette.foreground }}>
+                {session.presentation.title}
+              </h1>
             </div>
             <span className="inline-flex items-center gap-2 rounded-lg bg-white px-5 py-3 font-mono text-3xl font-black text-zinc-950">
               <QrCodeIcon aria-hidden className="h-7 w-7" />
@@ -445,13 +454,24 @@ export default function ScreenPage({ code }: ScreenPageProps) {
 
           <section className="grid items-center gap-8 lg:grid-cols-[1fr_560px]">
             <div>
-              <p className="text-2xl font-bold text-amber-200">Meedoen met de sessie</p>
-              <h2 className="mt-5 max-w-4xl text-6xl font-black leading-tight md:text-8xl">
+              <p className="text-2xl font-bold" style={{ color: generalScreenPalette.subtle }}>
+                Meedoen met de sessie
+              </p>
+              <h2
+                className="mt-5 max-w-4xl text-6xl font-black leading-tight md:text-8xl"
+                style={{ color: generalScreenPalette.foreground }}
+              >
                 Scan de QR-code
               </h2>
-              <p className="mt-6 max-w-3xl text-2xl font-semibold leading-9 text-zinc-200">
+              <p
+                className="mt-6 max-w-3xl text-2xl font-semibold leading-9"
+                style={{ color: generalScreenPalette.muted }}
+              >
                 Of ga naar de deelnemerslink en gebruik code{" "}
-                <span className="font-mono text-amber-200">{session.presentation.code}</span>.
+                <span className="font-mono" style={{ color: generalScreenPalette.subtle }}>
+                  {session.presentation.code}
+                </span>
+                .
               </p>
             </div>
             <div className="justify-self-center lg:justify-self-end">
@@ -526,24 +546,42 @@ export default function ScreenPage({ code }: ScreenPageProps) {
     );
   }
 
+  const isGeneralQuestionScreen = !activeQuestion || activeQuestion.type === "slide";
+
   return (
     <main
-      className={`min-h-screen text-white ${activeQuestion ? "bg-zinc-950" : "bg-black"}`}
-      style={activeQuestion ? undefined : idleScreenBackground}
+      className={`min-h-screen ${isGeneralQuestionScreen ? "" : "bg-zinc-950 text-white"}`}
+      style={isGeneralQuestionScreen ? generalScreenStyle : undefined}
     >
       <div className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-6 px-6 py-6">
         {activeQuestion ? (
-          <header className="border-b border-zinc-700 pb-5">
+          <header
+            className={`border-b pb-5 ${isGeneralQuestionScreen ? "" : "border-zinc-700"}`}
+            style={isGeneralQuestionScreen ? generalBorderStyle : undefined}
+          >
             <div>
-              <p className="text-sm font-bold uppercase text-emerald-300">Sessie Interactief</p>
-              <h1 className="mt-2 text-3xl font-black md:text-5xl">{session.presentation.title}</h1>
+              <p
+                className={`text-sm font-bold uppercase ${isGeneralQuestionScreen ? "" : "text-emerald-300"}`}
+                style={isGeneralQuestionScreen ? { color: generalScreenPalette.subtle } : undefined}
+              >
+                Sessie Interactief
+              </p>
+              <h1
+                className="mt-2 text-3xl font-black md:text-5xl"
+                style={isGeneralQuestionScreen ? { color: generalScreenPalette.foreground } : undefined}
+              >
+                {session.presentation.title}
+              </h1>
             </div>
           </header>
         ) : null}
 
         {!activeQuestion ? (
           <section className="grid flex-1 place-items-center text-center">
-            <h2 className="max-w-5xl text-6xl font-black leading-tight text-white md:text-8xl">
+            <h2
+              className="max-w-5xl text-6xl font-black leading-tight md:text-8xl"
+              style={{ color: generalScreenPalette.foreground }}
+            >
               {idleScreenText}
             </h2>
           </section>
@@ -555,14 +593,49 @@ export default function ScreenPage({ code }: ScreenPageProps) {
                 : "grid flex-1 grid-rows-[1fr_auto] gap-5"
             }
           >
-            <div className="grid min-h-[56vh] place-items-center rounded-lg border border-zinc-700 bg-zinc-900 p-8 text-center md:min-h-[62vh] md:p-12">
+            <div
+              className={`grid min-h-[56vh] place-items-center rounded-lg border p-8 text-center md:min-h-[62vh] md:p-12 ${
+                activeQuestion.type === "slide" ? "" : "border-zinc-700 bg-zinc-900"
+              }`}
+              style={
+                activeQuestion.type === "slide"
+                  ? {
+                      backgroundColor: generalScreenPalette.panel,
+                      borderColor: generalScreenPalette.border,
+                      color: generalScreenPalette.foreground,
+                    }
+                  : undefined
+              }
+            >
               <div className="mx-auto max-w-6xl">
-                <span className="rounded-md bg-emerald-300 px-2 py-1 text-xs font-black uppercase text-emerald-950">
+                <span
+                  className={`rounded-md px-2 py-1 text-xs font-black uppercase ${
+                    activeQuestion.type === "slide" ? "" : "bg-emerald-300 text-emerald-950"
+                  }`}
+                  style={
+                    activeQuestion.type === "slide"
+                      ? {
+                          backgroundColor: generalScreenPalette.badgeBackground,
+                          color: generalScreenPalette.badgeForeground,
+                        }
+                      : undefined
+                  }
+                >
                   {screenQuestionLabel(activeQuestion)}
                 </span>
-                <h2 className="mt-5 text-5xl font-black leading-tight md:text-7xl">{activeQuestion.prompt}</h2>
+                <h2
+                  className="mt-5 text-5xl font-black leading-tight md:text-7xl"
+                  style={activeQuestion.type === "slide" ? { color: generalScreenPalette.foreground } : undefined}
+                >
+                  {activeQuestion.prompt}
+                </h2>
                 {activeQuestion.description ? (
-                  <p className="mx-auto mt-6 max-w-4xl whitespace-pre-line text-2xl font-semibold leading-10 text-zinc-200">
+                  <p
+                    className={`mx-auto mt-6 max-w-4xl whitespace-pre-line text-2xl font-semibold leading-10 ${
+                      activeQuestion.type === "slide" ? "" : "text-zinc-200"
+                    }`}
+                    style={activeQuestion.type === "slide" ? { color: generalScreenPalette.muted } : undefined}
+                  >
                     {activeQuestion.description}
                   </p>
                 ) : null}

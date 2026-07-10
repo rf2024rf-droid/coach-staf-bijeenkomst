@@ -10,6 +10,7 @@ import {
   KeyRound,
   ListChecks,
   Monitor,
+  Palette,
   Pencil,
   Play,
   Plus,
@@ -28,6 +29,12 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { QrCode } from "@/app/components/QrCode";
 import { ResultView } from "@/app/components/ResultView";
 import type { PresenterPayload, QuestionResult, QuestionType, ScreenView } from "@/app/types";
+import {
+  DEFAULT_GENERAL_SCREEN_BACKGROUND_COLOR,
+  getGeneralScreenPalette,
+  normalizeGeneralScreenBackgroundColor,
+  normalizeHexColor,
+} from "@/lib/generalScreenAppearance";
 
 type PresenterDashboardProps = {
   id: string;
@@ -218,6 +225,12 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [generalBackgroundDraft, setGeneralBackgroundDraft] = useState(DEFAULT_GENERAL_SCREEN_BACKGROUND_COLOR);
+  const [generalBackgroundDirty, setGeneralBackgroundDirty] = useState(false);
+  const [generalBackgroundSaving, setGeneralBackgroundSaving] = useState(false);
+  const [generalBackgroundError, setGeneralBackgroundError] = useState("");
+  const persistedGeneralScreenBackgroundColor = payload?.presentation.generalScreenBackgroundColor ?? null;
+  const loadedPresentationId = payload?.presentation.id ?? "";
 
   const joinLink = useMemo(() => {
     if (!origin || !payload) {
@@ -293,6 +306,70 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
 
     return () => window.clearInterval(timer);
   }, [load]);
+
+  useEffect(() => {
+    if (!loadedPresentationId || !generalBackgroundDirty) {
+      return;
+    }
+
+    const normalized = normalizeHexColor(generalBackgroundDraft);
+    if (!normalized) {
+      return;
+    }
+
+    const nextStoredColor = normalizeGeneralScreenBackgroundColor(normalized);
+    if (nextStoredColor === persistedGeneralScreenBackgroundColor) {
+      const timer = window.setTimeout(() => setGeneralBackgroundDirty(false), 0);
+      return () => window.clearTimeout(timer);
+    }
+
+    const timer = window.setTimeout(async () => {
+      setGeneralBackgroundSaving(true);
+      setGeneralBackgroundError("");
+
+      try {
+        const response = await fetch(apiPath(`/api/presentations/${id}`), {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ generalScreenBackgroundColor: nextStoredColor }),
+        });
+        const data = (await response.json()) as PresenterPayload | { error: string };
+        if (!response.ok || "error" in data) {
+          throw new Error("error" in data ? data.error : "Achtergrondkleur kon niet worden opgeslagen.");
+        }
+
+        setPayload(data);
+        setGeneralBackgroundDirty(false);
+      } catch (caught) {
+        setGeneralBackgroundError(
+          caught instanceof Error ? caught.message : "Achtergrondkleur kon niet worden opgeslagen."
+        );
+      } finally {
+        setGeneralBackgroundSaving(false);
+      }
+    }, 700);
+
+    return () => window.clearTimeout(timer);
+  }, [
+    apiPath,
+    generalBackgroundDirty,
+    generalBackgroundDraft,
+    id,
+    loadedPresentationId,
+    persistedGeneralScreenBackgroundColor,
+  ]);
+
+  function updateGeneralBackgroundDraft(value: string) {
+    setGeneralBackgroundDraft(value.toUpperCase());
+    setGeneralBackgroundDirty(true);
+    setGeneralBackgroundError("");
+  }
+
+  function restoreDefaultGeneralBackground() {
+    setGeneralBackgroundDraft(DEFAULT_GENERAL_SCREEN_BACKGROUND_COLOR);
+    setGeneralBackgroundDirty(true);
+    setGeneralBackgroundError("");
+  }
 
   function applyKey(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -726,6 +803,17 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
         : screenState.tone === "amber"
           ? "border-amber-300 bg-amber-50 text-amber-950"
           : "border-zinc-300 bg-white text-zinc-950";
+  const generalBackgroundInputValue = generalBackgroundDirty
+    ? generalBackgroundDraft
+    : persistedGeneralScreenBackgroundColor ?? DEFAULT_GENERAL_SCREEN_BACKGROUND_COLOR;
+  const normalizedGeneralBackgroundDraft = normalizeHexColor(generalBackgroundInputValue);
+  const generalBackgroundPreviewColor =
+    normalizedGeneralBackgroundDraft ?? DEFAULT_GENERAL_SCREEN_BACKGROUND_COLOR;
+  const generalBackgroundPalette = getGeneralScreenPalette(generalBackgroundPreviewColor);
+  const generalBackgroundInvalid = Boolean(generalBackgroundInputValue.trim() && !normalizedGeneralBackgroundDraft);
+  const generalBackgroundDefault =
+    Boolean(normalizedGeneralBackgroundDraft) &&
+    normalizeGeneralScreenBackgroundColor(normalizedGeneralBackgroundDraft) === null;
 
   return (
     <main className={`min-h-screen bg-[#f4f4ef] text-zinc-950 ${activeQuestion ? "pb-72 md:pb-36" : ""}`}>
@@ -1202,6 +1290,114 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
                   <Copy aria-hidden className="h-5 w-5" />
                   Kopieer scherm-URL
                 </button>
+              </div>
+            </article>
+
+            <article className={`${presenterTab === "instellingen" ? "" : "hidden"} rounded-lg border border-zinc-300 bg-white p-5 shadow-sm`}>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="inline-flex items-center gap-2 text-xs font-black uppercase text-emerald-800">
+                    <Palette aria-hidden className="h-4 w-4" />
+                    Vormgeving
+                  </p>
+                  <h2 className="mt-1 text-lg font-black">Algemeen scherm</h2>
+                  <p className="mt-2 max-w-2xl text-sm font-semibold text-zinc-600">
+                    Deze kleur wordt gebruikt op het algemene scherm, zoals de lobby en het wachtenscherm.
+                  </p>
+                </div>
+                <span className="rounded-md bg-zinc-100 px-3 py-2 font-mono text-sm font-black text-zinc-800">
+                  {generalBackgroundPreviewColor}
+                </span>
+              </div>
+
+              <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_320px]">
+                <section className="rounded-lg border border-zinc-200 bg-zinc-50 p-4">
+                  <label className="text-sm font-black text-zinc-800" htmlFor="general-screen-background">
+                    Achtergrondkleur
+                  </label>
+                  <div className="mt-3 grid gap-3 sm:grid-cols-[72px_1fr_auto] sm:items-end">
+                    <input
+                      aria-label="Kies achtergrondkleur"
+                      className="h-12 w-full cursor-pointer rounded-lg border border-zinc-300 bg-white p-1"
+                      id="general-screen-background"
+                      onChange={(event) => updateGeneralBackgroundDraft(event.target.value)}
+                      type="color"
+                      value={generalBackgroundPreviewColor}
+                    />
+                    <label className="min-w-0 text-sm font-bold text-zinc-700" htmlFor="general-screen-background-hex">
+                      HEX
+                      <input
+                        aria-invalid={generalBackgroundInvalid}
+                        className={`mt-1 w-full rounded-lg border bg-white px-3 py-3 font-mono text-sm font-black outline-none focus:ring-2 ${
+                          generalBackgroundInvalid
+                            ? "border-rose-300 text-rose-800 focus:border-rose-600 focus:ring-rose-100"
+                            : "border-zinc-300 text-zinc-950 focus:border-emerald-700 focus:ring-emerald-100"
+                        }`}
+                        id="general-screen-background-hex"
+                        maxLength={7}
+                        onChange={(event) => updateGeneralBackgroundDraft(event.target.value)}
+                        placeholder="#09090B"
+                        spellCheck={false}
+                        value={generalBackgroundInputValue}
+                      />
+                    </label>
+                    <div
+                      aria-label={`Kleurpreview ${generalBackgroundPreviewColor}`}
+                      className="h-12 rounded-lg border border-zinc-300 shadow-inner sm:w-16"
+                      style={{ backgroundColor: generalBackgroundPreviewColor }}
+                    />
+                  </div>
+
+                  <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <p
+                      className={`text-sm font-semibold ${
+                        generalBackgroundError || generalBackgroundInvalid ? "text-rose-700" : "text-zinc-600"
+                      }`}
+                    >
+                      {generalBackgroundError ||
+                        (generalBackgroundInvalid
+                          ? "Gebruik een geldige HEX-kleur, bijvoorbeeld #00963E."
+                          : generalBackgroundSaving
+                            ? "Achtergrondkleur opslaan..."
+                            : generalBackgroundDefault
+                              ? `Standaardkleur actief (${DEFAULT_GENERAL_SCREEN_BACKGROUND_COLOR})`
+                              : "Achtergrondkleur opgeslagen.")}
+                    </p>
+                    <button
+                      className="inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-bold hover:bg-zinc-50 disabled:opacity-50"
+                      disabled={generalBackgroundSaving}
+                      onClick={restoreDefaultGeneralBackground}
+                      type="button"
+                    >
+                      <RotateCcw aria-hidden className="h-4 w-4" />
+                      Standaard herstellen
+                    </button>
+                  </div>
+                </section>
+
+                <section className="rounded-lg border border-zinc-200 bg-white p-3">
+                  <p className="text-xs font-black uppercase text-zinc-500">Preview algemeen scherm</p>
+                  <div
+                    className="mt-3 grid aspect-video place-items-center rounded-lg border p-5 text-center"
+                    style={{
+                      backgroundColor: generalBackgroundPalette.background,
+                      borderColor: generalBackgroundPalette.border,
+                      color: generalBackgroundPalette.foreground,
+                    }}
+                  >
+                    <div>
+                      <p className="text-[10px] font-black uppercase" style={{ color: generalBackgroundPalette.subtle }}>
+                        Sessie Interactief
+                      </p>
+                      <h3 className="mt-2 text-xl font-black leading-tight">
+                        {payload.presentation.idleScreenText || payload.presentation.title}
+                      </h3>
+                      <p className="mt-2 text-xs font-semibold" style={{ color: generalBackgroundPalette.muted }}>
+                        {payload.presentation.code}
+                      </p>
+                    </div>
+                  </div>
+                </section>
               </div>
             </article>
 

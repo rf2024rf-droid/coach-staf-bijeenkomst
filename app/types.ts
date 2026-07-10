@@ -60,6 +60,7 @@ export type PresenterPayload = {
     workflowStatus: PresentationWorkflowStatus;
     publishedAt: string | null;
     idleScreenText: string;
+    generalScreenBackgroundColor: string | null;
     activeQuestionId: string | null;
     screenQuestionId: string | null;
     screenView: ScreenView;
@@ -85,6 +86,7 @@ export type PublicSessionPayload = {
     presentationType: PresentationKind;
     workflowStatus: PresentationWorkflowStatus;
     idleScreenText: string;
+    generalScreenBackgroundColor: string | null;
   };
   screenView: ScreenView;
   activeQuestion: QuestionResult | null;

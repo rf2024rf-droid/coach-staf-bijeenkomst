@@ -224,6 +224,11 @@ export default function ParticipantPage({ code }: ParticipantPageProps) {
     : null;
   const participantDisplayId =
     session?.participantLabel ?? (participantId ? `ID ${participantId.replace(/[^a-z0-9]/gi, "").slice(0, 6).toUpperCase()}` : "");
+  const showParticipantScore = Boolean(
+    session &&
+      (session.presentation.presentationType === "quiz" || session.presentation.presentationType === "combined") &&
+      session.quizTotals.finalized
+  );
   const quizResultsLocked = Boolean(
     activeQuestion?.type === "quiz" && resultsQuestion?.id === activeQuestion.id
   );
@@ -372,7 +377,7 @@ export default function ParticipantPage({ code }: ParticipantPageProps) {
                 {participantDisplayId}
               </span>
             ) : null}
-            {session.quizTotals.finalized ? (
+            {showParticipantScore ? (
               <span className="rounded-md bg-amber-300 px-2 py-1 text-sm font-black text-amber-950">
                 Score {participantScore?.score ?? 0}/{session.quizTotals.finalized}
               </span>

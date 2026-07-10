@@ -24,7 +24,6 @@ import type {
   ModeratorAccountSummary,
   ModeratorPresentationSummary,
   ModeratorRole,
-  PresenterPayload,
 } from "@/app/types";
 
 type SessionState = {
@@ -105,6 +104,36 @@ function statusClassName(status: ModeratorAccountSummary["status"]) {
   return "bg-amber-100 text-amber-900";
 }
 
+function presentationStatusLabel(status: ModeratorPresentationSummary["workflowStatus"]) {
+  if (status === "published") {
+    return "Gepubliceerd";
+  }
+  if (status === "completed") {
+    return "Afgerond";
+  }
+  return "Concept";
+}
+
+function presentationStatusClassName(status: ModeratorPresentationSummary["workflowStatus"]) {
+  if (status === "published") {
+    return "bg-emerald-100 text-emerald-900";
+  }
+  if (status === "completed") {
+    return "bg-sky-100 text-sky-900";
+  }
+  return "bg-amber-100 text-amber-900";
+}
+
+function presentationTypeLabel(type: ModeratorPresentationSummary["presentationType"]) {
+  if (type === "quiz") {
+    return "Quiz";
+  }
+  if (type === "combined") {
+    return "Combinatie";
+  }
+  return "Interactieve presentatie";
+}
+
 function moderatorTabClassName(active: boolean) {
   return `rounded-lg px-4 py-3 text-left text-sm font-black transition ${
     active ? "bg-zinc-950 text-white shadow-sm" : "bg-white text-zinc-700 hover:bg-zinc-100"
@@ -124,8 +153,6 @@ export default function ModeratorDashboard({ entryMode = "users" }: ModeratorDas
   const [signupPasswordRepeat, setSignupPasswordRepeat] = useState("");
   const [signupCode, setSignupCode] = useState("");
   const [adminPassword, setAdminPassword] = useState("");
-  const [newTitle, setNewTitle] = useState("Sessie Interactief");
-  const [newTemplate, setNewTemplate] = useState<"default" | "quiz">("default");
   const [query, setQuery] = useState("");
   const [moderatorTab, setModeratorTab] = useState<ModeratorTab>("presentations");
   const [editingId, setEditingId] = useState("");
@@ -155,10 +182,12 @@ export default function ModeratorDashboard({ entryMode = "users" }: ModeratorDas
       presentations.reduce(
         (accumulator, presentation) => ({
           questions: accumulator.questions + presentation.totals.questions,
+          slides: accumulator.slides + presentation.totals.slides,
+          items: accumulator.items + presentation.totals.items,
           answers: accumulator.answers + presentation.totals.answers,
           participants: accumulator.participants + presentation.totals.participants,
         }),
-        { questions: 0, answers: 0, participants: 0 }
+        { questions: 0, slides: 0, items: 0, answers: 0, participants: 0 }
       ),
     [presentations]
   );
@@ -419,42 +448,6 @@ export default function ModeratorDashboard({ entryMode = "users" }: ModeratorDas
     await navigator.clipboard.writeText(value);
     setNotice(`${label} gekopieerd`);
     window.setTimeout(() => setNotice(""), 1800);
-  }
-
-  async function createPresentation(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const title = newTitle.trim();
-    if (!title) {
-      setError("Titel is verplicht.");
-      return;
-    }
-
-    if (presentationLimitReached) {
-      setError(`Je kunt maximaal ${session?.limits.maxPresentations} presentaties of quizzen aanmaken.`);
-      return;
-    }
-
-    setBusy("create");
-    setError("");
-
-    try {
-      const response = await fetch("/api/presentations", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ title, template: newTemplate }),
-      });
-      const payload = (await response.json()) as PresenterPayload | { error: string };
-      if (!response.ok || "error" in payload) {
-        throw new Error("error" in payload ? payload.error : "Presentatie kon niet worden aangemaakt.");
-      }
-
-      setNotice("Presentatie aangemaakt");
-      router.push(`/presenter/${payload.presentation.id}`);
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Presentatie kon niet worden aangemaakt.");
-    } finally {
-      setBusy("");
-    }
   }
 
   async function renamePresentation(id: string) {
@@ -846,48 +839,26 @@ export default function ModeratorDashboard({ entryMode = "users" }: ModeratorDas
           </nav>
         ) : null}
 
-        <section className={`${session.role === "admin" && moderatorTab !== "presentations" ? "hidden" : ""} grid gap-4 rounded-lg border border-zinc-300 bg-white p-5 shadow-sm lg:grid-cols-[1fr_auto] lg:items-end`}>
+        <section className={`${session.role === "admin" && moderatorTab !== "presentations" ? "hidden" : ""} grid gap-4 rounded-lg border border-zinc-300 bg-white p-5 shadow-sm lg:grid-cols-[1fr_auto] lg:items-center`}>
           <div>
-            <p className="text-xs font-black uppercase text-emerald-800">Nieuwe sessie</p>
-            <h2 className="mt-1 text-xl font-black">Presentatie aanmaken</h2>
+            <p className="text-xs font-black uppercase text-emerald-800">Startpunt</p>
+            <h2 className="mt-1 text-2xl font-black">Nieuwe presentatie maken</h2>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-600">
               {session.role === "tester"
-                ? `Je kunt maximaal ${session.limits.maxPresentations} presentaties of quizzen maken met maximaal ${session.limits.maxQuestions} vragen per presentatie.`
-                : "Maak hier een presentatie aan. Beheerderspresentaties hebben geen gebruikerslimiet."}
+                ? `Je wordt stap voor stap begeleid. Je kunt maximaal ${session.limits.maxPresentations} presentaties of quizzen maken met maximaal ${session.limits.maxQuestions} onderdelen per presentatie.`
+                : "Maak stap voor stap een presentatie, quiz of combinatie met vragen en slides."}
             </p>
           </div>
-          <form className="grid gap-3 sm:grid-cols-[minmax(220px,340px)_minmax(180px,240px)] lg:grid-cols-[minmax(220px,340px)_minmax(180px,240px)_auto]" onSubmit={createPresentation}>
-            <label className="sr-only" htmlFor="new-presentation-title">
-              Titel
-            </label>
-            <input
-              className="rounded-lg border border-zinc-300 px-4 py-3 text-base outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
-              id="new-presentation-title"
-              maxLength={90}
-              onChange={(event) => setNewTitle(event.target.value)}
-              value={newTitle}
-            />
-            <label className="sr-only" htmlFor="new-presentation-template">
-              Presentatietype
-            </label>
-            <select
-              className="rounded-lg border border-zinc-300 bg-white px-4 py-3 text-base font-bold outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
-              id="new-presentation-template"
-              onChange={(event) => setNewTemplate(event.target.value === "quiz" ? "quiz" : "default")}
-              value={newTemplate}
-            >
-              <option value="default">Interactieve sessie</option>
-              <option value="quiz">Quizpresentatie</option>
-            </select>
-            <button
-              className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-800 px-4 py-3 font-bold text-white hover:bg-emerald-900 disabled:opacity-60"
-              disabled={busy === "create" || presentationLimitReached}
-              type="submit"
-            >
-              <Plus aria-hidden className="h-5 w-5" />
-              {busy === "create" ? "Aanmaken..." : "Maak presentatie"}
-            </button>
-          </form>
+          <button
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-800 px-5 py-4 text-base font-black text-white hover:bg-emerald-900 disabled:opacity-60"
+            disabled={presentationLimitReached}
+            onClick={() => router.push("/moderator/nieuw")}
+            type="button"
+          >
+            <Plus aria-hidden className="h-5 w-5" />
+            Nieuwe presentatie maken
+            <ArrowRight aria-hidden className="h-5 w-5" />
+          </button>
         </section>
 
         <section className={`${session.role === "admin" && moderatorTab !== "presentations" ? "hidden" : ""} grid gap-2 rounded-lg border border-zinc-300 bg-white/80 p-2 md:grid-cols-4`}>
@@ -899,8 +870,11 @@ export default function ModeratorDashboard({ entryMode = "users" }: ModeratorDas
             </p>
           </article>
           <article className="rounded-lg bg-zinc-50 px-4 py-3">
-            <p className="text-sm font-semibold text-zinc-600">Vragen</p>
-            <p className="mt-1 text-2xl font-black">{totals.questions}</p>
+            <p className="text-sm font-semibold text-zinc-600">Onderdelen</p>
+            <p className="mt-1 text-2xl font-black">{totals.items}</p>
+            <p className="mt-1 text-xs font-bold text-zinc-500">
+              {totals.questions} vragen / {totals.slides} slides
+            </p>
           </article>
           <article className="rounded-lg bg-zinc-50 px-4 py-3">
             <p className="text-sm font-semibold text-zinc-600">Antwoorden</p>
@@ -1011,7 +985,24 @@ export default function ModeratorDashboard({ entryMode = "users" }: ModeratorDas
 
           {!filtered.length ? (
             <div className="rounded-lg border border-dashed border-zinc-300 p-8 text-center text-zinc-600">
-              Geen presentaties gevonden.
+              <h3 className="text-xl font-black text-zinc-950">
+                {presentations.length ? "Geen presentaties gevonden" : "Je eerste presentatie staat klaar om gemaakt te worden"}
+              </h3>
+              <p className="mx-auto mt-2 max-w-xl text-sm font-semibold leading-6">
+                {presentations.length
+                  ? "Pas je zoekopdracht aan om andere sessies te tonen."
+                  : "Start met een titel, kies daarna het type en voeg stap voor stap vragen of slides toe."}
+              </p>
+              {!presentations.length ? (
+                <button
+                  className="mt-5 inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-800 px-5 py-3 font-black text-white hover:bg-emerald-900"
+                  onClick={() => router.push("/moderator/nieuw")}
+                  type="button"
+                >
+                  <Plus aria-hidden className="h-5 w-5" />
+                  Nieuwe presentatie maken
+                </button>
+              ) : null}
             </div>
           ) : (
             <div className="grid gap-4">
@@ -1055,8 +1046,17 @@ export default function ModeratorDashboard({ entryMode = "users" }: ModeratorDas
                               {presentation.ownerEmail ?? "Beheerder"}
                             </span>
                           ) : null}
+                          <span className="rounded-md bg-zinc-900 px-2 py-1 font-bold text-white">
+                            {presentationTypeLabel(presentation.presentationType)}
+                          </span>
+                          <span className={`rounded-md px-2 py-1 font-bold ${presentationStatusClassName(presentation.workflowStatus)}`}>
+                            {presentationStatusLabel(presentation.workflowStatus)}
+                          </span>
                           <span className="rounded-md bg-white px-2 py-1 text-zinc-700">
-                            {presentation.totals.questions} vragen
+                            {presentation.totals.items} onderdelen
+                          </span>
+                          <span className="rounded-md bg-white px-2 py-1 text-zinc-700">
+                            {presentation.totals.questions} vragen / {presentation.totals.slides} slides
                           </span>
                           <span className="rounded-md bg-white px-2 py-1 text-zinc-700">
                             {presentation.totals.answers} antwoorden
@@ -1066,17 +1066,24 @@ export default function ModeratorDashboard({ entryMode = "users" }: ModeratorDas
                           </span>
                         </div>
                         <p className="mt-3 text-sm text-zinc-600">
-                          Aangemaakt {formatDate(presentation.createdAt)} / bijgewerkt {formatDate(presentation.updatedAt)}
+                          Laatste wijziging {formatDate(presentation.updatedAt)}
                         </p>
                       </div>
 
                       <div className="flex flex-wrap gap-2 lg:justify-end">
                         <a
+                          className="inline-flex items-center gap-2 rounded-lg bg-emerald-800 px-3 py-2 text-sm font-bold text-white hover:bg-emerald-900"
+                          href={`/moderator/nieuw?id=${presentation.id}`}
+                        >
+                          <Pencil aria-hidden className="h-4 w-4" />
+                          Bewerk
+                        </a>
+                        <a
                           className="inline-flex items-center gap-2 rounded-lg bg-zinc-900 px-3 py-2 text-sm font-bold text-white hover:bg-zinc-700"
                           href={presenterUrl}
                         >
                           <ArrowRight aria-hidden className="h-4 w-4" />
-                          Open
+                          Regie
                         </a>
                         <a
                           className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-bold hover:bg-zinc-100"

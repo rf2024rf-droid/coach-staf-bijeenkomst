@@ -23,6 +23,9 @@ export async function PATCH(request: Request, context: RouteContext) {
     const key = await resolvePresenterKey(request, id);
     const payload = (await request.json().catch(() => ({}))) as {
       idleScreenText?: unknown;
+      title?: unknown;
+      presentationType?: unknown;
+      workflowStatus?: unknown;
     };
     const result = await updatePresentationSettings(id, key, payload);
     return Response.json(result);

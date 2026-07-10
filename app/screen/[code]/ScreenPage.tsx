@@ -43,6 +43,19 @@ function correctVerb(count: number) {
   return count === 1 ? "had" : "hadden";
 }
 
+function screenQuestionLabel(question: QuestionResult) {
+  if (question.type === "slide") {
+    return question.kind === "chapter_slide" ? "Tussenscherm" : "Informatieslide";
+  }
+  if (question.type === "quiz") {
+    return "Quizvraag";
+  }
+  if (question.type === "open") {
+    return "Open antwoord";
+  }
+  return "Multiple choice";
+}
+
 function SpotlightResults({ question }: { question: QuestionResult }) {
   if (question.type === "multiple" || question.type === "quiz") {
     const winner = question.options.reduce(
@@ -539,16 +552,19 @@ export default function ScreenPage({ code }: ScreenPageProps) {
             <div className="rounded-lg border border-zinc-700 bg-zinc-900 p-7 md:p-9">
               <div className="mx-auto max-w-6xl">
                   <span className="rounded-md bg-emerald-300 px-2 py-1 text-xs font-black uppercase text-emerald-950">
-                  {activeQuestion.type === "quiz"
-                    ? "Quizvraag"
-                    : activeQuestion.type === "open"
-                      ? "Open antwoord"
-                      : "Multiple choice"}
+                  {screenQuestionLabel(activeQuestion)}
                 </span>
                 <h2 className="mt-5 text-5xl font-black leading-tight md:text-7xl">{activeQuestion.prompt}</h2>
+                {activeQuestion.description ? (
+                  <p className="mt-6 max-w-4xl whitespace-pre-line text-2xl font-semibold leading-10 text-zinc-200">
+                    {activeQuestion.description}
+                  </p>
+                ) : null}
               </div>
             </div>
-            <ResponsePulse count={activeQuestion.answerCount} questionType={activeQuestion.type} />
+            {activeQuestion.type === "slide" ? null : (
+              <ResponsePulse count={activeQuestion.answerCount} questionType={activeQuestion.type} />
+            )}
           </section>
         )}
       </div>

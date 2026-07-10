@@ -17,6 +17,10 @@ function createParticipantId() {
 }
 
 function questionTypeLabel(type: QuestionType) {
+  if (type === "slide") {
+    return "Informatieslide";
+  }
+
   if (type === "quiz") {
     return "Quizvraag";
   }
@@ -225,8 +229,9 @@ export default function ParticipantPage({ code }: ParticipantPageProps) {
   );
   const submitted = Boolean(activeQuestion && submittedQuestionId === activeQuestion.id);
   const isChoiceQuestion = activeQuestion?.type === "multiple" || activeQuestion?.type === "quiz";
+  const isSlide = activeQuestion?.type === "slide";
   const canSubmit =
-    !quizResultsLocked && (isChoiceQuestion ? Boolean(selectedOptionId) : Boolean(textAnswer.trim()));
+    !isSlide && !quizResultsLocked && (isChoiceQuestion ? Boolean(selectedOptionId) : Boolean(textAnswer.trim()));
   const submitButtonLabel = quizResultsLocked
     ? "Antwoord gesloten"
     : submitting
@@ -434,6 +439,23 @@ export default function ParticipantPage({ code }: ParticipantPageProps) {
           <section className="rounded-lg border border-zinc-700 bg-zinc-900 p-6 text-center shadow-sm">
             <h2 className="text-2xl font-black">Wachten op de volgende vraag</h2>
             <p className="mt-3 text-zinc-300">Je scherm werkt automatisch bij zodra de presentator een vraag opent.</p>
+          </section>
+        ) : isSlide ? (
+          <section className="rounded-lg border border-zinc-700 bg-zinc-900 p-5 shadow-sm">
+            <div className="mb-5">
+              <span className="rounded-md bg-sky-300 px-2 py-1 text-xs font-black uppercase text-sky-950">
+                {questionTypeLabel(activeQuestion.type)}
+              </span>
+              <h2 className="mt-3 text-2xl font-black leading-9">{activeQuestion.prompt}</h2>
+              {activeQuestion.description ? (
+                <p className="mt-4 whitespace-pre-line text-base font-semibold leading-7 text-zinc-200">
+                  {activeQuestion.description}
+                </p>
+              ) : null}
+            </div>
+            <p className="rounded-lg border border-zinc-700 bg-zinc-950 px-4 py-3 text-sm font-semibold text-zinc-300">
+              Je hoeft op dit onderdeel niets in te vullen.
+            </p>
           </section>
         ) : (
           <form className="rounded-lg border border-zinc-700 bg-zinc-900 p-5 shadow-sm" onSubmit={submit}>

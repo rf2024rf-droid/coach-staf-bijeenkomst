@@ -1,10 +1,12 @@
 import postgres from "postgres";
 
-export type QuestionType = "open" | "multiple" | "quiz";
+export type QuestionType = "open" | "multiple" | "quiz" | "slide";
 export type QuestionStatus = "open" | "closed";
 export type ScreenView = "question" | "qr" | "results" | "ranking";
 export type ModeratorRole = "admin" | "tester";
 export type AppAccountStatus = "pending" | "active" | "deactivated" | "deleted";
+export type PresentationKind = "quiz" | "interactive" | "combined";
+export type PresentationWorkflowStatus = "concept" | "completed" | "published";
 
 export type PresentationRow = {
   id: string;
@@ -13,6 +15,9 @@ export type PresentationRow = {
   presenter_key: string;
   owner_user_id: string | null;
   owner_email: string | null;
+  presentation_type: PresentationKind | null;
+  workflow_status: PresentationWorkflowStatus | null;
+  published_at: string | null;
   idle_screen_text: string | null;
   active_question_id: string | null;
   screen_question_id: string | null;
@@ -26,6 +31,7 @@ type QuestionRow = {
   presentation_id: string;
   type: QuestionType;
   prompt: string;
+  content_json: string | null;
   status: QuestionStatus;
   position: number;
   finalized_at: string | null;
@@ -85,7 +91,10 @@ export type ModeratorActor = {
 export type QuestionResult = {
   id: string;
   type: QuestionType;
+  kind: string;
   prompt: string;
+  description: string;
+  content: Record<string, unknown>;
   status: QuestionStatus;
   position: number;
   finalized: boolean;
@@ -130,6 +139,9 @@ export type PresenterPayload = {
     title: string;
     code: string;
     presenterKey: string;
+    presentationType: PresentationKind;
+    workflowStatus: PresentationWorkflowStatus;
+    publishedAt: string | null;
     idleScreenText: string;
     activeQuestionId: string | null;
     screenQuestionId: string | null;
@@ -153,6 +165,8 @@ export type PublicSessionPayload = {
     id: string;
     title: string;
     code: string;
+    presentationType: PresentationKind;
+    workflowStatus: PresentationWorkflowStatus;
     idleScreenText: string;
   };
   screenView: ScreenView;
@@ -182,11 +196,16 @@ export type ModeratorPresentationSummary = {
   title: string;
   code: string;
   presenterKey: string;
+  presentationType: PresentationKind;
+  workflowStatus: PresentationWorkflowStatus;
+  publishedAt: string | null;
   ownerEmail: string | null;
   createdAt: string;
   updatedAt: string;
   totals: {
     questions: number;
+    slides: number;
+    items: number;
     answers: number;
     participants: number;
   };
@@ -223,7 +242,23 @@ type OptionInput = {
   isCorrect: boolean;
 };
 
-type PresentationTemplate = "default" | "quiz";
+type PresentationTemplate = "default" | "quiz" | "blank";
+
+function normalizePresentationKind(value: unknown): PresentationKind {
+  if (value === "quiz" || value === "combined") {
+    return value;
+  }
+
+  return "interactive";
+}
+
+function normalizeWorkflowStatus(value: unknown): PresentationWorkflowStatus {
+  if (value === "completed" || value === "published") {
+    return value;
+  }
+
+  return "concept";
+}
 
 const schemaStatements = [
   `CREATE TABLE IF NOT EXISTS presentations (
@@ -233,6 +268,9 @@ const schemaStatements = [
     presenter_key TEXT NOT NULL,
     owner_user_id TEXT,
     owner_email TEXT,
+    presentation_type TEXT NOT NULL DEFAULT 'interactive',
+    workflow_status TEXT NOT NULL DEFAULT 'concept',
+    published_at TEXT,
     idle_screen_text TEXT,
     active_question_id TEXT,
     screen_question_id TEXT,
@@ -255,6 +293,7 @@ const schemaStatements = [
     presentation_id TEXT NOT NULL REFERENCES presentations(id) ON DELETE CASCADE,
     type TEXT NOT NULL,
     prompt TEXT NOT NULL,
+    content_json TEXT,
     status TEXT NOT NULL DEFAULT 'closed',
     position INTEGER NOT NULL,
     finalized_at TEXT,
@@ -291,10 +330,14 @@ const schemaStatements = [
   )`,
   "ALTER TABLE presentations ADD COLUMN IF NOT EXISTS owner_user_id TEXT",
   "ALTER TABLE presentations ADD COLUMN IF NOT EXISTS owner_email TEXT",
+  "ALTER TABLE presentations ADD COLUMN IF NOT EXISTS presentation_type TEXT NOT NULL DEFAULT 'interactive'",
+  "ALTER TABLE presentations ADD COLUMN IF NOT EXISTS workflow_status TEXT NOT NULL DEFAULT 'concept'",
+  "ALTER TABLE presentations ADD COLUMN IF NOT EXISTS published_at TEXT",
   "ALTER TABLE presentations ADD COLUMN IF NOT EXISTS idle_screen_text TEXT",
   "ALTER TABLE presentations ADD COLUMN IF NOT EXISTS screen_view TEXT NOT NULL DEFAULT 'question'",
   "ALTER TABLE presentations ADD COLUMN IF NOT EXISTS screen_question_id TEXT",
   "ALTER TABLE questions ADD COLUMN IF NOT EXISTS finalized_at TEXT",
+  "ALTER TABLE questions ADD COLUMN IF NOT EXISTS content_json TEXT",
   "ALTER TABLE question_options ADD COLUMN IF NOT EXISTS is_correct BOOLEAN NOT NULL DEFAULT false",
   "CREATE UNIQUE INDEX IF NOT EXISTS presentations_code_idx ON presentations (code)",
   "CREATE INDEX IF NOT EXISTS presentations_owner_idx ON presentations (owner_user_id)",
@@ -390,6 +433,82 @@ function cleanText(value: unknown, maxLength: number) {
   return value.replace(/[\u0000-\u001F\u007F]/g, " ").replace(/\s+/g, " ").trim().slice(0, maxLength);
 }
 
+function cleanMultilineText(value: unknown, maxLength: number) {
+  if (typeof value !== "string") {
+    return "";
+  }
+
+  return value
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, " ")
+    .replace(/[ \t]+/g, " ")
+    .trim()
+    .slice(0, maxLength);
+}
+
+function cleanPositiveInteger(value: unknown, max: number) {
+  if (value === null || value === undefined || value === "") {
+    return null;
+  }
+
+  const numberValue = Number(value);
+  if (!Number.isFinite(numberValue) || numberValue < 0) {
+    return null;
+  }
+
+  return Math.min(Math.floor(numberValue), max);
+}
+
+function parseQuestionContent(value: string | null): Record<string, unknown> {
+  if (!value) {
+    return {};
+  }
+
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : {};
+  } catch {
+    return {};
+  }
+}
+
+function normalizeQuestionContent(payload: Record<string, unknown>, type: QuestionType) {
+  const incoming =
+    payload.content && typeof payload.content === "object" && !Array.isArray(payload.content)
+      ? (payload.content as Record<string, unknown>)
+      : {};
+  const kind = cleanText(incoming.kind ?? payload.kind, 50) || type;
+  const description = cleanMultilineText(incoming.description ?? payload.description, 500);
+  const slideBody = cleanMultilineText(incoming.slideBody ?? payload.slideBody, 900);
+  const imageUrl = cleanText(incoming.imageUrl ?? payload.imageUrl, 500);
+  const required = incoming.required ?? payload.required;
+  const timeLimitSeconds = cleanPositiveInteger(incoming.timeLimitSeconds ?? payload.timeLimitSeconds, 3600);
+  const points = cleanPositiveInteger(incoming.points ?? payload.points, 1000);
+  const normalized: Record<string, unknown> = { kind };
+
+  if (description) {
+    normalized.description = description;
+  }
+  if (slideBody) {
+    normalized.slideBody = slideBody;
+  }
+  if (imageUrl) {
+    normalized.imageUrl = imageUrl;
+  }
+  if (typeof required === "boolean") {
+    normalized.required = required;
+  }
+  if (timeLimitSeconds !== null) {
+    normalized.timeLimitSeconds = timeLimitSeconds;
+  }
+  if (points !== null) {
+    normalized.points = points;
+  }
+
+  return JSON.stringify(normalized);
+}
+
 function cleanEmail(value: unknown) {
   return cleanText(value, 254).toLowerCase();
 }
@@ -481,6 +600,9 @@ function mapPresentation(row: PresentationRow) {
     title: row.title,
     code: row.code,
     presenterKey: row.presenter_key,
+    presentationType: row.presentation_type ?? "interactive",
+    workflowStatus: row.workflow_status ?? "concept",
+    publishedAt: row.published_at,
     idleScreenText: row.idle_screen_text || "Sessie Interactief",
     activeQuestionId: row.active_question_id,
     screenQuestionId: row.screen_question_id,
@@ -496,6 +618,9 @@ function buildQuestions(
   responseRows: ResponseRow[]
 ) {
   return questionRows.map((question) => {
+    const content = parseQuestionContent(question.content_json);
+    const kind = cleanText(content.kind, 50) || question.type;
+    const description = cleanMultilineText(content.description, 500);
     const responses = responseRows.filter((response) => response.question_id === question.id);
     const options = optionRows
       .filter((option) => option.question_id === question.id)
@@ -518,7 +643,10 @@ function buildQuestions(
     return {
       id: question.id,
       type: question.type,
+      kind,
       prompt: question.prompt,
+      description,
+      content,
       status: question.status,
       position: question.position,
       finalized: Boolean(question.finalized_at),
@@ -1210,7 +1338,8 @@ async function insertQuestion(
   type: QuestionType,
   prompt: string,
   options: OptionInput[],
-  openImmediately: boolean
+  openImmediately: boolean,
+  contentJson: string | null = null
 ) {
   const sql = getSql();
   const id = makeId("q");
@@ -1220,8 +1349,8 @@ async function insertQuestion(
 
   await sql.begin(async (tx) => {
     await tx`
-      INSERT INTO questions (id, presentation_id, type, prompt, status, position, created_at, updated_at)
-      VALUES (${id}, ${presentationId}, ${type}, ${prompt}, ${status}, ${position}, ${timestamp}, ${timestamp})
+      INSERT INTO questions (id, presentation_id, type, prompt, content_json, status, position, created_at, updated_at)
+      VALUES (${id}, ${presentationId}, ${type}, ${prompt}, ${contentJson}, ${status}, ${position}, ${timestamp}, ${timestamp})
     `;
 
     if (isChoiceQuestion(type)) {
@@ -1248,16 +1377,27 @@ async function insertQuestion(
 export async function createPresentation(
   titleInput: unknown,
   templateInput: unknown = "default",
-  actor: ModeratorActor = { role: "admin", userId: null, email: null }
+  actor: ModeratorActor = { role: "admin", userId: null, email: null },
+  options: { presentationType?: unknown; workflowStatus?: unknown } = {}
 ) {
   await ensureSchema();
 
   const sql = getSql();
   const title = cleanText(titleInput, 90) || "Sessie Interactief";
-  const template: PresentationTemplate = templateInput === "quiz" ? "quiz" : "default";
+  const template: PresentationTemplate =
+    templateInput === "quiz" ? "quiz" : templateInput === "blank" ? "blank" : "default";
+  const presentationType =
+    template === "quiz" ? "quiz" : normalizePresentationKind(options.presentationType);
+  const workflowStatus =
+    options.workflowStatus === "completed" || options.workflowStatus === "published"
+      ? normalizeWorkflowStatus(options.workflowStatus)
+      : template === "blank"
+        ? "concept"
+        : "published";
   const id = makeId("prs");
   const presenterKey = makePresenterKey();
   const timestamp = nowIso();
+  const publishedAt = workflowStatus === "published" ? timestamp : null;
   let code = makeCode();
 
   for (let attempt = 0; attempt < 12; attempt += 1) {
@@ -1294,6 +1434,9 @@ export async function createPresentation(
       presenter_key,
       owner_user_id,
       owner_email,
+      presentation_type,
+      workflow_status,
+      published_at,
       active_question_id,
       screen_question_id,
       screen_view,
@@ -1307,6 +1450,9 @@ export async function createPresentation(
       ${presenterKey},
       ${actor.userId},
       ${actor.email},
+      ${presentationType},
+      ${workflowStatus},
+      ${publishedAt},
       NULL,
       NULL,
       'question',
@@ -1314,6 +1460,10 @@ export async function createPresentation(
       ${timestamp}
     )
   `;
+
+  if (template === "blank") {
+    return getPresenterPayload(id, presenterKey);
+  }
 
   if (template === "quiz") {
     await insertQuestion(
@@ -1418,15 +1568,47 @@ export async function getPresenterKeyForModerator(
 export async function updatePresentationSettings(
   presentationId: string,
   presenterKey: string,
-  payload: { idleScreenText?: unknown }
+  payload: {
+    idleScreenText?: unknown;
+    title?: unknown;
+    presentationType?: unknown;
+    workflowStatus?: unknown;
+  }
 ) {
-  await assertPresenter(presentationId, presenterKey);
+  const presentation = await assertPresenter(presentationId, presenterKey);
+  const title = payload.title === undefined ? presentation.title : cleanText(payload.title, 90);
+  if (!title) {
+    throw new AppError(400, "Titel is verplicht.");
+  }
 
-  const idleScreenText = cleanText(payload.idleScreenText, 90) || null;
+  const idleScreenText =
+    payload.idleScreenText === undefined
+      ? presentation.idle_screen_text
+      : cleanText(payload.idleScreenText, 90) || null;
+  const presentationType =
+    payload.presentationType === undefined
+      ? presentation.presentation_type ?? "interactive"
+      : normalizePresentationKind(payload.presentationType);
+  const workflowStatus =
+    payload.workflowStatus === undefined
+      ? presentation.workflow_status ?? "concept"
+      : normalizeWorkflowStatus(payload.workflowStatus);
+  const publishedAt =
+    workflowStatus === "published"
+      ? presentation.published_at ?? nowIso()
+      : workflowStatus === "concept"
+        ? null
+        : presentation.published_at;
 
   await getSql()`
     UPDATE presentations
-    SET idle_screen_text = ${idleScreenText}, updated_at = ${nowIso()}
+    SET
+      title = ${title},
+      idle_screen_text = ${idleScreenText},
+      presentation_type = ${presentationType},
+      workflow_status = ${workflowStatus},
+      published_at = ${publishedAt},
+      updated_at = ${nowIso()}
     WHERE id = ${presentationId}
   `;
 
@@ -1436,20 +1618,27 @@ export async function updatePresentationSettings(
 export async function addQuestion(
   presentationId: string,
   presenterKey: string,
-  payload: { type?: unknown; prompt?: unknown; options?: unknown },
+  payload: Record<string, unknown>,
   limits: { maxQuestions?: number | null } = {}
 ) {
   const presentation = await assertPresenter(presentationId, presenterKey);
   const type: QuestionType =
-    payload.type === "multiple" ? "multiple" : payload.type === "quiz" ? "quiz" : "open";
+    payload.type === "multiple"
+      ? "multiple"
+      : payload.type === "quiz"
+        ? "quiz"
+        : payload.type === "slide"
+          ? "slide"
+          : "open";
   const prompt = cleanText(payload.prompt, 180);
 
   if (!prompt) {
-    throw new AppError(400, "Vraagtekst is verplicht.");
+    throw new AppError(400, type === "slide" ? "Titel van de slide is verplicht." : "Vraagtekst is verplicht.");
   }
 
   const options = normalizeOptionInputs(payload.options, type);
   validateChoiceOptions(type, options);
+  const contentJson = normalizeQuestionContent(payload, type);
 
   const maxQuestions = limits.maxQuestions ?? (presentation.owner_user_id ? betaMaxQuestions() : null);
   if (maxQuestions) {
@@ -1465,7 +1654,9 @@ export async function addQuestion(
     }
   }
 
-  await insertQuestion(presentation.id, type, prompt, options, !presentation.active_question_id);
+  const openImmediately =
+    !presentation.active_question_id && (presentation.workflow_status ?? "published") === "published";
+  await insertQuestion(presentation.id, type, prompt, options, openImmediately, contentJson);
   return getPresenterPayload(presentationId, presenterKey);
 }
 
@@ -1518,7 +1709,7 @@ export async function updateQuestion(
   presentationId: string,
   presenterKey: string,
   questionId: string,
-  payload: { prompt?: unknown; options?: unknown }
+  payload: Record<string, unknown>
 ) {
   await assertPresenter(presentationId, presenterKey);
   const question = await fetchQuestion(questionId);
@@ -1529,11 +1720,12 @@ export async function updateQuestion(
 
   const prompt = cleanText(payload.prompt, 180);
   if (!prompt) {
-    throw new AppError(400, "Vraagtekst is verplicht.");
+    throw new AppError(400, question.type === "slide" ? "Titel van de slide is verplicht." : "Vraagtekst is verplicht.");
   }
 
   const optionInputs = normalizeOptionInputs(payload.options, question.type);
   validateChoiceOptions(question.type, optionInputs);
+  const contentJson = normalizeQuestionContent(payload, question.type);
 
   const sql = getSql();
   const timestamp = nowIso();
@@ -1550,7 +1742,7 @@ export async function updateQuestion(
   await sql.begin(async (tx) => {
     await tx`
       UPDATE questions
-      SET prompt = ${prompt}, updated_at = ${timestamp}
+      SET prompt = ${prompt}, content_json = ${contentJson}, updated_at = ${timestamp}
       WHERE id = ${questionId} AND presentation_id = ${presentationId}
     `;
 
@@ -1892,6 +2084,8 @@ export async function getPublicSession(codeInput: string, participantIdInput?: u
       id: presentation.id,
       title: presentation.title,
       code: presentation.code,
+      presentationType: presentation.presentation_type ?? "interactive",
+      workflowStatus: presentation.workflow_status ?? "concept",
       idleScreenText: presentation.idle_screen_text || "Sessie Interactief",
     },
     screenView: presentation.screen_view ?? "question",
@@ -1957,6 +2151,10 @@ export async function submitAnswer(
   const question = await fetchQuestion(presentation.active_question_id);
   if (!question || question.status !== "open") {
     throw new AppError(409, "Deze vraag is gesloten.");
+  }
+
+  if (question.type === "slide") {
+    throw new AppError(409, "Dit onderdeel vraagt geen antwoord.");
   }
 
   if (question.type === "quiz" && question.finalized_at) {
@@ -2036,6 +2234,8 @@ export async function listModeratorPresentations(
     Array<
       PresentationRow & {
         question_count: number;
+        slide_count: number;
+        item_count: number;
         answer_count: number;
         participant_count: number;
       }
@@ -2043,7 +2243,9 @@ export async function listModeratorPresentations(
   >`
     SELECT
       presentations.*,
-      (SELECT COUNT(*)::int FROM questions WHERE questions.presentation_id = presentations.id) AS question_count,
+      (SELECT COUNT(*)::int FROM questions WHERE questions.presentation_id = presentations.id AND questions.type <> 'slide') AS question_count,
+      (SELECT COUNT(*)::int FROM questions WHERE questions.presentation_id = presentations.id AND questions.type = 'slide') AS slide_count,
+      (SELECT COUNT(*)::int FROM questions WHERE questions.presentation_id = presentations.id) AS item_count,
       (SELECT COUNT(*)::int FROM responses WHERE responses.presentation_id = presentations.id) AS answer_count,
       GREATEST(
         (
@@ -2067,11 +2269,16 @@ export async function listModeratorPresentations(
     title: row.title,
     code: row.code,
     presenterKey: row.presenter_key,
+    presentationType: row.presentation_type ?? "interactive",
+    workflowStatus: row.workflow_status ?? "concept",
+    publishedAt: row.published_at,
     ownerEmail: row.owner_email,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     totals: {
       questions: numberFromDb(row.question_count),
+      slides: numberFromDb(row.slide_count),
+      items: numberFromDb(row.item_count),
       answers: numberFromDb(row.answer_count),
       participants: numberFromDb(row.participant_count),
     },
@@ -2207,6 +2414,9 @@ export async function duplicatePresentation(
         presenter_key,
         owner_user_id,
         owner_email,
+        presentation_type,
+        workflow_status,
+        published_at,
         idle_screen_text,
         active_question_id,
         screen_question_id,
@@ -2221,6 +2431,9 @@ export async function duplicatePresentation(
         ${presenterKey},
         ${duplicateOwnerUserId},
         ${duplicateOwnerEmail},
+        ${original.presentation_type ?? "interactive"},
+        ${original.workflow_status ?? "concept"},
+        ${original.published_at},
         ${original.idle_screen_text},
         NULL,
         NULL,
@@ -2234,12 +2447,13 @@ export async function duplicatePresentation(
       const newQuestionId = makeId("q");
       questionIdMap.set(question.id, newQuestionId);
       await tx`
-        INSERT INTO questions (id, presentation_id, type, prompt, status, position, created_at, updated_at)
+        INSERT INTO questions (id, presentation_id, type, prompt, content_json, status, position, created_at, updated_at)
         VALUES (
           ${newQuestionId},
           ${id},
           ${question.type},
           ${question.prompt},
+          ${question.content_json},
           'closed',
           ${question.position},
           ${timestamp},

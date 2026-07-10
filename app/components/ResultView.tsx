@@ -18,6 +18,19 @@ export function ResultView({ question, mode = "dashboard" }: ResultViewProps) {
   const [expandedQuestionId, setExpandedQuestionId] = useState<string | null>(null);
   const showAllResponses = expandedQuestionId === question.id;
 
+  if (question.type === "slide") {
+    return (
+      <section className="rounded-lg border border-zinc-200 bg-zinc-50 p-4 text-zinc-800">
+        <p className="text-sm font-black uppercase text-zinc-500">Slide zonder antwoorden</p>
+        {question.description ? (
+          <p className="mt-2 whitespace-pre-line text-sm font-semibold leading-6">{question.description}</p>
+        ) : (
+          <p className="mt-2 text-sm text-zinc-500">Dit onderdeel verzamelt geen reacties.</p>
+        )}
+      </section>
+    );
+  }
+
   if (question.type === "multiple" || question.type === "quiz") {
     const correctOption = question.options.find((option) => option.isCorrect);
 

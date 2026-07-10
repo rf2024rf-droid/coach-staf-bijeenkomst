@@ -5,6 +5,9 @@ create table if not exists presentations (
   presenter_key text not null,
   owner_user_id text,
   owner_email text,
+  presentation_type text not null default 'interactive',
+  workflow_status text not null default 'concept',
+  published_at text,
   idle_screen_text text,
   active_question_id text,
   screen_question_id text,
@@ -29,6 +32,7 @@ create table if not exists questions (
   presentation_id text not null references presentations(id) on delete cascade,
   type text not null,
   prompt text not null,
+  content_json text,
   status text not null default 'closed',
   position integer not null,
   finalized_at text,
@@ -69,10 +73,14 @@ create table if not exists participant_profiles (
 
 alter table presentations add column if not exists owner_user_id text;
 alter table presentations add column if not exists owner_email text;
+alter table presentations add column if not exists presentation_type text not null default 'interactive';
+alter table presentations add column if not exists workflow_status text not null default 'concept';
+alter table presentations add column if not exists published_at text;
 alter table presentations add column if not exists idle_screen_text text;
 alter table presentations add column if not exists screen_view text not null default 'question';
 alter table presentations add column if not exists screen_question_id text;
 alter table questions add column if not exists finalized_at text;
+alter table questions add column if not exists content_json text;
 alter table question_options add column if not exists is_correct boolean not null default false;
 
 create unique index if not exists presentations_code_idx on presentations (code);

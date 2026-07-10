@@ -1,7 +1,9 @@
-export type QuestionType = "open" | "multiple" | "quiz";
+export type QuestionType = "open" | "multiple" | "quiz" | "slide";
 export type ScreenView = "question" | "qr" | "results" | "ranking";
 export type ModeratorRole = "admin" | "tester";
 export type AppAccountStatus = "pending" | "active" | "deactivated" | "deleted";
+export type PresentationKind = "quiz" | "interactive" | "combined";
+export type PresentationWorkflowStatus = "concept" | "completed" | "published";
 
 export type LeaderboardEntry = {
   participantId: string;
@@ -20,7 +22,10 @@ export type QuizTotals = {
 export type QuestionResult = {
   id: string;
   type: QuestionType;
+  kind: string;
   prompt: string;
+  description: string;
+  content: Record<string, unknown>;
   status: "open" | "closed";
   position: number;
   finalized: boolean;
@@ -51,6 +56,9 @@ export type PresenterPayload = {
     title: string;
     code: string;
     presenterKey: string;
+    presentationType: PresentationKind;
+    workflowStatus: PresentationWorkflowStatus;
+    publishedAt: string | null;
     idleScreenText: string;
     activeQuestionId: string | null;
     screenQuestionId: string | null;
@@ -74,6 +82,8 @@ export type PublicSessionPayload = {
     id: string;
     title: string;
     code: string;
+    presentationType: PresentationKind;
+    workflowStatus: PresentationWorkflowStatus;
     idleScreenText: string;
   };
   screenView: ScreenView;
@@ -103,11 +113,16 @@ export type ModeratorPresentationSummary = {
   title: string;
   code: string;
   presenterKey: string;
+  presentationType: PresentationKind;
+  workflowStatus: PresentationWorkflowStatus;
+  publishedAt: string | null;
   ownerEmail: string | null;
   createdAt: string;
   updatedAt: string;
   totals: {
     questions: number;
+    slides: number;
+    items: number;
     answers: number;
     participants: number;
   };

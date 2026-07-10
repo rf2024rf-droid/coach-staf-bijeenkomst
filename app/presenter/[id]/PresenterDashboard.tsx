@@ -73,6 +73,10 @@ function createDefaultQuestionForm(): QuestionForm {
 }
 
 function questionTypeLabel(type: QuestionType) {
+  if (type === "slide") {
+    return "Slide";
+  }
+
   if (type === "quiz") {
     return "Quizvraag";
   }

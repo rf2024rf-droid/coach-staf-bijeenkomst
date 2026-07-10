@@ -19,6 +19,7 @@ export async function POST(request: Request, context: RouteContext) {
       type?: unknown;
       prompt?: unknown;
       options?: unknown;
+      content?: unknown;
     };
     const result = await addQuestion(id, key, payload);
     return Response.json(result, { status: 201 });
@@ -38,6 +39,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       direction?: unknown;
       prompt?: unknown;
       options?: unknown;
+      content?: unknown;
     };
     const questionId = typeof payload.questionId === "string" ? payload.questionId : "";
 

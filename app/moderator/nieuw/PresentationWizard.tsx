@@ -437,6 +437,8 @@ export default function PresentationWizard() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const requestedId = searchParams.get("id") ?? "";
+  const returnTo = searchParams.get("returnTo") === "beheerder" ? "beheerder" : "moderator";
+  const dashboardPath = returnTo === "beheerder" ? "/beheerder" : "/moderator";
   const [payload, setPayload] = useState<PresenterPayload | null>(null);
   const [step, setStep] = useState<WizardStep>(requestedId ? "canvas" : "title");
   const [title, setTitle] = useState("");
@@ -475,6 +477,11 @@ export default function PresentationWizard() {
     }),
     []
   );
+
+  function wizardPathFor(presentationId: string) {
+    const params = new URLSearchParams({ id: presentationId, returnTo });
+    return `/moderator/nieuw?${params.toString()}`;
+  }
 
   const applyPayload = useCallback((nextPayload: PresenterPayload, options: { markSaved?: boolean } = {}) => {
     setPayload(nextPayload);
@@ -722,7 +729,7 @@ export default function PresentationWizard() {
         throw new Error("error" in data ? data.error : "Concept kon niet worden aangemaakt.");
       }
       applyPayload(data);
-      router.replace(`/moderator/nieuw?id=${data.presentation.id}`);
+      router.replace(wizardPathFor(data.presentation.id));
       setStep("type");
       setNotice("Concept aangemaakt");
     } catch (caught) {
@@ -972,7 +979,7 @@ export default function PresentationWizard() {
             <div className="min-w-0">
               <button
                 className="mb-3 inline-flex items-center gap-2 text-sm font-bold text-zinc-600 hover:text-zinc-950"
-                onClick={() => router.push("/moderator")}
+                onClick={() => router.push(dashboardPath)}
                 type="button"
               >
                 <ArrowLeft aria-hidden className="h-4 w-4" />

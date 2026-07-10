@@ -198,6 +198,18 @@ export default function ModeratorDashboard({ entryMode = "users" }: ModeratorDas
       presentations.length >= session.limits.maxPresentations
   );
 
+  function builderPath(presentationId?: string) {
+    const params = new URLSearchParams({
+      returnTo: session?.role === "admin" ? "beheerder" : "moderator",
+    });
+
+    if (presentationId) {
+      params.set("id", presentationId);
+    }
+
+    return `/moderator/nieuw?${params.toString()}`;
+  }
+
   const loadAccounts = useCallback(async () => {
     const response = await fetch("/api/moderator/accounts", { cache: "no-store" });
     const data = (await response.json()) as AccountsResponse | { error: string };
@@ -247,6 +259,20 @@ export default function ModeratorDashboard({ entryMode = "users" }: ModeratorDas
     }, 0);
     return () => window.clearTimeout(timer);
   }, [loadSession]);
+
+  useEffect(() => {
+    if (!session?.authenticated || !session.role) {
+      return;
+    }
+
+    const wrongEntry =
+      (entryMode === "admin" && session.role !== "admin") ||
+      (entryMode === "users" && session.role === "admin");
+
+    if (wrongEntry) {
+      router.replace(session.role === "admin" ? "/beheerder" : "/moderator");
+    }
+  }, [entryMode, router, session?.authenticated, session?.role]);
 
   function applyPresentations(data: PresentationsResponse | { error: string }) {
     if ("error" in data) {
@@ -739,28 +765,10 @@ export default function ModeratorDashboard({ entryMode = "users" }: ModeratorDas
   if ((entryMode === "admin" && session.role !== "admin") || (entryMode === "users" && session.role === "admin")) {
     return (
       <main className="grid min-h-screen place-items-center bg-[#f5f5f0] px-5 text-zinc-950">
-        <section className="w-full max-w-md rounded-lg border border-zinc-300 bg-white p-6 text-center shadow-sm">
-          <p className="text-sm font-semibold uppercase text-emerald-800">Sessie Interactief</p>
-          <h1 className="mt-2 text-2xl font-black">Andere ingang nodig</h1>
-          <p className="mt-3 leading-7 text-zinc-700">
-            Je bent al ingelogd. Gebruik de juiste ingang voor dit account of log uit.
-          </p>
-          <div className="mt-5 grid gap-2">
-            <a
-              className="inline-flex items-center justify-center rounded-lg bg-zinc-900 px-4 py-3 font-bold text-white hover:bg-zinc-700"
-              href={session.role === "admin" ? "/beheerder" : "/moderator"}
-            >
-              Open juiste omgeving
-            </a>
-            <button
-              className="inline-flex items-center justify-center rounded-lg border border-zinc-300 bg-white px-4 py-3 font-bold text-zinc-700 hover:bg-zinc-50"
-              onClick={logout}
-              type="button"
-            >
-              Uitloggen
-            </button>
-          </div>
-        </section>
+        <div className="flex items-center gap-3 font-bold text-zinc-700">
+          <Loader2 aria-hidden className="h-5 w-5 animate-spin" />
+          Dashboard openen...
+        </div>
       </main>
     );
   }
@@ -852,7 +860,7 @@ export default function ModeratorDashboard({ entryMode = "users" }: ModeratorDas
           <button
             className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-800 px-5 py-4 text-base font-black text-white hover:bg-emerald-900 disabled:opacity-60"
             disabled={presentationLimitReached}
-            onClick={() => router.push("/moderator/nieuw")}
+            onClick={() => router.push(builderPath())}
             type="button"
           >
             <Plus aria-hidden className="h-5 w-5" />
@@ -996,7 +1004,7 @@ export default function ModeratorDashboard({ entryMode = "users" }: ModeratorDas
               {!presentations.length ? (
                 <button
                   className="mt-5 inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-800 px-5 py-3 font-black text-white hover:bg-emerald-900"
-                  onClick={() => router.push("/moderator/nieuw")}
+                  onClick={() => router.push(builderPath())}
                   type="button"
                 >
                   <Plus aria-hidden className="h-5 w-5" />
@@ -1073,7 +1081,7 @@ export default function ModeratorDashboard({ entryMode = "users" }: ModeratorDas
                       <div className="flex flex-wrap gap-2 lg:justify-end">
                         <a
                           className="inline-flex items-center gap-2 rounded-lg bg-emerald-800 px-3 py-2 text-sm font-bold text-white hover:bg-emerald-900"
-                          href={`/moderator/nieuw?id=${presentation.id}`}
+                          href={builderPath(presentation.id)}
                         >
                           <Pencil aria-hidden className="h-4 w-4" />
                           Bewerk

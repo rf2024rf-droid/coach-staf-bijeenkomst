@@ -34,7 +34,7 @@ import type {
 } from "@/app/types";
 
 type WizardStep = "title" | "type" | "canvas" | "preview" | "finish";
-type SaveState = "idle" | "saving" | "saved" | "blocked" | "error";
+type SaveState = "idle" | "pending" | "saving" | "saved" | "blocked" | "error";
 type BuilderKind =
   | "quiz_multiple"
   | "true_false"
@@ -281,6 +281,9 @@ function typeLabel(type: PresentationKind) {
 }
 
 function saveLabel(state: SaveState) {
+  if (state === "pending") {
+    return "Wijzigingen worden zo opgeslagen";
+  }
   if (state === "saving") {
     return "Wijzigingen opslaan...";
   }
@@ -444,6 +447,7 @@ export default function PresentationWizard() {
   const [showAddPanel, setShowAddPanel] = useState(!requestedId);
   const [previewIndex, setPreviewIndex] = useState(0);
   const [saveState, setSaveState] = useState<SaveState>("idle");
+  const [saveCycle, setSaveCycle] = useState(0);
   const [busy, setBusy] = useState("");
   const [draggingId, setDraggingId] = useState("");
   const [notice, setNotice] = useState("");
@@ -451,6 +455,11 @@ export default function PresentationWizard() {
   const [validationErrors, setValidationErrors] = useState<Record<string, string[]>>({});
   const [origin] = useState(() => (typeof window === "undefined" ? "" : window.location.origin));
   const applyingDraftRef = useRef(false);
+  const activeQuestionIdRef = useRef("");
+  const lastDraftQuestionIdRef = useRef("");
+  const draftRevisionRef = useRef(0);
+  const savingDraftRef = useRef(false);
+  const queuedSaveRef = useRef(false);
 
   const activeQuestion = useMemo(
     () => payload?.questions.find((question) => question.id === activeQuestionId) ?? null,
@@ -467,11 +476,13 @@ export default function PresentationWizard() {
     []
   );
 
-  const applyPayload = useCallback((nextPayload: PresenterPayload) => {
+  const applyPayload = useCallback((nextPayload: PresenterPayload, options: { markSaved?: boolean } = {}) => {
     setPayload(nextPayload);
     setTitle(nextPayload.presentation.title);
     setPresentationType(nextPayload.presentation.presentationType);
-    setSaveState("saved");
+    if (options.markSaved !== false) {
+      setSaveState("saved");
+    }
   }, []);
 
   const loadPresentation = useCallback(async () => {
@@ -507,15 +518,29 @@ export default function PresentationWizard() {
   }, [loadPresentation]);
 
   useEffect(() => {
+    activeQuestionIdRef.current = activeQuestionId;
+  }, [activeQuestionId]);
+
+  useEffect(() => {
     const timer = window.setTimeout(() => {
+      const nextDraftQuestionId = activeQuestion?.id ?? "";
+      if (nextDraftQuestionId === lastDraftQuestionIdRef.current) {
+        return;
+      }
+
+      lastDraftQuestionIdRef.current = nextDraftQuestionId;
       if (!activeQuestion) {
         applyingDraftRef.current = true;
+        draftRevisionRef.current += 1;
+        queuedSaveRef.current = false;
         setDraft(null);
         applyingDraftRef.current = false;
         return;
       }
 
       applyingDraftRef.current = true;
+      draftRevisionRef.current += 1;
+      queuedSaveRef.current = false;
       setDraft(draftFromQuestion(activeQuestion));
       setDirty(false);
       applyingDraftRef.current = false;
@@ -556,6 +581,15 @@ export default function PresentationWizard() {
         return;
       }
 
+      if (savingDraftRef.current) {
+        queuedSaveRef.current = true;
+        setSaveState("pending");
+        return;
+      }
+
+      savingDraftRef.current = true;
+      const revisionAtRequest = draftRevisionRef.current;
+      const questionIdAtRequest = currentDraft.id;
       setSaveState("saving");
       setError("");
       try {
@@ -584,12 +618,28 @@ export default function PresentationWizard() {
         if (!response.ok || "error" in data) {
           throw new Error("error" in data ? data.error : "Onderdeel kon niet worden opgeslagen.");
         }
-        applyPayload(data);
-        setDirty(false);
-        setSaveState("saved");
+
+        applyPayload(data, { markSaved: false });
+        const stillEditingSameQuestion = activeQuestionIdRef.current === questionIdAtRequest;
+        const noNewerChanges = revisionAtRequest === draftRevisionRef.current;
+
+        if (stillEditingSameQuestion && noNewerChanges) {
+          setDirty(false);
+          setSaveState("saved");
+        } else if (stillEditingSameQuestion) {
+          queuedSaveRef.current = true;
+          setDirty(true);
+          setSaveState("pending");
+        }
       } catch (caught) {
         setSaveState("error");
         setError(caught instanceof Error ? caught.message : "Onderdeel kon niet worden opgeslagen.");
+      } finally {
+        savingDraftRef.current = false;
+        if (queuedSaveRef.current && activeQuestionIdRef.current === currentDraft.id) {
+          queuedSaveRef.current = false;
+          setSaveCycle((current) => current + 1);
+        }
       }
     },
     [applyPayload, payload]
@@ -600,16 +650,22 @@ export default function PresentationWizard() {
       return;
     }
 
-    setSaveState("saving");
+    setSaveState("pending");
     const timer = window.setTimeout(() => {
       void saveDraft(draft);
-    }, 750);
+    }, 1800);
     return () => window.clearTimeout(timer);
-  }, [dirty, draft, saveDraft]);
+  }, [dirty, draft, saveCycle, saveDraft]);
+
+  function markDraftChanged() {
+    draftRevisionRef.current += 1;
+    setSaveState("pending");
+    setDirty(true);
+  }
 
   function updateDraft(updates: Partial<ItemDraft>) {
     setDraft((current) => (current ? { ...current, ...updates } : current));
-    setDirty(true);
+    markDraftChanged();
   }
 
   function updateOption(optionIdValue: string, updates: Partial<OptionDraft>) {
@@ -622,7 +678,7 @@ export default function PresentationWizard() {
       );
       return { ...current, options };
     });
-    setDirty(true);
+    markDraftChanged();
   }
 
   async function createDraftPresentation(event: FormEvent<HTMLFormElement>) {

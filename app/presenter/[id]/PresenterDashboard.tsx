@@ -451,6 +451,26 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
     }, questionId ? "Vraag staat live" : "Alle vragen gesloten");
   }
 
+  async function resetFlow() {
+    const confirmed = window.confirm(
+      "Presentatieflow opnieuw starten?\n\nDit sluit alle live vragen, haalt resultaten van het scherm en zet quizvragen weer open voor de regie. Antwoorden blijven bewaard."
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    await mutate(async () => {
+      const response = await fetch(apiPath(`/api/presentations/${id}/flow`), {
+        method: "PATCH",
+      });
+      const data = (await response.json()) as PresenterPayload | { error: string };
+      if (!response.ok || "error" in data) {
+        throw new Error("error" in data ? data.error : "Presentatieflow kon niet worden gereset.");
+      }
+      return data;
+    }, "Presentatieflow opnieuw gestart");
+  }
+
   async function updateScreenView(screenView: ScreenView, questionId: string | null = null) {
     await mutate(async () => {
       const response = await fetch(apiPath(`/api/presentations/${id}/screen-view`), {
@@ -925,9 +945,20 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
                     <p className="text-xs font-black uppercase text-emerald-800">Presentatieflow</p>
                     <h2 className="mt-1 text-xl font-black">Vragen live bedienen</h2>
                   </div>
-                  <span className="rounded-md bg-zinc-100 px-3 py-2 text-sm font-bold text-zinc-700">
-                    {payload.questions.length} vragen
-                  </span>
+                  <div className="flex flex-wrap gap-2 md:justify-end">
+                    <span className="rounded-md bg-zinc-100 px-3 py-2 text-sm font-bold text-zinc-700">
+                      {payload.questions.length} vragen
+                    </span>
+                    <button
+                      className="inline-flex items-center justify-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-bold text-amber-900 hover:bg-amber-100 disabled:opacity-60"
+                      disabled={saving}
+                      onClick={resetFlow}
+                      type="button"
+                    >
+                      <RotateCcw aria-hidden className="h-4 w-4" />
+                      Reset presentatieflow
+                    </button>
+                  </div>
                 </div>
                 <div className="grid gap-3">
                   {payload.questions.map((question, index) => {
@@ -997,12 +1028,12 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
                               className={`inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-black text-white disabled:opacity-60 ${
                                 isActive ? "bg-amber-700 hover:bg-amber-800" : "bg-emerald-800 hover:bg-emerald-900"
                               }`}
-                              disabled={saving || question.finalized}
+                              disabled={saving}
                               onClick={() => activate(isActive ? null : question.id)}
                               type="button"
                             >
                               {isActive ? <Square aria-hidden className="h-4 w-4" /> : <Play aria-hidden className="h-4 w-4" />}
-                              {question.finalized ? "Afgesloten" : isActive ? "Stop" : "Live"}
+                              {question.finalized ? "Open opnieuw" : isActive ? "Stop" : "Live"}
                             </button>
                           </div>
                         </div>
@@ -1328,7 +1359,7 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
                                   ? "bg-amber-700 hover:bg-amber-800"
                                   : "bg-emerald-800 hover:bg-emerald-900"
                               }`}
-                              disabled={saving || question.finalized}
+                              disabled={saving}
                               onClick={() =>
                                 activate(question.id === payload.presentation.activeQuestionId ? null : question.id)
                               }
@@ -1340,7 +1371,7 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
                                 <Play aria-hidden className="h-4 w-4" />
                               )}
                               {question.finalized
-                                ? "Afgesloten"
+                                ? "Open opnieuw"
                                 : question.id === payload.presentation.activeQuestionId
                                   ? "Stop live"
                                   : "Live"}

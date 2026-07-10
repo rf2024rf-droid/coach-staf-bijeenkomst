@@ -1671,10 +1671,6 @@ export async function setActiveQuestion(
     throw new AppError(404, "Vraag niet gevonden in deze presentatie.");
   }
 
-  if (question.type === "quiz" && question.finalized_at) {
-    throw new AppError(409, "Deze quizvraag is al afgesloten voor de puntentelling.");
-  }
-
   await sql.begin(async (tx) => {
     await tx`
       UPDATE questions
@@ -1683,12 +1679,42 @@ export async function setActiveQuestion(
     `;
     await tx`
       UPDATE questions
-      SET status = 'open', updated_at = ${timestamp}
+      SET
+        status = 'open',
+        finalized_at = CASE WHEN type = 'quiz' THEN NULL ELSE finalized_at END,
+        updated_at = ${timestamp}
       WHERE id = ${questionId}
     `;
     await tx`
       UPDATE presentations
       SET active_question_id = ${questionId}, screen_question_id = ${questionId}, screen_view = 'question', updated_at = ${timestamp}
+      WHERE id = ${presentationId}
+    `;
+  });
+
+  return getPresenterPayload(presentationId, presenterKey);
+}
+
+export async function resetPresentationFlow(
+  presentationId: string,
+  presenterKey: string
+) {
+  await assertPresenter(presentationId, presenterKey);
+  const sql = getSql();
+  const timestamp = nowIso();
+
+  await sql.begin(async (tx) => {
+    await tx`
+      UPDATE questions
+      SET
+        status = 'closed',
+        finalized_at = CASE WHEN type = 'quiz' THEN NULL ELSE finalized_at END,
+        updated_at = ${timestamp}
+      WHERE presentation_id = ${presentationId}
+    `;
+    await tx`
+      UPDATE presentations
+      SET active_question_id = NULL, screen_question_id = NULL, screen_view = 'question', updated_at = ${timestamp}
       WHERE id = ${presentationId}
     `;
   });

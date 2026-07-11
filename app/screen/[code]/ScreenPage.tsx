@@ -77,8 +77,8 @@ function SpotlightResults({ question }: { question: QuestionResult }) {
 
     if (question.type === "quiz") {
       return (
-        <div className="grid items-start gap-6 lg:grid-cols-[0.85fr_1.15fr]">
-          <section className="rounded-lg border border-emerald-200 bg-emerald-50 p-7 text-zinc-950">
+        <div className="grid items-stretch gap-6 lg:grid-cols-[0.85fr_1.15fr]">
+          <section className="flex h-full flex-col rounded-lg border border-emerald-200 bg-emerald-50 p-7 text-zinc-950">
             <p className="text-sm font-black uppercase text-emerald-800">Quizuitslag</p>
             <p className="mt-5 text-8xl font-black leading-none text-emerald-800 md:text-9xl">
               {question.correctCount}
@@ -105,19 +105,19 @@ function SpotlightResults({ question }: { question: QuestionResult }) {
             ) : null}
           </section>
 
-          <section className="self-start rounded-lg border border-zinc-700 bg-zinc-100 p-4 text-zinc-950 shadow-2xl shadow-zinc-950/20 md:p-5">
+          <section className="flex h-full flex-col rounded-lg border border-zinc-700 bg-zinc-100 p-4 text-zinc-950 shadow-2xl shadow-zinc-950/20 md:p-5">
             <p className="mb-4 text-sm font-black uppercase text-zinc-600">Antwoordopties</p>
-            <div className="grid gap-3">
+            <div className="grid flex-1 auto-rows-fr gap-3">
               {question.options.map((option, index) => (
                 <div
-                  className={`rounded-lg border p-4 ${
+                  className={`flex items-center rounded-lg border p-4 ${
                     option.isCorrect
                       ? "border-emerald-500 bg-emerald-50 ring-4 ring-emerald-200"
                       : "border-zinc-200 bg-white"
                   }`}
                   key={option.id}
                 >
-                  <h3 className="flex items-center gap-3 text-2xl font-black leading-tight">
+                  <h3 className="flex w-full items-center gap-3 text-2xl font-black leading-tight">
                     <span className="grid h-10 w-10 shrink-0 place-items-center rounded-md bg-zinc-950 text-lg font-black text-white">
                       {optionLetter(option.position, index)}
                     </span>

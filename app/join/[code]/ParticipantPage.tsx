@@ -34,6 +34,21 @@ function optionLetter(position: number | null | undefined, fallbackIndex = 0) {
   return String.fromCharCode(65 + index);
 }
 
+function SubmissionStatusDot({ visible }: { visible: boolean }) {
+  if (!visible) {
+    return null;
+  }
+
+  return (
+    <span
+      aria-label="Antwoord ontvangen"
+      className="inline-block h-3 w-3 rounded-full bg-emerald-300 shadow-[0_0_0_4px_rgba(16,185,129,0.16)]"
+      role="status"
+      title="Antwoord ontvangen"
+    />
+  );
+}
+
 type IdentityMode = "name" | "anonymous";
 
 function readStoredIdentity(storageKey: string): { mode: IdentityMode; displayName: string } {
@@ -474,12 +489,36 @@ export default function ParticipantPage({ code }: ParticipantPageProps) {
               Je hoeft op dit onderdeel niets in te vullen.
             </p>
           </section>
+        ) : activeQuestion.type === "quiz" && quizResultsLocked ? null : activeQuestion.type === "quiz" && quizTiming?.isExpired ? (
+          <section className="rounded-lg border border-amber-500 bg-amber-950 p-5 text-amber-50 shadow-sm">
+            <div className="mb-5">
+              <div className="flex items-center gap-2">
+                <span className="rounded-md bg-emerald-300 px-2 py-1 text-xs font-black uppercase text-emerald-950">
+                  {questionTypeLabel(activeQuestion.type)}
+                </span>
+                <SubmissionStatusDot visible={submitted} />
+              </div>
+              <h2 className="mt-3 text-2xl font-black leading-9">{activeQuestion.prompt}</h2>
+            </div>
+            <div className="grid min-h-56 place-items-center rounded-lg border border-amber-300/40 bg-amber-900/70 px-5 py-8 text-center">
+              <div>
+                <XCircle aria-hidden className="mx-auto h-14 w-14" />
+                <h3 className="mt-4 text-4xl font-black leading-tight">Tijd voorbij</h3>
+                <p className="mx-auto mt-3 max-w-sm text-base font-bold leading-7 text-amber-100">
+                  Deze quizvraag is gesloten. Je kunt geen antwoord meer kiezen.
+                </p>
+              </div>
+            </div>
+          </section>
         ) : (
           <form className="rounded-lg border border-zinc-700 bg-zinc-900 p-5 shadow-sm" onSubmit={submit}>
             <div className="mb-5">
-              <span className="rounded-md bg-emerald-300 px-2 py-1 text-xs font-black uppercase text-emerald-950">
-                {questionTypeLabel(activeQuestion.type)}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="rounded-md bg-emerald-300 px-2 py-1 text-xs font-black uppercase text-emerald-950">
+                  {questionTypeLabel(activeQuestion.type)}
+                </span>
+                <SubmissionStatusDot visible={submitted} />
+              </div>
               <h2 className="mt-3 text-2xl font-black leading-9">{activeQuestion.prompt}</h2>
             </div>
 
@@ -580,17 +619,6 @@ export default function ParticipantPage({ code }: ParticipantPageProps) {
           </form>
         )}
 
-        {submitted && activeQuestion ? (
-          <section className="rounded-lg border border-emerald-700 bg-emerald-950 p-5 shadow-sm">
-            <div className="flex items-center gap-2 font-bold text-emerald-100">
-              <CheckCircle2 aria-hidden className="h-5 w-5" />
-              Antwoord ontvangen
-            </div>
-            <p className="mt-3 text-sm font-semibold leading-6 text-emerald-50">
-              Je antwoord is opgeslagen. De presentator bepaalt wanneer de resultaten zichtbaar worden.
-            </p>
-          </section>
-        ) : null}
       </div>
     </main>
   );

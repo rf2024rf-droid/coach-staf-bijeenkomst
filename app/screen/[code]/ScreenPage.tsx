@@ -433,6 +433,8 @@ export default function ScreenPage({ code }: ScreenPageProps) {
   const idleScreenText = session.presentation.idleScreenText || "Sessie Interactief";
   const activeQuestionTiming =
     activeQuestion?.type === "quiz" ? getQuestionTimingState(activeQuestion.content, "quiz", nowMs) : null;
+  const activeCorrectOption =
+    activeQuestion?.type === "quiz" ? activeQuestion.options.find((option) => option.isCorrect) ?? null : null;
   const compactOpenResults =
     resultsQuestion?.type === "open" &&
     resultsQuestion.responses.filter((response) => response.textAnswer).length > 16;
@@ -626,6 +628,38 @@ export default function ScreenPage({ code }: ScreenPageProps) {
                   style={{ width: `${Math.round(activeQuestionTiming.countdownProgress * 100)}%` }}
                 />
               </div>
+            </div>
+          </section>
+        ) : activeQuestion.type === "quiz" && activeQuestionTiming?.isExpired ? (
+          <section className="grid flex-1 place-items-center text-center">
+            <div className="mx-auto w-full max-w-6xl rounded-lg border border-zinc-700 bg-zinc-900 p-8 shadow-2xl shadow-black/30 md:p-12">
+              <p className="text-lg font-black uppercase tracking-wide text-amber-200 md:text-xl">Tijd voorbij</p>
+              <h2 className="mx-auto mt-5 max-w-5xl text-4xl font-black leading-tight text-white md:text-6xl">
+                {activeQuestion.prompt}
+              </h2>
+              {activeCorrectOption ? (
+                <div className="mx-auto mt-9 grid max-w-4xl gap-5 rounded-lg border border-emerald-300 bg-emerald-50 p-6 text-zinc-950 md:grid-cols-[160px_1fr] md:items-center md:p-8">
+                  <div className="grid h-36 w-full place-items-center rounded-lg bg-emerald-700 text-7xl font-black leading-none text-white md:h-40 md:text-8xl">
+                    {optionLetter(activeCorrectOption.position, 0)}
+                  </div>
+                  <div className="text-left">
+                    <p className="inline-flex items-center gap-2 text-sm font-black uppercase text-emerald-800">
+                      <CheckCircle2 aria-hidden className="h-5 w-5" />
+                      Juist antwoord
+                    </p>
+                    <p className="mt-3 text-3xl font-black leading-tight text-zinc-950 md:text-5xl">
+                      {activeCorrectOption.label}
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <p className="mx-auto mt-8 max-w-3xl text-2xl font-bold leading-9 text-zinc-300">
+                  De quizvraag is gesloten.
+                </p>
+              )}
+              <p className="mt-7 text-lg font-bold text-zinc-400">
+                {activeQuestion.answerCount} {voteLabel(activeQuestion.answerCount)} ontvangen
+              </p>
             </div>
           </section>
         ) : (

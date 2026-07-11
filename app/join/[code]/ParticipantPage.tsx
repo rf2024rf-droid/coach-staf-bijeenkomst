@@ -311,6 +311,7 @@ export default function ParticipantPage({ code }: ParticipantPageProps) {
   const isChoiceQuestion = activeQuestion?.type === "multiple" || activeQuestion?.type === "quiz";
   const isSlide = activeQuestion?.type === "slide";
   const showSessionHeader = !activeQuestion && !showQuizFeedback;
+  const centerQuizFeedback = Boolean(showQuizFeedback && (!activeQuestion || quizResultsLocked));
   const canSubmit =
     !isSlide && !votingLocked && (isChoiceQuestion ? Boolean(selectedOptionId) : Boolean(textAnswer.trim()));
   const submitButtonLabel = quizResultsLocked || quizTiming?.isExpired
@@ -442,7 +443,11 @@ export default function ParticipantPage({ code }: ParticipantPageProps) {
 
   return (
     <main className="min-h-screen bg-zinc-950 px-3 py-3 text-white">
-      <div className="mx-auto flex w-full max-w-xl flex-col gap-3">
+      <div
+        className={`mx-auto flex w-full max-w-xl flex-col gap-3 ${
+          centerQuizFeedback ? "min-h-[calc(100vh-1.5rem)] justify-center" : ""
+        }`}
+      >
         {showSessionHeader ? (
           <header className="rounded-lg border border-zinc-700 bg-zinc-900 p-4 shadow-sm">
             <p className="text-sm font-semibold uppercase text-emerald-300">Sessie Interactief</p>
@@ -469,41 +474,47 @@ export default function ParticipantPage({ code }: ParticipantPageProps) {
 
         {showQuizFeedback ? (
           <section
-            className={`rounded-lg border p-4 shadow-sm ${
+            className={`rounded-lg border-2 p-6 text-center shadow-2xl ${
               participantResult?.isCorrect
-                ? "border-emerald-500 bg-emerald-950 text-emerald-50"
-                : "border-amber-500 bg-amber-950 text-amber-50"
+                ? "border-emerald-300 bg-emerald-950 text-emerald-50 shadow-emerald-950/40"
+                : "border-rose-400 bg-rose-950 text-rose-50 shadow-rose-950/40"
             }`}
           >
             {participantResult ? (
               <>
-                <div className="flex items-center gap-2 text-lg font-black">
+                <div className="flex flex-col items-center gap-3 text-3xl font-black leading-tight">
                   {participantResult.isCorrect ? (
-                    <CheckCircle2 aria-hidden className="h-6 w-6" />
+                    <CheckCircle2 aria-hidden className="h-16 w-16" />
                   ) : (
-                    <XCircle aria-hidden className="h-6 w-6" />
+                    <XCircle aria-hidden className="h-16 w-16" />
                   )}
-                  {participantResult.isCorrect ? "Goed beantwoord" : "Helaas, fout beantwoord"}
+                  <span>{participantResult.isCorrect ? "Goed beantwoord" : "Helaas, fout beantwoord"}</span>
                 </div>
-                <p className="mt-3 text-sm font-bold leading-6">
-                  Jouw antwoord:{" "}
-                  <span className="font-black">
+                <div
+                  className={`mt-7 rounded-lg border-2 px-4 py-5 ${
+                    participantResult.isCorrect
+                      ? "border-emerald-300 bg-emerald-900/80"
+                      : "border-rose-300 bg-rose-900/80"
+                  }`}
+                >
+                  <p className="text-xs font-black uppercase opacity-80">Jouw antwoord</p>
+                  <p className="mt-2 text-2xl font-black leading-tight">
                     {participantResult.optionPosition
                       ? `${optionLetter(participantResult.optionPosition)}. `
                       : ""}
                     {participantResult.optionLabel}
-                  </span>
-                </p>
+                  </p>
+                </div>
                 {!participantResult.isCorrect && participantResult.correctOptionLabel ? (
-                  <p className="mt-1 text-sm font-bold leading-6">
-                    Juiste antwoord:{" "}
-                    <span className="font-black">
+                  <div className="mt-4 rounded-lg border border-emerald-400/70 bg-emerald-950/80 px-4 py-4 text-emerald-50">
+                    <p className="text-xs font-black uppercase text-emerald-200">Juiste antwoord</p>
+                    <p className="mt-2 text-xl font-black leading-tight">
                       {participantResult.correctOptionPosition
                         ? `${optionLetter(participantResult.correctOptionPosition)}. `
                         : ""}
                       {participantResult.correctOptionLabel}
-                    </span>
-                  </p>
+                    </p>
+                  </div>
                 ) : null}
               </>
             ) : (

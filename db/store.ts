@@ -7,7 +7,12 @@ import {
   normalizeHexColor,
   resolveGeneralScreenFontFamily,
 } from "@/lib/generalScreenAppearance";
-import { buildLiveQuestionContent, getQuestionTimingState } from "@/lib/questionTiming";
+import {
+  QUIZ_LATE_SUBMISSION_GRACE_MS,
+  QUIZ_SELECTION_DEADLINE_TOLERANCE_MS,
+  buildLiveQuestionContent,
+  getQuestionTimingState,
+} from "@/lib/questionTiming";
 
 export type QuestionType = "open" | "multiple" | "quiz" | "slide";
 export type QuestionStatus = "open" | "closed";
@@ -68,6 +73,8 @@ type ResponseRow = {
   option_id: string | null;
   option_label: string | null;
   text_answer: string | null;
+  client_selected_at: string | null;
+  client_sequence: number | null;
   created_at: string;
   updated_at: string;
 };
@@ -336,6 +343,8 @@ const schemaStatements = [
     participant_name TEXT NOT NULL,
     option_id TEXT REFERENCES question_options(id) ON DELETE SET NULL,
     text_answer TEXT,
+    client_selected_at TEXT,
+    client_sequence INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL DEFAULT (now()::text),
     updated_at TEXT NOT NULL DEFAULT (now()::text)
   )`,
@@ -363,6 +372,8 @@ const schemaStatements = [
   "ALTER TABLE questions ADD COLUMN IF NOT EXISTS finalized_at TEXT",
   "ALTER TABLE questions ADD COLUMN IF NOT EXISTS content_json TEXT",
   "ALTER TABLE question_options ADD COLUMN IF NOT EXISTS is_correct BOOLEAN NOT NULL DEFAULT false",
+  "ALTER TABLE responses ADD COLUMN IF NOT EXISTS client_selected_at TEXT",
+  "ALTER TABLE responses ADD COLUMN IF NOT EXISTS client_sequence INTEGER NOT NULL DEFAULT 0",
   "CREATE UNIQUE INDEX IF NOT EXISTS presentations_code_idx ON presentations (code)",
   "CREATE INDEX IF NOT EXISTS presentations_owner_idx ON presentations (owner_user_id)",
   "CREATE UNIQUE INDEX IF NOT EXISTS app_accounts_email_idx ON app_accounts (email)",
@@ -480,6 +491,41 @@ function cleanPositiveInteger(value: unknown, max: number) {
   }
 
   return Math.min(Math.floor(numberValue), max);
+}
+
+function cleanClientSequence(value: unknown) {
+  const numberValue = Number(value ?? 0);
+  if (!Number.isFinite(numberValue) || numberValue < 0) {
+    return 0;
+  }
+
+  return Math.min(Math.floor(numberValue), 1_000_000_000);
+}
+
+function parseTimestampMs(value: unknown) {
+  if (typeof value !== "string" || !value.trim()) {
+    return null;
+  }
+
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function normalizeClientSelectedAt(value: unknown, serverNowMs: number) {
+  const parsed = parseTimestampMs(value);
+  if (parsed === null || parsed > serverNowMs + 1000) {
+    return {
+      iso: new Date(serverNowMs).toISOString(),
+      ms: serverNowMs,
+      fromClient: false,
+    };
+  }
+
+  return {
+    iso: new Date(parsed).toISOString(),
+    ms: parsed,
+    fromClient: true,
+  };
 }
 
 function parseQuestionContent(value: string | null): Record<string, unknown> {
@@ -2213,9 +2259,14 @@ export async function submitAnswer(
     participantName?: unknown;
     optionId?: unknown;
     textAnswer?: unknown;
+    clientSelectedAt?: unknown;
+    clientSequence?: unknown;
   }
 ) {
+  const serverReceivedAtMs = Date.now();
   await ensureSchema();
+  const clientSelectedAt = normalizeClientSelectedAt(payload.clientSelectedAt, serverReceivedAtMs);
+  const clientSequence = cleanClientSequence(payload.clientSequence);
 
   const presentation = await fetchPresentationByCode(codeInput);
   if (!presentation) {
@@ -2240,12 +2291,23 @@ export async function submitAnswer(
   }
 
   if (question.type === "quiz") {
-    const timing = getQuestionTimingState(parseQuestionContent(question.content_json), question.type);
+    const timing = getQuestionTimingState(parseQuestionContent(question.content_json), question.type, serverReceivedAtMs);
     if (timing.isCountdown) {
       throw new AppError(409, "De quizvraag start zo. Wacht tot de aftelperiode klaar is.");
     }
     if (timing.isExpired) {
-      throw new AppError(409, "De tijd is voorbij. Deze quizvraag is gesloten voor deelnemers.");
+      const arrivedWithinGrace = Boolean(
+        timing.answerEndsAtMs && serverReceivedAtMs <= timing.answerEndsAtMs + QUIZ_LATE_SUBMISSION_GRACE_MS
+      );
+      const selectedBeforeDeadline = Boolean(
+        timing.answerEndsAtMs &&
+          clientSelectedAt.fromClient &&
+          clientSelectedAt.ms <= timing.answerEndsAtMs + QUIZ_SELECTION_DEADLINE_TOLERANCE_MS
+      );
+
+      if (!arrivedWithinGrace || !selectedBeforeDeadline) {
+        throw new AppError(409, "De tijd is voorbij. Deze quizvraag is gesloten voor deelnemers.");
+      }
     }
   }
 
@@ -2296,16 +2358,62 @@ export async function submitAnswer(
   }
 
   const sql = getSql();
-  const timestamp = nowIso();
+  const timestamp = new Date(serverReceivedAtMs).toISOString();
 
   await sql.begin(async (tx) => {
+    const existingResponse = first(
+      await tx<Pick<ResponseRow, "client_selected_at" | "client_sequence" | "updated_at">[]>`
+        SELECT client_selected_at, client_sequence, updated_at
+        FROM responses
+        WHERE question_id = ${question.id} AND participant_id = ${participantId}
+        FOR UPDATE
+      `
+    );
+
+    if (isChoiceQuestion(question.type) && existingResponse) {
+      const existingSelectedAtMs =
+        parseTimestampMs(existingResponse.client_selected_at) ?? parseTimestampMs(existingResponse.updated_at) ?? 0;
+      const existingSequence = numberFromDb(existingResponse.client_sequence);
+      const incomingIsOlder =
+        clientSelectedAt.ms < existingSelectedAtMs ||
+        (clientSelectedAt.ms === existingSelectedAtMs && clientSequence <= existingSequence);
+
+      if (incomingIsOlder) {
+        return;
+      }
+    }
+
     await tx`
       DELETE FROM responses
       WHERE question_id = ${question.id} AND participant_id = ${participantId}
     `;
     await tx`
-      INSERT INTO responses (id, presentation_id, question_id, participant_id, participant_name, option_id, text_answer, created_at, updated_at)
-      VALUES (${makeId("rsp")}, ${presentation.id}, ${question.id}, ${participantId}, ${participantName}, ${optionId}, ${textAnswer}, ${timestamp}, ${timestamp})
+      INSERT INTO responses (
+        id,
+        presentation_id,
+        question_id,
+        participant_id,
+        participant_name,
+        option_id,
+        text_answer,
+        client_selected_at,
+        client_sequence,
+        created_at,
+        updated_at
+      )
+      VALUES (
+        ${makeId("rsp")},
+        ${presentation.id},
+        ${question.id},
+        ${participantId},
+        ${participantName},
+        ${optionId},
+        ${textAnswer},
+        ${clientSelectedAt.iso},
+        ${clientSequence},
+        ${timestamp},
+        ${timestamp}
+      )
     `;
   });
 

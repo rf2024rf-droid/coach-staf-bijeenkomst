@@ -12,6 +12,8 @@ export async function POST(request: Request, context: RouteContext) {
       participantName?: unknown;
       optionId?: unknown;
       textAnswer?: unknown;
+      clientSelectedAt?: unknown;
+      clientSequence?: unknown;
     };
     const result = await submitAnswer(code, payload);
     return Response.json(result, { status: 201 });

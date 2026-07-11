@@ -96,8 +96,8 @@ export default function ParticipantPage({ code }: ParticipantPageProps) {
   const [textAnswer, setTextAnswer] = useState("");
   const [selectedOptionId, setSelectedOptionId] = useState("");
   const lastActiveQuestionId = useRef("");
-  const choiceSubmittingRef = useRef(false);
-  const pendingChoiceOptionIdRef = useRef<string | null>(null);
+  const choiceSequenceRef = useRef(0);
+  const latestChoiceAcknowledgedSequenceRef = useRef(0);
   const [submittedQuestionId, setSubmittedQuestionId] = useState("");
   const [loading, setLoading] = useState(true);
   const [registering, setRegistering] = useState(false);
@@ -120,6 +120,8 @@ export default function ParticipantPage({ code }: ParticipantPageProps) {
           setSelectedOptionId("");
           setTextAnswer("");
           setSubmittedQuestionId("");
+          choiceSequenceRef.current = 0;
+          latestChoiceAcknowledgedSequenceRef.current = 0;
         }
         if (activeId) {
           lastActiveQuestionId.current = activeId;
@@ -200,49 +202,41 @@ export default function ParticipantPage({ code }: ParticipantPageProps) {
     setSelectedOptionId(optionId);
     setError("");
 
-    if (choiceSubmittingRef.current) {
-      pendingChoiceOptionIdRef.current = optionId;
-      return;
-    }
-
-    choiceSubmittingRef.current = true;
+    const clientSequence = choiceSequenceRef.current + 1;
+    choiceSequenceRef.current = clientSequence;
     setSubmitting(true);
 
     try {
-      let nextOptionId: string | null = optionId;
+      const response = await fetch(`/api/session/${normalizedCode}/answers`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          participantId,
+          participantName: session.participantLabel,
+          optionId,
+          textAnswer: "",
+          clientSelectedAt: new Date().toISOString(),
+          clientSequence,
+        }),
+      });
+      const data = (await response.json()) as PublicSessionPayload | { error: string };
+      if (!response.ok || "error" in data) {
+        throw new Error("error" in data ? data.error : "Antwoord kon niet worden verzonden.");
+      }
 
-      while (nextOptionId) {
-        const currentOptionId: string = nextOptionId;
-        pendingChoiceOptionIdRef.current = null;
-
-        const response = await fetch(`/api/session/${normalizedCode}/answers`, {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            participantId,
-            participantName: session.participantLabel,
-            optionId: currentOptionId,
-            textAnswer: "",
-          }),
-        });
-        const data = (await response.json()) as PublicSessionPayload | { error: string };
-        if (!response.ok || "error" in data) {
-          throw new Error("error" in data ? data.error : "Antwoord kon niet worden verzonden.");
-        }
-
+      if (clientSequence >= latestChoiceAcknowledgedSequenceRef.current) {
+        latestChoiceAcknowledgedSequenceRef.current = clientSequence;
         setSession(data);
         setSubmittedQuestionId(data.activeQuestion?.id ?? session.activeQuestion.id);
-        nextOptionId =
-          pendingChoiceOptionIdRef.current && pendingChoiceOptionIdRef.current !== currentOptionId
-            ? pendingChoiceOptionIdRef.current
-            : null;
       }
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Antwoord kon niet worden verzonden.");
+      if (clientSequence === choiceSequenceRef.current) {
+        setError(caught instanceof Error ? caught.message : "Antwoord kon niet worden verzonden.");
+      }
     } finally {
-      pendingChoiceOptionIdRef.current = null;
-      choiceSubmittingRef.current = false;
-      setSubmitting(false);
+      if (clientSequence === choiceSequenceRef.current) {
+        setSubmitting(false);
+      }
     }
   }
 

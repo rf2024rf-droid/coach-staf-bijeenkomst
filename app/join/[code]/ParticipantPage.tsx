@@ -96,6 +96,8 @@ export default function ParticipantPage({ code }: ParticipantPageProps) {
   const [textAnswer, setTextAnswer] = useState("");
   const [selectedOptionId, setSelectedOptionId] = useState("");
   const lastActiveQuestionId = useRef("");
+  const choiceSubmittingRef = useRef(false);
+  const pendingChoiceOptionIdRef = useRef<string | null>(null);
   const [submittedQuestionId, setSubmittedQuestionId] = useState("");
   const [loading, setLoading] = useState(true);
   const [registering, setRegistering] = useState(false);
@@ -159,7 +161,7 @@ export default function ParticipantPage({ code }: ParticipantPageProps) {
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!session?.activeQuestion || !participantId || !session.participantLabel || !canSubmit) {
+    if (!session?.activeQuestion || !participantId || !session.participantLabel || isChoiceQuestion || !canSubmit) {
       return;
     }
 
@@ -186,6 +188,60 @@ export default function ParticipantPage({ code }: ParticipantPageProps) {
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Antwoord kon niet worden verzonden.");
     } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function submitChoice(optionId: string) {
+    if (!session?.activeQuestion || !participantId || !session.participantLabel || !isChoiceQuestion || votingLocked) {
+      return;
+    }
+
+    setSelectedOptionId(optionId);
+    setError("");
+
+    if (choiceSubmittingRef.current) {
+      pendingChoiceOptionIdRef.current = optionId;
+      return;
+    }
+
+    choiceSubmittingRef.current = true;
+    setSubmitting(true);
+
+    try {
+      let nextOptionId: string | null = optionId;
+
+      while (nextOptionId) {
+        const currentOptionId: string = nextOptionId;
+        pendingChoiceOptionIdRef.current = null;
+
+        const response = await fetch(`/api/session/${normalizedCode}/answers`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            participantId,
+            participantName: session.participantLabel,
+            optionId: currentOptionId,
+            textAnswer: "",
+          }),
+        });
+        const data = (await response.json()) as PublicSessionPayload | { error: string };
+        if (!response.ok || "error" in data) {
+          throw new Error("error" in data ? data.error : "Antwoord kon niet worden verzonden.");
+        }
+
+        setSession(data);
+        setSubmittedQuestionId(data.activeQuestion?.id ?? session.activeQuestion.id);
+        nextOptionId =
+          pendingChoiceOptionIdRef.current && pendingChoiceOptionIdRef.current !== currentOptionId
+            ? pendingChoiceOptionIdRef.current
+            : null;
+      }
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Antwoord kon niet worden verzonden.");
+    } finally {
+      pendingChoiceOptionIdRef.current = null;
+      choiceSubmittingRef.current = false;
       setSubmitting(false);
     }
   }
@@ -260,6 +316,7 @@ export default function ParticipantPage({ code }: ParticipantPageProps) {
   const submitted = Boolean(activeQuestion && submittedQuestionId === activeQuestion.id);
   const isChoiceQuestion = activeQuestion?.type === "multiple" || activeQuestion?.type === "quiz";
   const isSlide = activeQuestion?.type === "slide";
+  const showSessionHeader = !activeQuestion && !showQuizFeedback;
   const canSubmit =
     !isSlide && !votingLocked && (isChoiceQuestion ? Boolean(selectedOptionId) : Boolean(textAnswer.trim()));
   const submitButtonLabel = quizResultsLocked || quizTiming?.isExpired
@@ -390,33 +447,35 @@ export default function ParticipantPage({ code }: ParticipantPageProps) {
   }
 
   return (
-    <main className="min-h-screen bg-zinc-950 px-4 py-5 text-white">
-      <div className="mx-auto flex w-full max-w-2xl flex-col gap-5">
-        <header className="rounded-lg border border-zinc-700 bg-zinc-900 p-4 shadow-sm">
-          <p className="text-sm font-semibold uppercase text-emerald-300">Sessie Interactief</p>
-          <h1 className="mt-1 text-2xl font-black">{session.presentation.title}</h1>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <span className="rounded-md bg-zinc-950 px-2 py-1 font-mono text-sm font-bold text-zinc-300">
-              {session.presentation.code}
-            </span>
-            {participantDisplayId ? (
-              <span className="rounded-md bg-emerald-300 px-2 py-1 text-sm font-black text-emerald-950">
-                {participantDisplayId}
+    <main className="min-h-screen bg-zinc-950 px-3 py-3 text-white">
+      <div className="mx-auto flex w-full max-w-xl flex-col gap-3">
+        {showSessionHeader ? (
+          <header className="rounded-lg border border-zinc-700 bg-zinc-900 p-4 shadow-sm">
+            <p className="text-sm font-semibold uppercase text-emerald-300">Sessie Interactief</p>
+            <h1 className="mt-1 text-2xl font-black">{session.presentation.title}</h1>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <span className="rounded-md bg-zinc-950 px-2 py-1 font-mono text-sm font-bold text-zinc-300">
+                {session.presentation.code}
               </span>
-            ) : null}
-            {showParticipantScore ? (
-              <span className="rounded-md bg-amber-300 px-2 py-1 text-sm font-black text-amber-950">
-                Score {participantScore?.score ?? 0}/{session.quizTotals.finalized}
-              </span>
-            ) : null}
-          </div>
-        </header>
+              {participantDisplayId ? (
+                <span className="rounded-md bg-emerald-300 px-2 py-1 text-sm font-black text-emerald-950">
+                  {participantDisplayId}
+                </span>
+              ) : null}
+              {showParticipantScore ? (
+                <span className="rounded-md bg-amber-300 px-2 py-1 text-sm font-black text-amber-950">
+                  Score {participantScore?.score ?? 0}/{session.quizTotals.finalized}
+                </span>
+              ) : null}
+            </div>
+          </header>
+        ) : null}
 
-        {error ? <p className="rounded-lg border border-rose-700 bg-rose-950 px-4 py-3 text-sm font-semibold text-rose-100">{error}</p> : null}
+        {error ? <p className="rounded-lg border border-rose-700 bg-rose-950 px-3 py-2 text-sm font-semibold text-rose-100">{error}</p> : null}
 
         {showQuizFeedback ? (
           <section
-            className={`rounded-lg border p-5 shadow-sm ${
+            className={`rounded-lg border p-4 shadow-sm ${
               participantResult?.isCorrect
                 ? "border-emerald-500 bg-emerald-950 text-emerald-50"
                 : "border-amber-500 bg-amber-950 text-amber-50"
@@ -468,17 +527,17 @@ export default function ParticipantPage({ code }: ParticipantPageProps) {
         ) : null}
 
         {!activeQuestion ? (
-          <section className="rounded-lg border border-zinc-700 bg-zinc-900 p-6 text-center shadow-sm">
+          <section className="rounded-lg border border-zinc-700 bg-zinc-900 p-5 text-center shadow-sm">
             <h2 className="text-2xl font-black">Wachten op de volgende vraag</h2>
             <p className="mt-3 text-zinc-300">Je scherm werkt automatisch bij zodra de presentator een vraag opent.</p>
           </section>
         ) : isSlide ? (
-          <section className="rounded-lg border border-zinc-700 bg-zinc-900 p-5 shadow-sm">
+          <section className="rounded-lg border border-zinc-700 bg-zinc-900 p-4 shadow-sm">
             <div className="mb-5">
               <span className="rounded-md bg-sky-300 px-2 py-1 text-xs font-black uppercase text-sky-950">
                 {questionTypeLabel(activeQuestion.type)}
               </span>
-              <h2 className="mt-3 text-2xl font-black leading-9">{activeQuestion.prompt}</h2>
+              <h2 className="mt-2 text-xl font-black leading-7">{activeQuestion.prompt}</h2>
               {activeQuestion.description ? (
                 <p className="mt-4 whitespace-pre-line text-base font-semibold leading-7 text-zinc-200">
                   {activeQuestion.description}
@@ -490,17 +549,17 @@ export default function ParticipantPage({ code }: ParticipantPageProps) {
             </p>
           </section>
         ) : activeQuestion.type === "quiz" && quizResultsLocked ? null : activeQuestion.type === "quiz" && quizTiming?.isExpired ? (
-          <section className="rounded-lg border border-amber-500 bg-amber-950 p-5 text-amber-50 shadow-sm">
-            <div className="mb-5">
+          <section className="rounded-lg border border-amber-500 bg-amber-950 p-4 text-amber-50 shadow-sm">
+            <div className="mb-3">
               <div className="flex items-center gap-2">
                 <span className="rounded-md bg-emerald-300 px-2 py-1 text-xs font-black uppercase text-emerald-950">
                   {questionTypeLabel(activeQuestion.type)}
                 </span>
                 <SubmissionStatusDot visible={submitted} />
               </div>
-              <h2 className="mt-3 text-2xl font-black leading-9">{activeQuestion.prompt}</h2>
+              <h2 className="mt-2 text-xl font-black leading-7">{activeQuestion.prompt}</h2>
             </div>
-            <div className="grid min-h-56 place-items-center rounded-lg border border-amber-300/40 bg-amber-900/70 px-5 py-8 text-center">
+            <div className="grid min-h-52 place-items-center rounded-lg border border-amber-300/40 bg-amber-900/70 px-4 py-7 text-center">
               <div>
                 <XCircle aria-hidden className="mx-auto h-14 w-14" />
                 <h3 className="mt-4 text-4xl font-black leading-tight">Tijd voorbij</h3>
@@ -511,19 +570,19 @@ export default function ParticipantPage({ code }: ParticipantPageProps) {
             </div>
           </section>
         ) : (
-          <form className="rounded-lg border border-zinc-700 bg-zinc-900 p-5 shadow-sm" onSubmit={submit}>
-            <div className="mb-5">
+          <form className="rounded-lg border border-zinc-700 bg-zinc-900 p-4 shadow-sm" onSubmit={submit}>
+            <div className="mb-3">
               <div className="flex items-center gap-2">
                 <span className="rounded-md bg-emerald-300 px-2 py-1 text-xs font-black uppercase text-emerald-950">
                   {questionTypeLabel(activeQuestion.type)}
                 </span>
                 <SubmissionStatusDot visible={submitted} />
               </div>
-              <h2 className="mt-3 text-2xl font-black leading-9">{activeQuestion.prompt}</h2>
+              <h2 className="mt-2 text-xl font-black leading-7">{activeQuestion.prompt}</h2>
             </div>
 
             {activeQuestion.type === "quiz" && quizTiming && (quizTiming.isCountdown || quizTiming.timeLimitSeconds) ? (
-              <div className="mb-5 rounded-lg border border-zinc-700 bg-zinc-950 p-3">
+              <div className="mb-3 rounded-lg border border-zinc-700 bg-zinc-950 p-2.5">
                 <div className="mb-2 flex items-center justify-between gap-3">
                   <span className="text-xs font-black uppercase text-zinc-300">
                     {quizTiming.isCountdown
@@ -534,7 +593,7 @@ export default function ParticipantPage({ code }: ParticipantPageProps) {
                   </span>
                   <span className="text-xs font-bold text-zinc-500">Quiztimer</span>
                 </div>
-                <div className="h-3 overflow-hidden rounded-full bg-zinc-800">
+                <div className="h-2.5 overflow-hidden rounded-full bg-zinc-800">
                   <div
                     className={`h-full rounded-full transition-[width] duration-200 ${
                       quizTiming.isExpired ? "bg-amber-300" : "bg-emerald-300"
@@ -550,10 +609,10 @@ export default function ParticipantPage({ code }: ParticipantPageProps) {
             ) : null}
 
             {isChoiceQuestion ? (
-              <div className="grid gap-3">
+              <div className="grid gap-2">
                 {activeQuestion.options.map((option, index) => (
                   <button
-                    className={`rounded-lg border px-4 py-4 text-left text-base font-bold transition disabled:cursor-not-allowed ${
+                    className={`rounded-lg border px-3 py-3 text-left text-base font-bold transition disabled:cursor-not-allowed ${
                       selectedOptionId === option.id
                         ? "border-emerald-300 bg-emerald-300 text-emerald-950"
                         : votingLocked
@@ -562,7 +621,7 @@ export default function ParticipantPage({ code }: ParticipantPageProps) {
                     }`}
                     disabled={votingLocked}
                     key={option.id}
-                    onClick={() => setSelectedOptionId(option.id)}
+                    onClick={() => void submitChoice(option.id)}
                     type="button"
                   >
                     <span className="flex items-start gap-3">
@@ -580,7 +639,7 @@ export default function ParticipantPage({ code }: ParticipantPageProps) {
               </div>
             ) : (
               <textarea
-                className="mt-5 min-h-36 w-full resize-y rounded-lg border border-zinc-600 bg-zinc-950 px-4 py-3 text-base text-white outline-none placeholder:text-zinc-500 focus:border-emerald-300 focus:ring-2 focus:ring-emerald-300/30"
+                className="mt-3 min-h-32 w-full resize-y rounded-lg border border-zinc-600 bg-zinc-950 px-4 py-3 text-base text-white outline-none placeholder:text-zinc-500 focus:border-emerald-300 focus:ring-2 focus:ring-emerald-300/30"
                 maxLength={280}
                 onChange={(event) => setTextAnswer(event.target.value)}
                 placeholder="Typ je antwoord"
@@ -588,20 +647,16 @@ export default function ParticipantPage({ code }: ParticipantPageProps) {
               />
             )}
 
-            <button
-              className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-300 px-4 py-4 font-bold text-emerald-950 hover:bg-emerald-200 disabled:opacity-60"
-              disabled={!canSubmit || submitting}
-              type="submit"
-            >
-              {quizResultsLocked ? (
-                <XCircle aria-hidden className="h-5 w-5" />
-              ) : submitted ? (
-                <CheckCircle2 aria-hidden className="h-5 w-5" />
-              ) : (
-                <Send aria-hidden className="h-5 w-5" />
-              )}
-              {submitButtonLabel}
-            </button>
+            {!isChoiceQuestion ? (
+              <button
+                className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-300 px-4 py-4 font-bold text-emerald-950 hover:bg-emerald-200 disabled:opacity-60"
+                disabled={!canSubmit || submitting}
+                type="submit"
+              >
+                {submitted ? <CheckCircle2 aria-hidden className="h-5 w-5" /> : <Send aria-hidden className="h-5 w-5" />}
+                {submitButtonLabel}
+              </button>
+            ) : null}
 
             {quizTiming?.isCountdown ? (
               <p className="mt-3 rounded-lg border border-sky-700 bg-sky-950 px-4 py-3 text-sm font-semibold leading-6 text-sky-100">

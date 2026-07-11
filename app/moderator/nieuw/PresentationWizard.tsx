@@ -1400,7 +1400,7 @@ export default function PresentationWizard() {
                           />
                           {draft.type === "quiz" ? (
                             <span className="mt-1 block text-xs font-semibold leading-5 text-zinc-500">
-                              Bij live zetten start eerst 3-2-1. Na deze tijd sluit de telefoon automatisch voor stemmen.
+                              Bij live zetten start eerst 5 seconden aftellen. Na deze tijd sluit de telefoon automatisch voor stemmen.
                             </span>
                           ) : null}
                         </label>

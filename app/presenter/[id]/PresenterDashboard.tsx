@@ -61,12 +61,14 @@ type QuestionForm = {
   prompt: string;
   options: string;
   quizOptions: OptionDraft[];
+  timeLimitSeconds: string;
 };
 
 type QuestionEditForm = {
   prompt: string;
   options: string;
   quizOptions: OptionDraft[];
+  timeLimitSeconds: string;
 };
 
 type PresenterTab = "regie" | "vragen" | "resultaten" | "instellingen";
@@ -89,6 +91,7 @@ function createDefaultQuestionForm(): QuestionForm {
     prompt: "",
     options: "Ja\nNee\nMisschien",
     quizOptions: defaultQuizOptions(),
+    timeLimitSeconds: "",
   };
 }
 
@@ -230,6 +233,7 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
     prompt: "",
     options: "",
     quizOptions: defaultQuizOptions(),
+    timeLimitSeconds: "",
   }));
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -514,6 +518,9 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
           type: form.type,
           prompt: form.prompt,
           options,
+          content: {
+            timeLimitSeconds: form.type === "quiz" && form.timeLimitSeconds ? Number(form.timeLimitSeconds) : null,
+          },
         }),
       });
       const data = (await response.json()) as PresenterPayload | { error: string };
@@ -540,6 +547,10 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
               isCorrect: option.isCorrect,
             }))
           : defaultQuizOptions(),
+      timeLimitSeconds:
+        typeof question.content.timeLimitSeconds === "number" && question.content.timeLimitSeconds > 0
+          ? String(question.content.timeLimitSeconds)
+          : "",
     });
   }
 
@@ -561,6 +572,11 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
           questionId: question.id,
           prompt: editForm.prompt,
           options,
+          content: {
+            ...question.content,
+            timeLimitSeconds:
+              question.type === "quiz" && editForm.timeLimitSeconds ? Number(editForm.timeLimitSeconds) : null,
+          },
         }),
       });
       const data = (await response.json()) as PresenterPayload | { error: string };
@@ -571,7 +587,7 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
     }, "Vraag bijgewerkt");
 
     setEditingQuestionId("");
-    setEditForm({ prompt: "", options: "", quizOptions: defaultQuizOptions() });
+    setEditForm({ prompt: "", options: "", quizOptions: defaultQuizOptions(), timeLimitSeconds: "" });
   }
 
   async function moveQuestion(questionId: string, direction: "up" | "down") {
@@ -1628,10 +1644,27 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
               ) : null}
 
               {form.type === "quiz" ? (
-                <QuizOptionsEditor
-                  onChange={(quizOptions) => setForm((current) => ({ ...current, quizOptions }))}
-                  options={form.quizOptions}
-                />
+                <>
+                  <QuizOptionsEditor
+                    onChange={(quizOptions) => setForm((current) => ({ ...current, quizOptions }))}
+                    options={form.quizOptions}
+                  />
+                  <label className="mt-4 block text-sm font-semibold text-zinc-700" htmlFor="question-time-limit">
+                    Tijdslimiet quizvraag
+                  </label>
+                  <input
+                    className="mt-2 w-full rounded-lg border border-zinc-300 px-3 py-3 outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
+                    id="question-time-limit"
+                    min={0}
+                    onChange={(event) => setForm((current) => ({ ...current, timeLimitSeconds: event.target.value }))}
+                    placeholder="Leeg of 0 is geen timer"
+                    type="number"
+                    value={form.timeLimitSeconds}
+                  />
+                  <p className="mt-2 text-xs font-semibold text-zinc-500">
+                    Bij live zetten start eerst een korte aftelling. Daarna sluit de telefoon automatisch na deze tijd.
+                  </p>
+                </>
               ) : null}
 
               <button
@@ -1823,10 +1856,24 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
                         ) : null}
 
                         {question.type === "quiz" ? (
-                          <QuizOptionsEditor
-                            onChange={(quizOptions) => setEditForm((current) => ({ ...current, quizOptions }))}
-                            options={editForm.quizOptions}
-                          />
+                          <>
+                            <QuizOptionsEditor
+                              onChange={(quizOptions) => setEditForm((current) => ({ ...current, quizOptions }))}
+                              options={editForm.quizOptions}
+                            />
+                            <label className="mt-4 block text-sm font-semibold text-zinc-700" htmlFor={`edit-time-limit-${question.id}`}>
+                              Tijdslimiet quizvraag
+                            </label>
+                            <input
+                              className="mt-2 w-full rounded-lg border border-zinc-300 px-3 py-3 outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
+                              id={`edit-time-limit-${question.id}`}
+                              min={0}
+                              onChange={(event) => setEditForm((current) => ({ ...current, timeLimitSeconds: event.target.value }))}
+                              placeholder="Leeg of 0 is geen timer"
+                              type="number"
+                              value={editForm.timeLimitSeconds}
+                            />
+                          </>
                         ) : null}
 
                         <div className="mt-4 flex flex-wrap gap-2">
@@ -1843,7 +1890,7 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
                             className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-bold hover:bg-zinc-100"
                             onClick={() => {
                               setEditingQuestionId("");
-                              setEditForm({ prompt: "", options: "", quizOptions: defaultQuizOptions() });
+                              setEditForm({ prompt: "", options: "", quizOptions: defaultQuizOptions(), timeLimitSeconds: "" });
                             }}
                             type="button"
                           >
@@ -1935,10 +1982,27 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
             ) : null}
 
             {editingQuestion.type === "quiz" ? (
-              <QuizOptionsEditor
-                onChange={(quizOptions) => setEditForm((current) => ({ ...current, quizOptions }))}
-                options={editForm.quizOptions}
-              />
+              <>
+                <QuizOptionsEditor
+                  onChange={(quizOptions) => setEditForm((current) => ({ ...current, quizOptions }))}
+                  options={editForm.quizOptions}
+                />
+                <label className="mt-4 block text-sm font-semibold text-zinc-700" htmlFor={`edit-time-limit-${editingQuestion.id}`}>
+                  Tijdslimiet quizvraag
+                </label>
+                <input
+                  className="mt-2 w-full rounded-lg border border-zinc-300 px-3 py-3 outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
+                  id={`edit-time-limit-${editingQuestion.id}`}
+                  min={0}
+                  onChange={(event) => setEditForm((current) => ({ ...current, timeLimitSeconds: event.target.value }))}
+                  placeholder="Leeg of 0 is geen timer"
+                  type="number"
+                  value={editForm.timeLimitSeconds}
+                />
+                <p className="mt-2 text-xs font-semibold text-zinc-500">
+                  Na de aftelling sluit de telefoon automatisch wanneer de tijd voorbij is.
+                </p>
+              </>
             ) : null}
 
             <div className="mt-5 flex flex-wrap gap-2">
@@ -1955,7 +2019,7 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
                 className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 bg-white px-4 py-3 text-sm font-bold hover:bg-zinc-100"
                 onClick={() => {
                   setEditingQuestionId("");
-                  setEditForm({ prompt: "", options: "", quizOptions: defaultQuizOptions() });
+                  setEditForm({ prompt: "", options: "", quizOptions: defaultQuizOptions(), timeLimitSeconds: "" });
                 }}
                 type="button"
               >

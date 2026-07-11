@@ -3,6 +3,7 @@
 import { CheckCircle2, Loader2, Send, ShieldCheck, UserRound, XCircle } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PublicSessionPayload, QuestionType } from "@/app/types";
+import { getQuestionTimingState } from "@/lib/questionTiming";
 
 type ParticipantPageProps = {
   code: string;
@@ -85,6 +86,7 @@ export default function ParticipantPage({ code }: ParticipantPageProps) {
   const [registering, setRegistering] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [nowMs, setNowMs] = useState(() => Date.now());
 
   const load = useCallback(
     async (silent = false) => {
@@ -135,9 +137,14 @@ export default function ParticipantPage({ code }: ParticipantPageProps) {
     return () => window.clearInterval(timer);
   }, [load]);
 
+  useEffect(() => {
+    const timer = window.setInterval(() => setNowMs(Date.now()), 200);
+    return () => window.clearInterval(timer);
+  }, []);
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!session?.activeQuestion || !participantId || !session.participantLabel) {
+    if (!session?.activeQuestion || !participantId || !session.participantLabel || !canSubmit) {
       return;
     }
 
@@ -232,13 +239,18 @@ export default function ParticipantPage({ code }: ParticipantPageProps) {
   const quizResultsLocked = Boolean(
     activeQuestion?.type === "quiz" && resultsQuestion?.id === activeQuestion.id
   );
+  const quizTiming = activeQuestion?.type === "quiz" ? getQuestionTimingState(activeQuestion.content, "quiz", nowMs) : null;
+  const quizTimerLocked = Boolean(quizTiming?.isCountdown || quizTiming?.isExpired);
+  const votingLocked = quizResultsLocked || quizTimerLocked;
   const submitted = Boolean(activeQuestion && submittedQuestionId === activeQuestion.id);
   const isChoiceQuestion = activeQuestion?.type === "multiple" || activeQuestion?.type === "quiz";
   const isSlide = activeQuestion?.type === "slide";
   const canSubmit =
-    !isSlide && !quizResultsLocked && (isChoiceQuestion ? Boolean(selectedOptionId) : Boolean(textAnswer.trim()));
-  const submitButtonLabel = quizResultsLocked
+    !isSlide && !votingLocked && (isChoiceQuestion ? Boolean(selectedOptionId) : Boolean(textAnswer.trim()));
+  const submitButtonLabel = quizResultsLocked || quizTiming?.isExpired
     ? "Antwoord gesloten"
+    : quizTiming?.isCountdown
+      ? "Vraag start zo"
     : submitting
       ? "Verzenden..."
       : submitted
@@ -471,6 +483,33 @@ export default function ParticipantPage({ code }: ParticipantPageProps) {
               <h2 className="mt-3 text-2xl font-black leading-9">{activeQuestion.prompt}</h2>
             </div>
 
+            {activeQuestion.type === "quiz" && quizTiming && (quizTiming.isCountdown || quizTiming.timeLimitSeconds) ? (
+              <div className="mb-5 rounded-lg border border-zinc-700 bg-zinc-950 p-3">
+                <div className="mb-2 flex items-center justify-between gap-3">
+                  <span className="text-xs font-black uppercase text-zinc-300">
+                    {quizTiming.isCountdown
+                      ? "Maak je klaar"
+                      : quizTiming.isExpired
+                        ? "Tijd voorbij"
+                        : "Tijd loopt"}
+                  </span>
+                  <span className="text-xs font-bold text-zinc-500">Quiztimer</span>
+                </div>
+                <div className="h-3 overflow-hidden rounded-full bg-zinc-800">
+                  <div
+                    className={`h-full rounded-full transition-[width] duration-200 ${
+                      quizTiming.isExpired ? "bg-amber-300" : "bg-emerald-300"
+                    }`}
+                    style={{
+                      width: `${Math.round(
+                        (quizTiming.isCountdown ? quizTiming.countdownProgress : quizTiming.answerProgress) * 100
+                      )}%`,
+                    }}
+                  />
+                </div>
+              </div>
+            ) : null}
+
             {isChoiceQuestion ? (
               <div className="grid gap-3">
                 {activeQuestion.options.map((option, index) => (
@@ -478,11 +517,11 @@ export default function ParticipantPage({ code }: ParticipantPageProps) {
                     className={`rounded-lg border px-4 py-4 text-left text-base font-bold transition disabled:cursor-not-allowed ${
                       selectedOptionId === option.id
                         ? "border-emerald-300 bg-emerald-300 text-emerald-950"
-                        : quizResultsLocked
+                        : votingLocked
                           ? "border-zinc-700 bg-zinc-950 text-zinc-400"
                           : "border-zinc-700 bg-zinc-950 text-white hover:border-zinc-500 hover:bg-zinc-800"
                     }`}
-                    disabled={quizResultsLocked}
+                    disabled={votingLocked}
                     key={option.id}
                     onClick={() => setSelectedOptionId(option.id)}
                     type="button"
@@ -525,7 +564,15 @@ export default function ParticipantPage({ code }: ParticipantPageProps) {
               {submitButtonLabel}
             </button>
 
-            {quizResultsLocked ? (
+            {quizTiming?.isCountdown ? (
+              <p className="mt-3 rounded-lg border border-sky-700 bg-sky-950 px-4 py-3 text-sm font-semibold leading-6 text-sky-100">
+                De quizvraag start zo. Houd je klaar om je antwoord te kiezen.
+              </p>
+            ) : quizTiming?.isExpired ? (
+              <p className="mt-3 rounded-lg border border-amber-700 bg-amber-950 px-4 py-3 text-sm font-semibold leading-6 text-amber-100">
+                De tijd is voorbij. Deze quizvraag is gesloten voor deelnemers.
+              </p>
+            ) : quizResultsLocked ? (
               <p className="mt-3 rounded-lg border border-amber-700 bg-amber-950 px-4 py-3 text-sm font-semibold leading-6 text-amber-100">
                 De quizresultaten staan live. Je antwoord kan nu niet meer worden aangepast.
               </p>

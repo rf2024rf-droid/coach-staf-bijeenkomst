@@ -9,6 +9,7 @@ import {
   getGeneralScreenPalette,
   resolveGeneralScreenFontSize,
 } from "@/lib/generalScreenAppearance";
+import { getQuestionTimingState } from "@/lib/questionTiming";
 
 type ScreenPageProps = {
   code: string;
@@ -359,6 +360,7 @@ export default function ScreenPage({ code }: ScreenPageProps) {
   const [origin] = useState(() => (typeof window === "undefined" ? "" : window.location.origin));
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [nowMs, setNowMs] = useState(() => Date.now());
 
   const joinLink = origin ? `${origin}/join/${normalizedCode}` : "";
 
@@ -399,6 +401,11 @@ export default function ScreenPage({ code }: ScreenPageProps) {
     return () => window.clearInterval(timer);
   }, [load]);
 
+  useEffect(() => {
+    const timer = window.setInterval(() => setNowMs(Date.now()), 200);
+    return () => window.clearInterval(timer);
+  }, []);
+
   if (loading && !session) {
     return (
       <main className="grid min-h-screen place-items-center bg-zinc-950 text-white">
@@ -424,6 +431,8 @@ export default function ScreenPage({ code }: ScreenPageProps) {
   const activeQuestion = session.activeQuestion;
   const resultsQuestion = session.screenQuestion ?? activeQuestion;
   const idleScreenText = session.presentation.idleScreenText || "Sessie Interactief";
+  const activeQuestionTiming =
+    activeQuestion?.type === "quiz" ? getQuestionTimingState(activeQuestion.content, "quiz", nowMs) : null;
   const compactOpenResults =
     resultsQuestion?.type === "open" &&
     resultsQuestion.responses.filter((response) => response.textAnswer).length > 16;
@@ -603,6 +612,21 @@ export default function ScreenPage({ code }: ScreenPageProps) {
             >
               {idleScreenText}
             </h2>
+          </section>
+        ) : activeQuestionTiming?.isCountdown ? (
+          <section className="grid flex-1 place-items-center text-center">
+            <div className="mx-auto w-full max-w-4xl rounded-lg border border-zinc-700 bg-zinc-900 p-10 md:p-14">
+              <p className="text-xl font-black uppercase tracking-wide text-emerald-300">Quiz start zo</p>
+              <h2 className="mt-8 text-[168px] font-black leading-none text-white md:text-[240px]">
+                {activeQuestionTiming.countdownNumber}
+              </h2>
+              <div className="mx-auto mt-8 h-4 max-w-2xl overflow-hidden rounded-full bg-zinc-800">
+                <div
+                  className="h-full rounded-full bg-emerald-300 transition-[width] duration-200"
+                  style={{ width: `${Math.round(activeQuestionTiming.countdownProgress * 100)}%` }}
+                />
+              </div>
+            </div>
           </section>
         ) : (
           <section

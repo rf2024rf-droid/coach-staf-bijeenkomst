@@ -7,6 +7,7 @@ import {
   normalizeHexColor,
   resolveGeneralScreenFontFamily,
 } from "@/lib/generalScreenAppearance";
+import { buildLiveQuestionContent, getQuestionTimingState } from "@/lib/questionTiming";
 
 export type QuestionType = "open" | "multiple" | "quiz" | "slide";
 export type QuestionStatus = "open" | "closed";
@@ -1372,11 +1373,14 @@ async function insertQuestion(
   const position = await getNextPosition(presentationId);
   const status: QuestionStatus = openImmediately ? "open" : "closed";
   const timestamp = nowIso();
+  const insertContentJson = openImmediately
+    ? JSON.stringify(buildLiveQuestionContent(parseQuestionContent(contentJson), type, timestamp))
+    : contentJson;
 
   await sql.begin(async (tx) => {
     await tx`
       INSERT INTO questions (id, presentation_id, type, prompt, content_json, status, position, created_at, updated_at)
-      VALUES (${id}, ${presentationId}, ${type}, ${prompt}, ${contentJson}, ${status}, ${position}, ${timestamp}, ${timestamp})
+      VALUES (${id}, ${presentationId}, ${type}, ${prompt}, ${insertContentJson}, ${status}, ${position}, ${timestamp}, ${timestamp})
     `;
 
     if (isChoiceQuestion(type)) {
@@ -1789,7 +1793,10 @@ export async function updateQuestion(
 
   const optionInputs = normalizeOptionInputs(payload.options, question.type);
   validateChoiceOptions(question.type, optionInputs);
-  const contentJson = normalizeQuestionContent(payload, question.type);
+  const contentJson = normalizeQuestionContent(
+    payload.content === undefined ? { ...payload, content: parseQuestionContent(question.content_json) } : payload,
+    question.type
+  );
 
   const sql = getSql();
   const timestamp = nowIso();
@@ -1926,6 +1933,9 @@ export async function setActiveQuestion(
   if (!question || question.presentation_id !== presentationId) {
     throw new AppError(404, "Vraag niet gevonden in deze presentatie.");
   }
+  const liveContentJson = JSON.stringify(
+    buildLiveQuestionContent(parseQuestionContent(question.content_json), question.type, timestamp)
+  );
 
   await sql.begin(async (tx) => {
     await tx`
@@ -1937,6 +1947,7 @@ export async function setActiveQuestion(
       UPDATE questions
       SET
         status = 'open',
+        content_json = ${liveContentJson},
         finalized_at = CASE WHEN type = 'quiz' THEN NULL ELSE finalized_at END,
         updated_at = ${timestamp}
       WHERE id = ${questionId}
@@ -2226,6 +2237,16 @@ export async function submitAnswer(
 
   if (question.type === "quiz" && question.finalized_at) {
     throw new AppError(409, "Deze quizvraag is al afgesloten voor de puntentelling.");
+  }
+
+  if (question.type === "quiz") {
+    const timing = getQuestionTimingState(parseQuestionContent(question.content_json), question.type);
+    if (timing.isCountdown) {
+      throw new AppError(409, "De quizvraag start zo. Wacht tot de aftelperiode klaar is.");
+    }
+    if (timing.isExpired) {
+      throw new AppError(409, "De tijd is voorbij. Deze quizvraag is gesloten voor deelnemers.");
+    }
   }
 
   if (

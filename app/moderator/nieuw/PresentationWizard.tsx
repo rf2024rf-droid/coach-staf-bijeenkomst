@@ -1387,14 +1387,22 @@ export default function PresentationWizard() {
                           Verplicht onderdeel
                         </label>
                         <label className="block">
-                          <span className="text-sm font-bold text-zinc-600">Tijdslimiet in seconden</span>
+                          <span className="text-sm font-bold text-zinc-600">
+                            {draft.type === "quiz" ? "Quiz op tijd in seconden" : "Tijdslimiet in seconden"}
+                          </span>
                           <input
                             className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
                             min={0}
                             onChange={(event) => updateDraft({ timeLimitSeconds: event.target.value })}
+                            placeholder="Leeg of 0 is geen timer"
                             type="number"
                             value={draft.timeLimitSeconds}
                           />
+                          {draft.type === "quiz" ? (
+                            <span className="mt-1 block text-xs font-semibold leading-5 text-zinc-500">
+                              Bij live zetten start eerst 3-2-1. Na deze tijd sluit de telefoon automatisch voor stemmen.
+                            </span>
+                          ) : null}
                         </label>
                         <label className="block">
                           <span className="text-sm font-bold text-zinc-600">Punten</span>

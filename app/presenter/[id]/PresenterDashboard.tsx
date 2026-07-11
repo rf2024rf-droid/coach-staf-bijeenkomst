@@ -22,6 +22,7 @@ import {
   Square,
   Trash2,
   Trophy,
+  Timer,
   X,
 } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
@@ -45,6 +46,7 @@ import {
   resolveGeneralScreenFontFamily,
   resolveGeneralScreenFontSize,
 } from "@/lib/generalScreenAppearance";
+import { getQuestionTimingState } from "@/lib/questionTiming";
 
 type PresenterDashboardProps = {
   id: string;
@@ -218,6 +220,18 @@ function screenViewLabel(screenView: ScreenView) {
   return "live vraag";
 }
 
+function formatTimerSeconds(totalSeconds: number) {
+  const safeSeconds = Math.max(0, totalSeconds);
+  const minutes = Math.floor(safeSeconds / 60);
+  const seconds = safeSeconds % 60;
+
+  if (minutes <= 0) {
+    return `${seconds}s`;
+  }
+
+  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+}
+
 export default function PresenterDashboard({ id }: PresenterDashboardProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -239,6 +253,7 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [nowMs, setNowMs] = useState(() => Date.now());
   const [generalBackgroundDraft, setGeneralBackgroundDraft] = useState(DEFAULT_GENERAL_SCREEN_BACKGROUND_COLOR);
   const [generalBackgroundDirty, setGeneralBackgroundDirty] = useState(false);
   const [generalBackgroundSaving, setGeneralBackgroundSaving] = useState(false);
@@ -329,6 +344,11 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
 
     return () => window.clearInterval(timer);
   }, [load]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNowMs(Date.now()), 200);
+    return () => window.clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     if (!loadedPresentationId || !generalBackgroundDirty) {
@@ -817,6 +837,46 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
       payload.presentation.screenView === "results" &&
       payload.presentation.screenQuestionId === activeQuestion.id
   );
+  const activeQuizTiming =
+    activeQuestion?.type === "quiz" ? getQuestionTimingState(activeQuestion.content, "quiz", nowMs) : null;
+  const showActiveQuizTimer = Boolean(
+    activeQuestion?.type === "quiz" && activeQuizTiming && (activeQuizTiming.isCountdown || activeQuizTiming.timeLimitSeconds)
+  );
+  const activeQuizRemainingSeconds =
+    activeQuizTiming?.isCountdown && activeQuizTiming.answerOpenAtMs
+      ? Math.max(0, Math.ceil((activeQuizTiming.answerOpenAtMs - nowMs) / 1000))
+      : activeQuizTiming?.answerEndsAtMs
+        ? Math.max(0, Math.ceil((activeQuizTiming.answerEndsAtMs - nowMs) / 1000))
+        : null;
+  const activeQuizTimerLabel = activeQuizTiming?.isCountdown
+    ? "Aftellen"
+    : activeQuizTiming?.isExpired
+      ? "Tijd voorbij"
+      : "Tijd loopt";
+  const activeQuizTimerDetail = activeQuizTiming?.isCountdown
+    ? `Stemmen opent over ${formatTimerSeconds(activeQuizRemainingSeconds ?? 0)}.`
+    : activeQuizTiming?.isExpired
+      ? "De vraag is gesloten voor deelnemers."
+      : activeQuizRemainingSeconds !== null
+        ? `Nog ${formatTimerSeconds(activeQuizRemainingSeconds)} om te stemmen.`
+        : "Geen tijdslimiet actief.";
+  const activeQuizTimerProgress = activeQuizTiming
+    ? activeQuizTiming.isCountdown
+      ? activeQuizTiming.countdownProgress
+      : activeQuizTiming.timeLimitSeconds
+        ? activeQuizTiming.answerProgress
+        : 0
+    : 0;
+  const activeQuizTimerToneClass = activeQuizTiming?.isExpired
+    ? "border-amber-300 bg-amber-50 text-amber-950"
+    : activeQuizTiming?.isCountdown
+      ? "border-sky-300 bg-sky-50 text-sky-950"
+      : "border-emerald-300 bg-emerald-50 text-emerald-950";
+  const activeQuizTimerBarClass = activeQuizTiming?.isExpired
+    ? "bg-amber-500"
+    : activeQuizTiming?.isCountdown
+      ? "bg-sky-600"
+      : "bg-emerald-700";
   const isGeneralScreenVisible = payload.presentation.screenView === "question" && !activeQuestion;
   const rankingLabel =
     payload.quizTotals.total > 0 && payload.quizTotals.finalized >= payload.quizTotals.total
@@ -937,7 +997,7 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
     normalizeGeneralScreenFontSize(generalFontSizeInputValue) === null;
 
   return (
-    <main className={`min-h-screen bg-[#f4f4ef] text-zinc-950 ${activeQuestion ? "pb-72 md:pb-36" : ""}`}>
+    <main className={`min-h-screen bg-[#f4f4ef] text-zinc-950 ${activeQuestion ? "pb-80 md:pb-44" : ""}`}>
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-4 py-5 md:px-8">
         <header className="rounded-lg border border-zinc-300 bg-white p-5 shadow-sm">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -1092,6 +1152,24 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
                         <p className="mt-1 text-sm font-black">Volgende of algemeen</p>
                       </div>
                     </div>
+                    {showActiveQuizTimer ? (
+                      <div className={`mt-4 rounded-lg border px-4 py-3 ${activeQuizTimerToneClass}`}>
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                          <p className="inline-flex items-center gap-2 text-xs font-black uppercase">
+                            <Timer aria-hidden className="h-4 w-4" />
+                            Quiztimer
+                          </p>
+                          <p className="text-sm font-black">{activeQuizTimerLabel}</p>
+                        </div>
+                        <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-white/70">
+                          <div
+                            className={`h-full rounded-full transition-[width] duration-200 ${activeQuizTimerBarClass}`}
+                            style={{ width: `${Math.round(activeQuizTimerProgress * 100)}%` }}
+                          />
+                        </div>
+                        <p className="mt-2 text-sm font-bold opacity-85">{activeQuizTimerDetail}</p>
+                      </div>
+                    ) : null}
                   </div>
                   <div className="rounded-lg border border-black/10 bg-white p-4 text-zinc-950 shadow-sm">
                     <p className="text-xs font-black uppercase text-zinc-500">Aanbevolen volgende actie</p>
@@ -2050,6 +2128,29 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
                   {activeQuestion.answerCount} antwoorden · groot scherm:{" "}
                   {screenViewLabel(payload.presentation.screenView)}
                 </p>
+                {showActiveQuizTimer ? (
+                  <div className={`mt-2 max-w-md rounded-md border px-3 py-2 ${activeQuizTimerToneClass}`}>
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="inline-flex items-center gap-2 text-xs font-black uppercase">
+                        <Timer aria-hidden className="h-4 w-4" />
+                        {activeQuizTimerLabel}
+                      </p>
+                      <p className="shrink-0 text-sm font-black">
+                        {activeQuizTiming?.isExpired
+                          ? "Voorbij"
+                          : activeQuizRemainingSeconds !== null
+                            ? formatTimerSeconds(activeQuizRemainingSeconds)
+                            : ""}
+                      </p>
+                    </div>
+                    <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/70">
+                      <div
+                        className={`h-full rounded-full transition-[width] duration-200 ${activeQuizTimerBarClass}`}
+                        style={{ width: `${Math.round(activeQuizTimerProgress * 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                ) : null}
               </div>
             </div>
 

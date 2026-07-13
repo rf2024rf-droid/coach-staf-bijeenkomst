@@ -32,14 +32,14 @@ Zet in Vercel minimaal deze environment variable:
 SUPABASE_DATABASE_URL=postgresql://...
 SUPABASE_URL=https://jouw-project.supabase.co
 SUPABASE_ANON_KEY=...
-POSTGRES_POOL_SIZE=1
+POSTGRES_POOL_SIZE=2
 POSTGRES_IDLE_TIMEOUT=5
-PUBLIC_SESSION_CACHE_MS=1000
+PUBLIC_SESSION_CACHE_MS=1500
 MODERATOR_PASSWORD=kies-een-eigen-wachtwoord
 ```
 
 Gebruik bij voorkeur de Supabase pooler connection string met `sslmode=require`.
-Laat `POSTGRES_POOL_SIZE` op `1` staan bij Vercel/Supabase. De app draait serverless en meerdere Vercel-instances kunnen anders samen te veel databaseverbindingen openen.
+Laat `POSTGRES_POOL_SIZE` op `2` staan bij Vercel/Supabase. Dat voorkomt dat live knoppen achter een enkele databaseverbinding blijven wachten, terwijl de pool nog klein genoeg blijft voor serverless gebruik.
 `MODERATOR_SESSION_SECRET` en `ACCOUNT_SESSION_SECRET` zijn optioneel, maar aanbevolen. Gebruik daarvoor lange willekeurige teksten.
 
 Voor definitief verwijderen van gebruikers uit Supabase Auth is deze extra geheime sleutel nodig:

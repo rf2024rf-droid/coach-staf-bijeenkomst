@@ -434,7 +434,7 @@ function getSql() {
   client ??= postgres(databaseUrl, {
     connect_timeout: positiveIntegerEnv("POSTGRES_CONNECT_TIMEOUT", 10, 1, 60),
     idle_timeout: positiveIntegerEnv("POSTGRES_IDLE_TIMEOUT", 5, 1, 60),
-    max: positiveIntegerEnv("POSTGRES_POOL_SIZE", 1, 1, 1),
+    max: positiveIntegerEnv("POSTGRES_POOL_SIZE", 2, 2, 4),
     prepare: false,
   });
 
@@ -442,7 +442,7 @@ function getSql() {
 }
 
 function publicSessionCacheMs() {
-  return positiveIntegerEnv("PUBLIC_SESSION_CACHE_MS", 1000, 0, 5000);
+  return positiveIntegerEnv("PUBLIC_SESSION_CACHE_MS", 1500, 0, 5000);
 }
 
 function invalidatePublicSessionCache(codeInput: string | null | undefined) {

@@ -725,21 +725,21 @@ export default function ScreenPage({ code }: ScreenPageProps) {
                     {activeQuestion.description}
                   </p>
                 ) : null}
-                {showActiveQuizTimerBar ? (
-                  <div
-                    aria-hidden="true"
-                    className="mx-auto mt-10 h-4 w-full max-w-4xl overflow-hidden rounded-full bg-zinc-800 shadow-inner ring-1 ring-white/10"
-                  >
-                    <div
-                      className={`h-full rounded-full transition-[width] duration-200 ${
-                        activeQuizTimerProgress >= 85 ? "bg-amber-300" : "bg-emerald-300"
-                      }`}
-                      style={{ width: `${activeQuizTimerProgress}%` }}
-                    />
-                  </div>
-                ) : null}
               </div>
             </div>
+            {showActiveQuizTimerBar ? (
+              <div
+                aria-hidden="true"
+                className="mx-auto h-4 w-full max-w-5xl overflow-hidden rounded-full bg-zinc-800 shadow-inner ring-1 ring-white/10"
+              >
+                <div
+                  className={`h-full rounded-full transition-[width] duration-200 ${
+                    activeQuizTimerProgress >= 85 ? "bg-amber-300" : "bg-emerald-300"
+                  }`}
+                  style={{ width: `${activeQuizTimerProgress}%` }}
+                />
+              </div>
+            ) : null}
             {activeQuestion.type === "slide" ? null : (
               <ResponsePulse count={activeQuestion.answerCount} questionType={activeQuestion.type} />
             )}

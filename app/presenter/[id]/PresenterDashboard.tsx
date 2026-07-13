@@ -891,7 +891,7 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
   ];
 
   function tabClassName(tab: PresenterTab) {
-    return `rounded-lg px-4 py-3 text-left text-sm font-black transition ${
+    return `rounded-lg px-2 py-2 text-center text-xs font-black transition sm:px-4 sm:py-3 sm:text-left sm:text-sm ${
       presenterTab === tab
         ? "bg-zinc-950 text-white shadow-sm"
         : "bg-white text-zinc-700 hover:bg-zinc-100"
@@ -997,21 +997,21 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
     normalizeGeneralScreenFontSize(generalFontSizeInputValue) === null;
 
   return (
-    <main className={`min-h-screen bg-[#f4f4ef] text-zinc-950 ${activeQuestion ? "pb-80 md:pb-44" : ""}`}>
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-4 py-5 md:px-8">
-        <header className="rounded-lg border border-zinc-300 bg-white p-5 shadow-sm">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div>
+    <main className={`min-h-screen bg-[#f4f4ef] text-zinc-950 ${activeQuestion ? "pb-56 md:pb-40" : ""}`}>
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 px-3 py-3 md:gap-5 md:px-8 md:py-5">
+        <header className="rounded-lg border border-zinc-300 bg-white p-4 shadow-sm md:p-5">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+          <div className="min-w-0">
             <p className="text-sm font-semibold uppercase text-emerald-800">Sessie Interactief</p>
-            <h1 className="mt-2 text-3xl font-black md:text-4xl">{payload.presentation.title}</h1>
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              <span className="rounded-lg bg-zinc-900 px-3 py-2 font-mono text-lg font-black text-white">
+            <h1 className="mt-1 break-words text-2xl font-black leading-tight md:mt-2 md:text-4xl">{payload.presentation.title}</h1>
+            <div className="mt-3 flex flex-wrap items-center gap-1.5 md:gap-2">
+              <span className="rounded-lg bg-zinc-900 px-3 py-2 font-mono text-base font-black text-white md:text-lg">
                 {payload.presentation.code}
               </span>
-              <span className={`rounded-lg border px-3 py-2 text-sm font-bold ${screenToneClass}`}>
+              <span className={`rounded-lg border px-3 py-2 text-xs font-bold md:text-sm ${screenToneClass}`}>
                 {screenState.label}
               </span>
-              <span className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-700">
+              <span className="hidden rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-700 sm:inline-flex">
                 Groot scherm: {screenViewLabel(payload.presentation.screenView)}
               </span>
               <span className="rounded-md border border-zinc-200 bg-white/70 px-2 py-1 text-xs font-semibold text-zinc-600">
@@ -1025,22 +1025,22 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
               </span>
             </div>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-end">
             <a
-              className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-bold hover:bg-zinc-50"
+              className="inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-bold hover:bg-zinc-50"
               href="/moderator"
             >
               <ArrowLeft aria-hidden className="h-4 w-4" />
               Gebruikersomgeving
             </a>
             <a
-              className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-bold hover:bg-zinc-50"
+              className="inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-bold hover:bg-zinc-50"
               href="/beheerder"
             >
               Beheerder
             </a>
             <button
-              className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-bold hover:bg-zinc-50"
+              className="inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-bold hover:bg-zinc-50"
               onClick={() => copy(joinLink, "Deelnemerslink")}
               type="button"
             >
@@ -1048,7 +1048,7 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
               Link
             </button>
             <button
-              className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-bold hover:bg-zinc-50"
+              className="inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-bold hover:bg-zinc-50"
               onClick={() => copy(payload.presentation.code, "Sessiecode")}
               type="button"
             >
@@ -1056,7 +1056,7 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
               Code
             </button>
             <a
-              className="inline-flex items-center gap-2 rounded-lg bg-zinc-900 px-3 py-2 text-sm font-bold text-white hover:bg-zinc-700"
+              className="col-span-2 inline-flex items-center justify-center gap-2 rounded-lg bg-zinc-900 px-3 py-2 text-sm font-bold text-white hover:bg-zinc-700 sm:col-span-1"
               href={screenLink}
               rel="noreferrer"
               target="_blank"
@@ -1078,12 +1078,12 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
           </div>
         ) : null}
 
-        <nav className="grid gap-2 rounded-lg border border-zinc-300 bg-zinc-100 p-2 sm:grid-cols-4">
+        <nav className="grid grid-cols-4 gap-1.5 rounded-lg border border-zinc-300 bg-zinc-100 p-1.5 sm:gap-2 sm:p-2">
           {tabs.map((tab) => (
             <button className={tabClassName(tab.id)} key={tab.id} onClick={() => setPresenterTab(tab.id)} type="button">
-              <span className="flex items-center gap-3">
+              <span className="flex flex-col items-center gap-1 sm:flex-row sm:gap-3">
                 <span
-                  className={`grid h-10 w-10 shrink-0 place-items-center rounded-lg ${
+                  className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg sm:h-10 sm:w-10 ${
                     presenterTab === tab.id ? "bg-white/10 text-white" : "bg-zinc-100 text-zinc-700"
                   }`}
                 >
@@ -1091,7 +1091,7 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
                 </span>
                 <span className="min-w-0">
                   <span className="block">{tab.label}</span>
-                  <span className={`mt-1 block text-xs ${presenterTab === tab.id ? "text-zinc-300" : "text-zinc-500"}`}>
+                  <span className={`mt-1 hidden text-xs sm:block ${presenterTab === tab.id ? "text-zinc-300" : "text-zinc-500"}`}>
                     {tab.meta}
                   </span>
                 </span>
@@ -1101,78 +1101,61 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
         </nav>
 
         {presenterTab === "regie" ? (
-          <section className="grid gap-6 xl:grid-cols-[1fr_360px]">
-            <div className="flex flex-col gap-6">
-              <article
-                className={`rounded-lg border p-5 shadow-sm ${screenToneClass}`}
-              >
-                <div className="grid gap-5 lg:grid-cols-[1fr_420px] lg:items-start">
-                  <div className="min-w-0">
+          <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px] xl:gap-5">
+            <div className="flex flex-col gap-4 md:gap-5">
+              <article className={`rounded-lg border p-4 shadow-sm md:p-5 ${screenToneClass}`}>
+                <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-stretch">
+                  <div className="min-w-0 rounded-lg border border-black/10 bg-white/70 p-4">
                     <p className="inline-flex items-center gap-2 text-xs font-black uppercase">
                       <span className="h-2.5 w-2.5 rounded-full bg-current" />
-                      Live op groot scherm
+                      Nu op beeld
                     </p>
-                    <h2 className="mt-3 text-2xl font-black leading-tight md:text-3xl">
-                      {screenState.label}
-                    </h2>
-                    <p className="mt-3 text-sm font-semibold opacity-80">
-                      {screenState.detail}
-                    </p>
-                    <div className="mt-5 grid gap-3 md:grid-cols-3">
-                      <div
-                        className={`rounded-lg border px-3 py-3 ${
-                          activeQuestion && payload.presentation.screenView === "question"
-                            ? "border-emerald-700 bg-white"
-                            : "border-black/10 bg-white/70"
-                        }`}
-                      >
-                        <p className="text-xs font-black uppercase opacity-60">Stap 1</p>
-                        <p className="mt-1 text-sm font-black">Vraag live</p>
+                    <h2 className="mt-2 text-xl font-black leading-tight md:text-2xl">{screenState.label}</h2>
+                    <p className="mt-2 line-clamp-3 text-sm font-semibold opacity-80">{screenState.detail}</p>
+
+                    <div className="mt-4 grid grid-cols-3 gap-2">
+                      <div className="rounded-lg bg-white px-3 py-2">
+                        <p className="text-[11px] font-black uppercase text-zinc-500">Vragen</p>
+                        <p className="text-lg font-black text-zinc-950">{payload.totals.questions}</p>
                       </div>
-                      <div
-                        className={`rounded-lg border px-3 py-3 ${
-                          payload.presentation.screenView === "results"
-                            ? "border-sky-700 bg-white"
-                            : activeQuestion
-                              ? "border-sky-400 bg-white"
-                              : "border-black/10 bg-white/70"
-                        }`}
-                      >
-                        <p className="text-xs font-black uppercase opacity-60">Stap 2</p>
-                        <p className="mt-1 text-sm font-black">Resultaten tonen</p>
+                      <div className="rounded-lg bg-white px-3 py-2">
+                        <p className="text-[11px] font-black uppercase text-zinc-500">Antwoorden</p>
+                        <p className="text-lg font-black text-zinc-950">{payload.totals.answers}</p>
                       </div>
-                      <div
-                        className={`rounded-lg border px-3 py-3 ${
-                          payload.presentation.screenView === "results"
-                            ? "border-amber-500 bg-white"
-                            : "border-black/10 bg-white/70"
-                        }`}
-                      >
-                        <p className="text-xs font-black uppercase opacity-60">Stap 3</p>
-                        <p className="mt-1 text-sm font-black">Volgende of algemeen</p>
+                      <div className="rounded-lg bg-white px-3 py-2">
+                        <p className="text-[11px] font-black uppercase text-zinc-500">Deelnemers</p>
+                        <p className="text-lg font-black text-zinc-950">{payload.totals.participants}</p>
                       </div>
                     </div>
+
                     {showActiveQuizTimer ? (
-                      <div className={`mt-4 rounded-lg border px-4 py-3 ${activeQuizTimerToneClass}`}>
-                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                      <div className={`mt-4 rounded-lg border px-3 py-3 ${activeQuizTimerToneClass}`}>
+                        <div className="flex items-center justify-between gap-3">
                           <p className="inline-flex items-center gap-2 text-xs font-black uppercase">
                             <Timer aria-hidden className="h-4 w-4" />
-                            Quiztimer
+                            {activeQuizTimerLabel}
                           </p>
-                          <p className="text-sm font-black">{activeQuizTimerLabel}</p>
+                          <p className="text-sm font-black">
+                            {activeQuizTiming?.isExpired
+                              ? "Voorbij"
+                              : activeQuizRemainingSeconds !== null
+                                ? formatTimerSeconds(activeQuizRemainingSeconds)
+                                : ""}
+                          </p>
                         </div>
-                        <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-white/70">
+                        <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/70">
                           <div
                             className={`h-full rounded-full transition-[width] duration-200 ${activeQuizTimerBarClass}`}
                             style={{ width: `${Math.round(activeQuizTimerProgress * 100)}%` }}
                           />
                         </div>
-                        <p className="mt-2 text-sm font-bold opacity-85">{activeQuizTimerDetail}</p>
+                        <p className="mt-2 text-xs font-bold opacity-85">{activeQuizTimerDetail}</p>
                       </div>
                     ) : null}
                   </div>
-                  <div className="rounded-lg border border-black/10 bg-white p-4 text-zinc-950 shadow-sm">
-                    <p className="text-xs font-black uppercase text-zinc-500">Aanbevolen volgende actie</p>
+
+                  <div className="rounded-lg border border-black/10 bg-white p-3 text-zinc-950 shadow-sm md:p-4">
+                    <p className="text-xs font-black uppercase text-zinc-500">Regieknoppen</p>
                     <button
                       className={`mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg px-4 py-4 text-base font-black text-white disabled:opacity-50 ${
                         payload.presentation.screenView === "results"
@@ -1200,14 +1183,15 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
                       )}
                       {payload.presentation.screenView === "results"
                         ? nextQuestion
-                          ? "Volgende vraag live"
-                          : "Algemeen scherm tonen"
+                          ? "Volgende vraag"
+                          : "Algemeen scherm"
                         : "Resultaten tonen"}
                     </button>
-                    <div className="mt-3 grid gap-2 sm:grid-cols-2">
+
+                    <div className="mt-3 grid grid-cols-2 gap-2">
                       <button
                         className="inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-white px-3 py-3 text-sm font-bold hover:bg-zinc-50 disabled:opacity-50"
-                        disabled={saving || payload.presentation.screenView !== "results" || !nextQuestion}
+                        disabled={saving || !nextQuestion}
                         onClick={() => nextQuestion && activate(nextQuestion.id)}
                         type="button"
                       >
@@ -1221,7 +1205,7 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
                         type="button"
                       >
                         <Monitor aria-hidden className="h-4 w-4" />
-                        Algemeen scherm
+                        Algemeen
                       </button>
                       <button
                         className="inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-white px-3 py-3 text-sm font-bold hover:bg-zinc-50 disabled:opacity-50"
@@ -1230,7 +1214,7 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
                         type="button"
                       >
                         <Play aria-hidden className="h-4 w-4" />
-                        Terug naar vraag
+                        Vraag
                       </button>
                       <button
                         className="inline-flex items-center justify-center gap-2 rounded-lg bg-amber-700 px-3 py-3 text-sm font-bold text-white hover:bg-amber-800 disabled:opacity-50"
@@ -1239,20 +1223,33 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
                         type="button"
                       >
                         <Square aria-hidden className="h-4 w-4" />
-                        Stop live
+                        Stop
+                      </button>
+                      <button
+                        className={`col-span-2 inline-flex items-center justify-center gap-2 rounded-lg px-3 py-3 text-sm font-bold disabled:opacity-60 ${
+                          payload.presentation.screenView === "ranking"
+                            ? "bg-zinc-950 text-white hover:bg-zinc-800"
+                            : "bg-amber-700 text-white hover:bg-amber-800"
+                        }`}
+                        disabled={saving || !payload.quizTotals.finalized}
+                        onClick={toggleRanking}
+                        type="button"
+                      >
+                        <Trophy aria-hidden className="h-4 w-4" />
+                        {payload.presentation.screenView === "ranking" ? "Sluit stand" : rankingLabel}
                       </button>
                     </div>
                   </div>
                 </div>
               </article>
 
-              <article className="rounded-lg border border-zinc-300 bg-white p-5 shadow-sm">
-                <div className="mb-5 flex flex-col gap-3 border-b border-zinc-200 pb-4 md:flex-row md:items-end md:justify-between">
+              <article className="rounded-lg border border-zinc-300 bg-white p-3 shadow-sm md:p-5">
+                <div className="mb-3 flex flex-col gap-3 border-b border-zinc-200 pb-3 md:mb-5 md:flex-row md:items-end md:justify-between md:pb-4">
                   <div>
                     <p className="text-xs font-black uppercase text-emerald-800">Presentatieflow</p>
                     <h2 className="mt-1 text-xl font-black">Vragen live bedienen</h2>
                   </div>
-                  <div className="flex flex-wrap gap-2 md:justify-end">
+                  <div className="grid grid-cols-2 gap-2 md:flex md:flex-wrap md:justify-end">
                     <span className="rounded-md bg-zinc-100 px-3 py-2 text-sm font-bold text-zinc-700">
                       {payload.questions.length} vragen
                     </span>
@@ -1267,7 +1264,7 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
                     </button>
                   </div>
                 </div>
-                <div className="grid gap-3">
+                <div className="grid gap-2 md:gap-3">
                   {payload.questions.map((question, index) => {
                     const isActive = question.id === payload.presentation.activeQuestionId;
                     const showingResults =
@@ -1275,17 +1272,17 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
 
                     return (
                       <article
-                        className={`rounded-lg border p-4 ${
+                        className={`rounded-lg border p-3 md:p-4 ${
                           isActive ? "border-emerald-500 bg-emerald-50 ring-2 ring-emerald-100" : "border-zinc-200 bg-zinc-50"
                         }`}
                         key={question.id}
                       >
-                        <div className="grid gap-4 lg:grid-cols-[auto_1fr_auto] lg:items-center">
-                          <div className="grid h-11 w-11 place-items-center rounded-lg bg-zinc-950 font-black text-white">
-                            {question.position}
-                          </div>
+                        <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
                           <div className="min-w-0">
                             <div className="flex flex-wrap items-center gap-2">
+                              <span className="rounded-md bg-zinc-950 px-2.5 py-1 font-mono text-xs font-black text-white">
+                                {question.position}
+                              </span>
                               <span className="rounded-md bg-white px-2 py-1 text-xs font-bold uppercase text-zinc-600">
                                 {questionTypeLabel(question.type)}
                               </span>
@@ -1299,9 +1296,9 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
                                 {question.answerCount} antwoorden
                               </span>
                             </div>
-                            <h3 className="mt-2 font-black leading-snug">{question.prompt}</h3>
+                            <h3 className="mt-2 text-sm font-black leading-snug md:text-base">{question.prompt}</h3>
                           </div>
-                          <div className="flex flex-wrap gap-2 lg:justify-end">
+                          <div className="grid grid-cols-4 gap-2 lg:flex lg:flex-wrap lg:justify-end">
                             <button
                               aria-label="Vraag omhoog"
                               className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-zinc-300 bg-white hover:bg-zinc-100 disabled:opacity-40"
@@ -1321,7 +1318,7 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
                               <ArrowDown aria-hidden className="h-4 w-4" />
                             </button>
                             <button
-                              className={`inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-black disabled:opacity-60 ${
+                              className={`col-span-2 inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-black disabled:opacity-60 lg:col-span-1 ${
                                 showingResults ? "bg-zinc-950 text-white" : "bg-sky-800 text-white hover:bg-sky-900"
                               }`}
                               disabled={saving}
@@ -1332,7 +1329,7 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
                               {showingResults ? "Sluit" : "Resultaten"}
                             </button>
                             <button
-                              className={`inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-black text-white disabled:opacity-60 ${
+                              className={`col-span-4 inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-black text-white disabled:opacity-60 lg:col-span-1 ${
                                 isActive ? "bg-amber-700 hover:bg-amber-800" : "bg-emerald-800 hover:bg-emerald-900"
                               }`}
                               disabled={saving}
@@ -1351,8 +1348,8 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
               </article>
             </div>
 
-            <aside className="flex flex-col gap-6">
-              <article className="rounded-lg border border-zinc-800 bg-zinc-950 p-5 text-white shadow-sm">
+            <aside className="flex flex-col gap-4 md:gap-5">
+              <article className="rounded-lg border border-zinc-800 bg-zinc-950 p-4 text-white shadow-sm md:p-5">
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <p className="text-xs font-black uppercase text-emerald-300">Live preview groot scherm</p>
@@ -1370,7 +1367,7 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
                     Open
                   </a>
                 </div>
-                <div className="mt-4 overflow-hidden rounded-lg border border-zinc-700 bg-black shadow-inner">
+                <div className="mt-4 hidden overflow-hidden rounded-lg border border-zinc-700 bg-black shadow-inner md:block">
                   <div className="relative aspect-video w-full overflow-hidden">
                     <iframe
                       className="pointer-events-none absolute left-0 top-0 h-[400%] w-[400%] origin-top-left border-0"
@@ -1383,17 +1380,24 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
                 </div>
               </article>
 
-              <article className="rounded-lg border border-zinc-300 bg-white p-5 shadow-sm">
-                <h2 className="text-lg font-black">Deelnemers</h2>
-                <div className="mt-4 grid gap-4 sm:grid-cols-[140px_1fr] xl:grid-cols-1">
-                  <QrCode label={joinLink || payload.presentation.code} value={joinLink || payload.presentation.code} />
+              <article className="rounded-lg border border-zinc-300 bg-white p-4 shadow-sm md:p-5">
+                <div className="flex items-center justify-between gap-3">
+                  <h2 className="text-lg font-black">Deelnemers</h2>
+                  <span className="rounded-md bg-zinc-100 px-2 py-1 font-mono text-sm font-black">
+                    {payload.presentation.code}
+                  </span>
+                </div>
+                <div className="mt-3 grid gap-4 sm:grid-cols-[140px_1fr] xl:grid-cols-1">
+                  <div className="hidden sm:block">
+                    <QrCode label={joinLink || payload.presentation.code} value={joinLink || payload.presentation.code} />
+                  </div>
                   <div>
-                    <p className="rounded-lg bg-zinc-100 px-3 py-2 font-mono text-2xl font-black">
+                    <p className="rounded-lg bg-zinc-100 px-3 py-2 font-mono text-xl font-black sm:text-2xl">
                       {payload.presentation.code}
                     </p>
                     <button className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-bold hover:bg-zinc-50" onClick={() => copy(joinLink, "Deelnemerslink")} type="button">
                       <Copy aria-hidden className="h-4 w-4" />
-                      Link kopieren
+                      Kopieer link
                     </button>
                     <button className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-800 px-3 py-3 text-sm font-black text-white hover:bg-emerald-900 disabled:opacity-60" disabled={saving} onClick={() => updateScreenView("qr")} type="button">
                       <QrCodeIcon aria-hidden className="h-4 w-4" />
@@ -2111,25 +2115,25 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
       {activeQuestion ? (
         <section
           aria-label="Live commandocentrum"
-          className="fixed inset-x-3 bottom-3 z-50 mx-auto max-w-6xl rounded-lg border border-zinc-700 bg-zinc-950 p-3 text-white shadow-2xl shadow-zinc-950/30 md:bottom-4 md:p-4"
+          className="fixed inset-x-2 bottom-2 z-50 mx-auto max-w-6xl rounded-lg border border-zinc-700 bg-zinc-950 p-2 text-white shadow-2xl shadow-zinc-950/30 md:bottom-4 md:p-3"
         >
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex min-w-0 items-center gap-3">
-              <div className="grid h-12 w-12 shrink-0 place-items-center rounded-lg bg-emerald-300 text-emerald-950">
-                <Play aria-hidden className="h-6 w-6 fill-current" />
+          <div className="grid gap-2 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+            <div className="flex min-w-0 items-center gap-2 md:gap-3">
+              <div className="hidden h-10 w-10 shrink-0 place-items-center rounded-lg bg-emerald-300 text-emerald-950 sm:grid">
+                <Play aria-hidden className="h-5 w-5 fill-current" />
               </div>
               <div className="min-w-0">
-                <p className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-wide text-emerald-300">
+                <p className="inline-flex items-center gap-2 text-[11px] font-black uppercase tracking-wide text-emerald-300">
                   <span className="h-2 w-2 rounded-full bg-emerald-300 shadow-lg shadow-emerald-300/40" />
                   Nu live
                 </p>
-                <h2 className="truncate text-base font-black leading-6 md:text-lg">{activeQuestion.prompt}</h2>
-                <p className="mt-0.5 text-xs font-semibold text-zinc-400 md:text-sm">
+                <h2 className="truncate text-sm font-black leading-5 md:text-base">{activeQuestion.prompt}</h2>
+                <p className="mt-0.5 hidden text-xs font-semibold text-zinc-400 sm:block">
                   {activeQuestion.answerCount} antwoorden · groot scherm:{" "}
                   {screenViewLabel(payload.presentation.screenView)}
                 </p>
                 {showActiveQuizTimer ? (
-                  <div className={`mt-2 max-w-md rounded-md border px-3 py-2 ${activeQuizTimerToneClass}`}>
+                  <div className={`mt-1 max-w-md rounded-md border px-2 py-1.5 ${activeQuizTimerToneClass}`}>
                     <div className="flex items-center justify-between gap-3">
                       <p className="inline-flex items-center gap-2 text-xs font-black uppercase">
                         <Timer aria-hidden className="h-4 w-4" />
@@ -2143,7 +2147,7 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
                             : ""}
                       </p>
                     </div>
-                    <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/70">
+                    <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/70">
                       <div
                         className={`h-full rounded-full transition-[width] duration-200 ${activeQuizTimerBarClass}`}
                         style={{ width: `${Math.round(activeQuizTimerProgress * 100)}%` }}
@@ -2154,9 +2158,9 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-6 lg:flex lg:shrink-0">
+            <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-6 lg:flex lg:shrink-0">
               <button
-                className="inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-3 text-sm font-bold text-white hover:bg-zinc-800 disabled:opacity-40"
+                className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-zinc-700 bg-zinc-900 px-2 py-2 text-xs font-bold text-white hover:bg-zinc-800 disabled:opacity-40 md:text-sm"
                 disabled={saving || !previousQuestion}
                 onClick={() => previousQuestion && activate(previousQuestion.id)}
                 type="button"
@@ -2165,7 +2169,7 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
                 Vorige
               </button>
               <button
-                className="inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-3 text-sm font-bold text-white hover:bg-zinc-800 disabled:opacity-40"
+                className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-zinc-700 bg-zinc-900 px-2 py-2 text-xs font-bold text-white hover:bg-zinc-800 disabled:opacity-40 md:text-sm"
                 disabled={saving || !nextQuestion}
                 onClick={() => nextQuestion && activate(nextQuestion.id)}
                 type="button"
@@ -2174,7 +2178,7 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
                 Volgende
               </button>
               <button
-                className={`inline-flex items-center justify-center gap-2 rounded-lg px-3 py-3 text-sm font-bold disabled:opacity-60 ${
+                className={`inline-flex items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-xs font-bold disabled:opacity-60 md:text-sm ${
                   activeResultsVisible
                     ? "bg-white text-zinc-950 hover:bg-zinc-100"
                     : "bg-sky-700 text-white hover:bg-sky-800"
@@ -2184,10 +2188,10 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
                 type="button"
               >
                 <BarChart3 aria-hidden className="h-4 w-4" />
-                {activeResultsVisible ? "Sluit resultaten" : "Resultaten"}
+                {activeResultsVisible ? "Sluit" : "Resultaat"}
               </button>
               <button
-                className="inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-3 text-sm font-bold text-white hover:bg-zinc-800 disabled:opacity-60"
+                className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-zinc-700 bg-zinc-900 px-2 py-2 text-xs font-bold text-white hover:bg-zinc-800 disabled:opacity-60 md:text-sm"
                 disabled={saving}
                 onClick={showGeneralScreen}
                 type="button"
@@ -2196,7 +2200,7 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
                 Algemeen
               </button>
               <button
-                className={`inline-flex items-center justify-center gap-2 rounded-lg px-3 py-3 text-sm font-bold disabled:opacity-60 ${
+                className={`inline-flex items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-xs font-bold disabled:opacity-60 md:text-sm ${
                   payload.presentation.screenView === "ranking"
                     ? "bg-white text-zinc-950 hover:bg-zinc-100"
                     : "bg-amber-700 text-white hover:bg-amber-800"
@@ -2209,7 +2213,7 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
                 Stand
               </button>
               <button
-                className="inline-flex items-center justify-center gap-2 rounded-lg bg-amber-600 px-3 py-3 text-sm font-black text-white hover:bg-amber-700 disabled:opacity-60"
+                className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-amber-600 px-2 py-2 text-xs font-black text-white hover:bg-amber-700 disabled:opacity-60 md:text-sm"
                 disabled={saving}
                 onClick={() => activate(null)}
                 type="button"

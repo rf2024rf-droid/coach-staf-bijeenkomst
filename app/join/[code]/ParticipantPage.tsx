@@ -368,9 +368,6 @@ export default function ParticipantPage({ code }: ParticipantPageProps) {
                 Meedoen
               </span>
               <h2 className="mt-3 text-2xl font-black leading-8">Hoe wil je zichtbaar zijn?</h2>
-              <p className="mt-2 text-sm font-semibold leading-6 text-zinc-300">
-                Je kunt je naam invullen of anoniem deelnemen. Anoniem wordt automatisch Deelnemer 1, 2, enzovoort.
-              </p>
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2">
@@ -421,11 +418,7 @@ export default function ParticipantPage({ code }: ParticipantPageProps) {
                   value={displayName}
                 />
               </label>
-            ) : (
-              <div className="mt-5 rounded-lg border border-zinc-700 bg-zinc-950 px-4 py-4 text-sm font-semibold leading-6 text-zinc-300">
-                Je blijft anoniem voor de groep. Het platform toont alleen jouw automatische deelnemerlabel.
-              </div>
-            )}
+            ) : null}
 
             <button
               className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-300 px-4 py-4 font-bold text-emerald-950 hover:bg-emerald-200 disabled:opacity-60"

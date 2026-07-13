@@ -262,6 +262,22 @@ export class AppError extends Error {
 
 type Database = ReturnType<typeof postgres>;
 
+type PublicSessionBase = {
+  presentation: PresentationRow;
+  questions: QuestionResult[];
+  responseRows: ResponseRow[];
+  activeQuestion: QuestionResult | null;
+  screenQuestion: QuestionResult | null;
+  leaderboard: LeaderboardEntry[];
+  quizTotals: QuizTotals;
+  participantLabels: Map<string, string>;
+};
+
+type PublicSessionCacheEntry = {
+  expiresAt: number;
+  promise: Promise<PublicSessionBase>;
+};
+
 type OptionInput = {
   label: string;
   isCorrect: boolean;
@@ -389,9 +405,20 @@ const schemaStatements = [
 
 let client: Database | null = null;
 let schemaReady: Promise<void> | null = null;
+const publicSessionCache = new Map<string, PublicSessionCacheEntry>();
 
 function getDatabaseUrl() {
   return process.env.SUPABASE_DATABASE_URL ?? process.env.DATABASE_URL ?? process.env.POSTGRES_URL ?? "";
+}
+
+function positiveIntegerEnv(name: string, fallback: number, min: number, max: number) {
+  const rawValue = process.env[name];
+  const parsed = rawValue ? Number.parseInt(rawValue, 10) : fallback;
+  if (!Number.isFinite(parsed)) {
+    return fallback;
+  }
+
+  return Math.min(max, Math.max(min, parsed));
 }
 
 function getSql() {
@@ -405,13 +432,25 @@ function getSql() {
   }
 
   client ??= postgres(databaseUrl, {
-    connect_timeout: 10,
-    idle_timeout: 20,
-    max: Number(process.env.POSTGRES_POOL_SIZE ?? 5),
+    connect_timeout: positiveIntegerEnv("POSTGRES_CONNECT_TIMEOUT", 10, 1, 60),
+    idle_timeout: positiveIntegerEnv("POSTGRES_IDLE_TIMEOUT", 5, 1, 60),
+    max: positiveIntegerEnv("POSTGRES_POOL_SIZE", 1, 1, 1),
     prepare: false,
   });
 
   return client;
+}
+
+function publicSessionCacheMs() {
+  return positiveIntegerEnv("PUBLIC_SESSION_CACHE_MS", 1000, 0, 5000);
+}
+
+function invalidatePublicSessionCache(codeInput: string | null | undefined) {
+  if (!codeInput) {
+    return;
+  }
+
+  publicSessionCache.delete(normalizeCode(codeInput));
 }
 
 export async function ensureSchema() {
@@ -1726,6 +1765,7 @@ export async function updatePresentationSettings(
     WHERE id = ${presentationId}
   `;
 
+  invalidatePublicSessionCache(presentation.code);
   return getPresenterPayload(presentationId, presenterKey);
 }
 
@@ -1771,6 +1811,7 @@ export async function addQuestion(
   const openImmediately =
     !presentation.active_question_id && (presentation.workflow_status ?? "published") === "published";
   await insertQuestion(presentation.id, type, prompt, options, openImmediately, contentJson);
+  invalidatePublicSessionCache(presentation.code);
   return getPresenterPayload(presentationId, presenterKey);
 }
 
@@ -1816,6 +1857,7 @@ export async function deleteQuestion(
   });
 
   await normalizeQuestionPositions(presentationId);
+  invalidatePublicSessionCache(presentation.code);
   return getPresenterPayload(presentationId, presenterKey);
 }
 
@@ -1825,7 +1867,7 @@ export async function updateQuestion(
   questionId: string,
   payload: Record<string, unknown>
 ) {
-  await assertPresenter(presentationId, presenterKey);
+  const presentation = await assertPresenter(presentationId, presenterKey);
   const question = await fetchQuestion(questionId);
 
   if (!question || question.presentation_id !== presentationId) {
@@ -1890,6 +1932,7 @@ export async function updateQuestion(
     }
   });
 
+  invalidatePublicSessionCache(presentation.code);
   return getPresenterPayload(presentationId, presenterKey);
 }
 
@@ -1899,7 +1942,7 @@ export async function moveQuestion(
   questionId: string,
   direction: "up" | "down"
 ) {
-  await assertPresenter(presentationId, presenterKey);
+  const presentation = await assertPresenter(presentationId, presenterKey);
   const question = await fetchQuestion(questionId);
 
   if (!question || question.presentation_id !== presentationId) {
@@ -1946,6 +1989,7 @@ export async function moveQuestion(
     `;
   });
 
+  invalidatePublicSessionCache(presentation.code);
   return getPresenterPayload(presentationId, presenterKey);
 }
 
@@ -1954,7 +1998,7 @@ export async function setActiveQuestion(
   presenterKey: string,
   questionId: string | null
 ) {
-  await assertPresenter(presentationId, presenterKey);
+  const presentation = await assertPresenter(presentationId, presenterKey);
   const sql = getSql();
   const timestamp = nowIso();
 
@@ -1972,6 +2016,7 @@ export async function setActiveQuestion(
       `;
     });
 
+    invalidatePublicSessionCache(presentation.code);
     return getPresenterPayload(presentationId, presenterKey);
   }
 
@@ -2005,6 +2050,7 @@ export async function setActiveQuestion(
     `;
   });
 
+  invalidatePublicSessionCache(presentation.code);
   return getPresenterPayload(presentationId, presenterKey);
 }
 
@@ -2012,7 +2058,7 @@ export async function resetPresentationFlow(
   presentationId: string,
   presenterKey: string
 ) {
-  await assertPresenter(presentationId, presenterKey);
+  const presentation = await assertPresenter(presentationId, presenterKey);
   const sql = getSql();
   const timestamp = nowIso();
 
@@ -2032,6 +2078,7 @@ export async function resetPresentationFlow(
     `;
   });
 
+  invalidatePublicSessionCache(presentation.code);
   return getPresenterPayload(presentationId, presenterKey);
 }
 
@@ -2041,7 +2088,7 @@ export async function setScreenView(
   screenView: ScreenView,
   questionId: string | null = null
 ) {
-  await assertPresenter(presentationId, presenterKey);
+  const presentation = await assertPresenter(presentationId, presenterKey);
 
   if (screenView !== "question" && screenView !== "qr" && screenView !== "results" && screenView !== "ranking") {
     throw new AppError(400, "Ongeldige schermweergave.");
@@ -2088,6 +2135,7 @@ export async function setScreenView(
     `;
   }
 
+  invalidatePublicSessionCache(presentation.code);
   return getPresenterPayload(presentationId, presenterKey);
 }
 
@@ -2096,7 +2144,7 @@ export async function resetAnswers(
   presenterKey: string,
   questionId: string | null
 ) {
-  await assertPresenter(presentationId, presenterKey);
+  const presentation = await assertPresenter(presentationId, presenterKey);
   const sql = getSql();
 
   if (questionId) {
@@ -2123,10 +2171,11 @@ export async function resetAnswers(
     `;
   }
 
+  invalidatePublicSessionCache(presentation.code);
   return getPresenterPayload(presentationId, presenterKey);
 }
 
-export async function getPublicSession(codeInput: string, participantIdInput?: unknown): Promise<PublicSessionPayload> {
+async function loadPublicSessionBase(codeInput: string): Promise<PublicSessionBase> {
   await ensureSchema();
 
   const presentation = await fetchPresentationByCode(codeInput);
@@ -2170,6 +2219,58 @@ export async function getPublicSession(codeInput: string, participantIdInput?: u
     questions.find((question) => question.id === presentation.active_question_id && question.status === "open") ??
     null;
   const screenQuestion = questions.find((question) => question.id === presentation.screen_question_id) ?? null;
+
+  return {
+    presentation,
+    questions,
+    responseRows,
+    activeQuestion,
+    screenQuestion,
+    leaderboard,
+    quizTotals,
+    participantLabels,
+  };
+}
+
+async function getPublicSessionBase(codeInput: string) {
+  const code = normalizeCode(codeInput);
+  const cacheMs = publicSessionCacheMs();
+  const now = Date.now();
+  const cached = publicSessionCache.get(code);
+
+  if (cacheMs > 0 && cached && cached.expiresAt > now) {
+    return cached.promise;
+  }
+
+  const promise = loadPublicSessionBase(code);
+  if (cacheMs > 0) {
+    publicSessionCache.set(code, {
+      expiresAt: now + cacheMs,
+      promise,
+    });
+  }
+
+  try {
+    return await promise;
+  } catch (error) {
+    if (publicSessionCache.get(code)?.promise === promise) {
+      publicSessionCache.delete(code);
+    }
+    throw error;
+  }
+}
+
+export async function getPublicSession(codeInput: string, participantIdInput?: unknown): Promise<PublicSessionPayload> {
+  const {
+    presentation,
+    questions,
+    responseRows,
+    activeQuestion,
+    screenQuestion,
+    leaderboard,
+    quizTotals,
+    participantLabels,
+  } = await getPublicSessionBase(codeInput);
   const participantId = cleanText(participantIdInput, 80);
   const participantLabel = participantId ? participantLabels.get(participantId) ?? null : null;
   const correctOption =
@@ -2249,6 +2350,7 @@ export async function registerParticipant(
     payload.anonymous !== false
   );
 
+  invalidatePublicSessionCache(presentation.code);
   return getPublicSession(presentation.code, participantId);
 }
 
@@ -2417,6 +2519,7 @@ export async function submitAnswer(
     `;
   });
 
+  invalidatePublicSessionCache(presentation.code);
   return getPublicSession(presentation.code, participantId);
 }
 

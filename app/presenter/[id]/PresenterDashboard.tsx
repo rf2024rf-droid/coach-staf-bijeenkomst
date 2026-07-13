@@ -804,6 +804,36 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
     }, "Deelnemer verwijderd");
   }
 
+  async function removeAllParticipantsFromSession() {
+    const participantCount = participants.length;
+    const firstConfirmed = window.confirm(
+      `Alle deelnemers verwijderen?\n\nJe verwijdert ${participantCount} ${
+        participantCount === 1 ? "deelnemer" : "deelnemers"
+      } uit deze presentatie. Alle antwoorden van deze deelnemers worden ook verwijderd.`
+    );
+    if (!firstConfirmed) {
+      return;
+    }
+
+    const finalConfirmed = window.confirm(
+      "Laatste bevestiging: de deelnemerslijst wordt helemaal leeg gemaakt. Iedereen moet zich daarna opnieuw aanmelden via de QR-code of link."
+    );
+    if (!finalConfirmed) {
+      return;
+    }
+
+    await mutate(async () => {
+      const response = await fetch(apiPath(`/api/presentations/${id}/participants`), {
+        method: "DELETE",
+      });
+      const data = (await response.json()) as PresenterPayload | { error: string };
+      if (!response.ok || "error" in data) {
+        throw new Error("error" in data ? data.error : "Deelnemers konden niet worden verwijderd.");
+      }
+      return data;
+    }, "Alle deelnemers verwijderd");
+  }
+
   async function removeQuestion(questionId: string, prompt: string) {
     const confirmed = window.confirm(`Vraag verwijderen?\n\n${prompt}`);
     if (!confirmed) {
@@ -1506,15 +1536,26 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
                     Leg de startgroep vast zodra je wilt beginnen. De QR-code en aanmeldlink blijven daarna open voor late instromers.
                   </p>
                 </div>
-                <button
-                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-800 px-4 py-3 text-sm font-black text-white hover:bg-emerald-900 disabled:opacity-60"
-                  disabled={saving || !participants.length}
-                  onClick={startParticipantGroup}
-                  type="button"
-                >
-                  <UserCheck aria-hidden className="h-4 w-4" />
-                  {participantGroupStarted ? "Startgroep opnieuw vastleggen" : "Start met huidige groep"}
-                </button>
+                <div className="flex flex-col gap-2 sm:flex-row lg:flex-col xl:flex-row">
+                  <button
+                    className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-800 px-4 py-3 text-sm font-black text-white hover:bg-emerald-900 disabled:opacity-60"
+                    disabled={saving || !participants.length}
+                    onClick={startParticipantGroup}
+                    type="button"
+                  >
+                    <UserCheck aria-hidden className="h-4 w-4" />
+                    {participantGroupStarted ? "Startgroep opnieuw vastleggen" : "Start met huidige groep"}
+                  </button>
+                  <button
+                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-black text-rose-800 hover:border-rose-300 hover:bg-rose-100 disabled:opacity-60"
+                    disabled={saving || !participants.length}
+                    onClick={removeAllParticipantsFromSession}
+                    type="button"
+                  >
+                    <Trash2 aria-hidden className="h-4 w-4" />
+                    Alle deelnemers verwijderen
+                  </button>
+                </div>
               </div>
 
               <div className="mt-4 grid gap-2 md:grid-cols-4">

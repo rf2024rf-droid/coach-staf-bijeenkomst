@@ -2396,6 +2396,37 @@ export async function removeParticipant(
   return getPresenterPayload(presentationId, presenterKey);
 }
 
+export async function removeAllParticipants(
+  presentationId: string,
+  presenterKey: string
+) {
+  const presentation = await assertPresenter(presentationId, presenterKey);
+  const sql = getSql();
+  const timestamp = nowIso();
+
+  await sql.begin(async (tx) => {
+    await tx`
+      DELETE FROM responses
+      WHERE presentation_id = ${presentationId}
+    `;
+    await tx`
+      DELETE FROM participant_profiles
+      WHERE presentation_id = ${presentationId}
+    `;
+    await tx`
+      UPDATE presentations
+      SET
+        participant_group_started_at = NULL,
+        participant_group_started_count = 0,
+        updated_at = ${timestamp}
+      WHERE id = ${presentationId}
+    `;
+  });
+
+  invalidatePublicSessionCache(presentation.code);
+  return getPresenterPayload(presentationId, presenterKey);
+}
+
 async function loadPublicSessionBase(codeInput: string): Promise<PublicSessionBase> {
   await ensureSchema();
 

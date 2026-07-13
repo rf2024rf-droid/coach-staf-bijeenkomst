@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCircle2, Loader2, Send, ShieldCheck, UserRound, XCircle } from "lucide-react";
+import { CheckCircle2, Loader2, Pencil, Send, ShieldCheck, UserRound, XCircle } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PublicSessionPayload, QuestionType } from "@/app/types";
 import { getQuestionTimingState } from "@/lib/questionTiming";
@@ -93,9 +93,12 @@ export default function ParticipantPage({ code }: ParticipantPageProps) {
   });
   const [identityMode, setIdentityMode] = useState<IdentityMode>(storedIdentity.mode);
   const [displayName, setDisplayName] = useState(storedIdentity.displayName);
+  const [editingIdentity, setEditingIdentity] = useState(false);
   const [textAnswer, setTextAnswer] = useState("");
   const [selectedOptionId, setSelectedOptionId] = useState("");
   const lastActiveQuestionId = useRef("");
+  const identityKnownRef = useRef(storedIdentity.mode === "anonymous" || Boolean(storedIdentity.displayName.trim()));
+  const registrationErrorRef = useRef(false);
   const choiceSequenceRef = useRef(0);
   const latestChoiceAcknowledgedSequenceRef = useRef(0);
   const [submittedQuestionId, setSubmittedQuestionId] = useState("");
@@ -128,7 +131,18 @@ export default function ParticipantPage({ code }: ParticipantPageProps) {
         }
 
         setSession(data);
-        setError("");
+        if (data.participantLabel) {
+          identityKnownRef.current = true;
+          if (!editingIdentity && !registrationErrorRef.current) {
+            setError("");
+          }
+        } else if (participantId && identityKnownRef.current) {
+          registrationErrorRef.current = false;
+          setEditingIdentity(false);
+          setError("Je bent uit de deelnemerslijst gehaald. Meld je opnieuw aan.");
+        } else if (!editingIdentity && !registrationErrorRef.current) {
+          setError("");
+        }
       } catch (caught) {
         setError(caught instanceof Error ? caught.message : "Sessie kon niet worden geladen.");
       } finally {
@@ -137,7 +151,7 @@ export default function ParticipantPage({ code }: ParticipantPageProps) {
         }
       }
     },
-    [normalizedCode, participantId]
+    [editingIdentity, normalizedCode, participantId]
   );
 
   useEffect(() => {
@@ -255,6 +269,7 @@ export default function ParticipantPage({ code }: ParticipantPageProps) {
     }
 
     setRegistering(true);
+    registrationErrorRef.current = false;
     setError("");
 
     try {
@@ -279,8 +294,16 @@ export default function ParticipantPage({ code }: ParticipantPageProps) {
           displayName: anonymous ? "" : name,
         })
       );
+      identityKnownRef.current = true;
+      registrationErrorRef.current = false;
+      setEditingIdentity(false);
+      if (anonymous) {
+        setDisplayName("");
+      }
       setSession(data);
+      setError("");
     } catch (caught) {
+      registrationErrorRef.current = true;
       setError(caught instanceof Error ? caught.message : "Deelnemer kon niet worden aangemeld.");
     } finally {
       setRegistering(false);
@@ -312,6 +335,8 @@ export default function ParticipantPage({ code }: ParticipantPageProps) {
   const isSlide = activeQuestion?.type === "slide";
   const showSessionHeader = !activeQuestion && !showQuizFeedback;
   const centerQuizFeedback = Boolean(showQuizFeedback && (!activeQuestion || quizResultsLocked));
+  const showIdentityForm = Boolean(session && (!session.participantLabel || editingIdentity));
+  const isEditingIdentityForm = Boolean(editingIdentity && session?.participantLabel);
   const canSubmit =
     !isSlide && !votingLocked && (isChoiceQuestion ? Boolean(selectedOptionId) : Boolean(textAnswer.trim()));
   const submitButtonLabel = quizResultsLocked || quizTiming?.isExpired
@@ -346,7 +371,7 @@ export default function ParticipantPage({ code }: ParticipantPageProps) {
     );
   }
 
-  if (!session.participantLabel) {
+  if (showIdentityForm) {
     return (
       <main className="min-h-screen bg-zinc-950 px-4 py-5 text-white">
         <div className="mx-auto flex w-full max-w-2xl flex-col gap-5">
@@ -365,9 +390,11 @@ export default function ParticipantPage({ code }: ParticipantPageProps) {
           <form className="rounded-lg border border-zinc-700 bg-zinc-900 p-5 shadow-sm" onSubmit={registerIdentity}>
             <div className="mb-5">
               <span className="rounded-md bg-emerald-300 px-2 py-1 text-xs font-black uppercase text-emerald-950">
-                Meedoen
+                {isEditingIdentityForm ? "Profiel" : "Meedoen"}
               </span>
-              <h2 className="mt-3 text-2xl font-black leading-8">Hoe wil je zichtbaar zijn?</h2>
+              <h2 className="mt-3 text-2xl font-black leading-8">
+                {isEditingIdentityForm ? "Naam of anonimiteit aanpassen" : "Hoe wil je zichtbaar zijn?"}
+              </h2>
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2">
@@ -377,7 +404,11 @@ export default function ParticipantPage({ code }: ParticipantPageProps) {
                     ? "border-emerald-300 bg-emerald-300 text-emerald-950"
                     : "border-zinc-700 bg-zinc-950 text-white hover:border-zinc-500 hover:bg-zinc-800"
                 }`}
-                onClick={() => setIdentityMode("name")}
+                onClick={() => {
+                  registrationErrorRef.current = false;
+                  setError("");
+                  setIdentityMode("name");
+                }}
                 type="button"
               >
                 <span className="flex items-center gap-3 text-base font-black">
@@ -394,7 +425,11 @@ export default function ParticipantPage({ code }: ParticipantPageProps) {
                     ? "border-emerald-300 bg-emerald-300 text-emerald-950"
                     : "border-zinc-700 bg-zinc-950 text-white hover:border-zinc-500 hover:bg-zinc-800"
                 }`}
-                onClick={() => setIdentityMode("anonymous")}
+                onClick={() => {
+                  registrationErrorRef.current = false;
+                  setError("");
+                  setIdentityMode("anonymous");
+                }}
                 type="button"
               >
                 <span className="flex items-center gap-3 text-base font-black">
@@ -413,7 +448,11 @@ export default function ParticipantPage({ code }: ParticipantPageProps) {
                 <input
                   className="mt-2 w-full rounded-lg border border-zinc-600 bg-zinc-950 px-4 py-4 text-base font-bold text-white outline-none placeholder:text-zinc-500 focus:border-emerald-300 focus:ring-2 focus:ring-emerald-300/30"
                   maxLength={60}
-                  onChange={(event) => setDisplayName(event.target.value)}
+                  onChange={(event) => {
+                    registrationErrorRef.current = false;
+                    setError("");
+                    setDisplayName(event.target.value);
+                  }}
                   placeholder="Vul je naam in"
                   value={displayName}
                 />
@@ -426,8 +465,21 @@ export default function ParticipantPage({ code }: ParticipantPageProps) {
               type="submit"
             >
               {registering ? <Loader2 aria-hidden className="h-5 w-5 animate-spin" /> : <Send aria-hidden className="h-5 w-5" />}
-              {registering ? "Aanmelden..." : "Ga naar de sessie"}
+              {registering ? "Opslaan..." : isEditingIdentityForm ? "Opslaan" : "Ga naar de sessie"}
             </button>
+            {isEditingIdentityForm ? (
+              <button
+                className="mt-3 inline-flex w-full items-center justify-center rounded-lg border border-zinc-700 bg-zinc-950 px-4 py-3 font-bold text-zinc-200 hover:border-zinc-500 hover:bg-zinc-800"
+                onClick={() => {
+                  registrationErrorRef.current = false;
+                  setEditingIdentity(false);
+                  setError("");
+                }}
+                type="button"
+              >
+                Annuleren
+              </button>
+            ) : null}
           </form>
         </div>
       </main>
@@ -450,8 +502,21 @@ export default function ParticipantPage({ code }: ParticipantPageProps) {
                 {session.presentation.code}
               </span>
               {participantDisplayId ? (
-                <span className="rounded-md bg-emerald-300 px-2 py-1 text-sm font-black text-emerald-950">
-                  {participantDisplayId}
+                <span className="inline-flex overflow-hidden rounded-md bg-emerald-300 text-sm font-black text-emerald-950">
+                  <span className="px-2 py-1">{participantDisplayId}</span>
+                  <button
+                    aria-label="Naam of anonimiteit aanpassen"
+                    className="border-l border-emerald-600/30 px-1.5 py-1 hover:bg-emerald-200"
+                    onClick={() => {
+                      registrationErrorRef.current = false;
+                      setError("");
+                      setEditingIdentity(true);
+                    }}
+                    title="Naam of anonimiteit aanpassen"
+                    type="button"
+                  >
+                    <Pencil aria-hidden className="h-3.5 w-3.5" />
+                  </button>
                 </span>
               ) : null}
               {showParticipantScore ? (

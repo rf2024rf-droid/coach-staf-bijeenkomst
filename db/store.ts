@@ -1440,16 +1440,6 @@ async function fetchParticipantProfiles(presentationId: string) {
   `;
 }
 
-async function getNextParticipantDisplayIndex(presentationId: string) {
-  const rows = await getSql()<{ next_index: number }[]>`
-    SELECT COALESCE(MAX(display_index), 0) + 1 AS next_index
-    FROM participant_profiles
-    WHERE presentation_id = ${presentationId}
-  `;
-
-  return numberFromDb(first(rows)?.next_index) || 1;
-}
-
 async function upsertParticipantProfile(
   presentationId: string,
   participantIdInput: unknown,
@@ -1461,8 +1451,6 @@ async function upsertParticipantProfile(
     throw new AppError(400, "Deelnemer kon niet worden herkend. Scan de QR-code opnieuw.");
   }
 
-  const sql = getSql();
-  const existing = await fetchParticipantProfile(presentationId, participantId);
   const isAnonymous = anonymousInput !== false;
   const typedName = cleanText(displayNameInput, 60);
 
@@ -1470,51 +1458,115 @@ async function upsertParticipantProfile(
     throw new AppError(400, "Vul een naam in of kies voor anoniem deelnemen.");
   }
 
-  const displayIndex = existing?.display_index ?? (await getNextParticipantDisplayIndex(presentationId));
-  const displayName = isAnonymous ? `Deelnemer ${displayIndex}` : typedName;
+  const sql = getSql();
   const timestamp = nowIso();
-  const rows = existing
-    ? await sql<ParticipantProfileRow[]>`
-        UPDATE participant_profiles
-        SET display_name = ${displayName},
-            is_anonymous = ${isAnonymous},
-            display_index = ${displayIndex},
-            updated_at = ${timestamp}
-        WHERE id = ${existing.id}
-        RETURNING *
+
+  return sql.begin(async (tx) => {
+    await tx`SELECT pg_advisory_xact_lock(hashtext(${`participant-profile:${presentationId}`}))`;
+
+    if (!isAnonymous) {
+      const duplicate = first(
+        await tx<Pick<ParticipantProfileRow, "participant_id">[]>`
+          SELECT participant_id
+          FROM participant_profiles
+          WHERE presentation_id = ${presentationId}
+            AND LOWER(display_name) = LOWER(${typedName})
+            AND participant_id <> ${participantId}
+          LIMIT 1
+        `
+      );
+
+      if (duplicate) {
+        throw new AppError(409, "Deze naam is al ingevoerd. Kies een andere naam of blijf anoniem.");
+      }
+    }
+
+    const existing = first(
+      await tx<ParticipantProfileRow[]>`
+        SELECT *
+        FROM participant_profiles
+        WHERE presentation_id = ${presentationId} AND participant_id = ${participantId}
+        FOR UPDATE
       `
-    : await sql<ParticipantProfileRow[]>`
-        INSERT INTO participant_profiles (
-          id,
-          presentation_id,
-          participant_id,
-          display_name,
-          is_anonymous,
-          display_index,
-          created_at,
-          updated_at
-        )
-        VALUES (
-          ${makeId("ptc")},
-          ${presentationId},
-          ${participantId},
-          ${displayName},
-          ${isAnonymous},
-          ${displayIndex},
-          ${timestamp},
-          ${timestamp}
-        )
-        RETURNING *
-      `;
-  const profile = first(rows);
+    );
+    let displayIndex = existing?.display_index ?? 0;
+    if (!displayIndex) {
+      displayIndex =
+        numberFromDb(
+          first(
+            await tx<{ next_index: number }[]>`
+              SELECT COALESCE(MAX(display_index), 0) + 1 AS next_index
+              FROM participant_profiles
+              WHERE presentation_id = ${presentationId}
+            `
+          )?.next_index
+        ) || 1;
+    }
+    let displayName = isAnonymous ? `Deelnemer ${displayIndex}` : typedName;
+    if (isAnonymous) {
+      for (let attempt = 0; attempt < 200; attempt += 1) {
+        const duplicateLabel = first(
+          await tx<Pick<ParticipantProfileRow, "participant_id">[]>`
+            SELECT participant_id
+            FROM participant_profiles
+            WHERE presentation_id = ${presentationId}
+              AND LOWER(display_name) = LOWER(${displayName})
+              AND participant_id <> ${participantId}
+            LIMIT 1
+          `
+        );
 
-  await sql`
-    UPDATE responses
-    SET participant_name = ${displayName}, updated_at = ${timestamp}
-    WHERE presentation_id = ${presentationId} AND participant_id = ${participantId}
-  `;
+        if (!duplicateLabel) {
+          break;
+        }
 
-  return profile;
+        displayIndex += 1;
+        displayName = `Deelnemer ${displayIndex}`;
+      }
+    }
+    const rows = existing
+      ? await tx<ParticipantProfileRow[]>`
+          UPDATE participant_profiles
+          SET display_name = ${displayName},
+              is_anonymous = ${isAnonymous},
+              display_index = ${displayIndex},
+              updated_at = ${timestamp}
+          WHERE id = ${existing.id}
+          RETURNING *
+        `
+      : await tx<ParticipantProfileRow[]>`
+          INSERT INTO participant_profiles (
+            id,
+            presentation_id,
+            participant_id,
+            display_name,
+            is_anonymous,
+            display_index,
+            created_at,
+            updated_at
+          )
+          VALUES (
+            ${makeId("ptc")},
+            ${presentationId},
+            ${participantId},
+            ${displayName},
+            ${isAnonymous},
+            ${displayIndex},
+            ${timestamp},
+            ${timestamp}
+          )
+          RETURNING *
+        `;
+    const profile = first(rows);
+
+    await tx`
+      UPDATE responses
+      SET participant_name = ${displayName}, updated_at = ${timestamp}
+      WHERE presentation_id = ${presentationId} AND participant_id = ${participantId}
+    `;
+
+    return profile;
+  });
 }
 
 async function getNextPosition(presentationId: string) {
@@ -2311,6 +2363,34 @@ export async function resetAnswers(
       WHERE presentation_id = ${presentationId} AND type = 'quiz'
     `;
   }
+
+  invalidatePublicSessionCache(presentation.code);
+  return getPresenterPayload(presentationId, presenterKey);
+}
+
+export async function removeParticipant(
+  presentationId: string,
+  presenterKey: string,
+  participantIdInput: unknown
+) {
+  const presentation = await assertPresenter(presentationId, presenterKey);
+  const participantId = cleanText(participantIdInput, 80);
+
+  if (!participantId) {
+    throw new AppError(400, "Deelnemer kon niet worden herkend.");
+  }
+
+  const sql = getSql();
+  await sql.begin(async (tx) => {
+    await tx`
+      DELETE FROM responses
+      WHERE presentation_id = ${presentationId} AND participant_id = ${participantId}
+    `;
+    await tx`
+      DELETE FROM participant_profiles
+      WHERE presentation_id = ${presentationId} AND participant_id = ${participantId}
+    `;
+  });
 
   invalidatePublicSessionCache(presentation.code);
   return getPresenterPayload(presentationId, presenterKey);

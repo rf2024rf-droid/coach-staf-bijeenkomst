@@ -783,6 +783,27 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
     }, questionId ? "Antwoorden bij vraag gewist" : "Alle antwoorden gewist");
   }
 
+  async function removeParticipantFromSession(participantId: string, label: string) {
+    const confirmed = window.confirm(
+      `Deelnemer verwijderen?\n\n${label}\n\nDeze deelnemer verdwijnt uit de lijst en alle antwoorden van deze deelnemer worden verwijderd. De deelnemer moet zich daarna opnieuw aanmelden.`
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    await mutate(async () => {
+      const response = await fetch(
+        apiPath(`/api/presentations/${id}/participants/${encodeURIComponent(participantId)}`),
+        { method: "DELETE" }
+      );
+      const data = (await response.json()) as PresenterPayload | { error: string };
+      if (!response.ok || "error" in data) {
+        throw new Error("error" in data ? data.error : "Deelnemer kon niet worden verwijderd.");
+      }
+      return data;
+    }, "Deelnemer verwijderd");
+  }
+
   async function removeQuestion(questionId: string, prompt: string) {
     const confirmed = window.confirm(`Vraag verwijderen?\n\n${prompt}`);
     if (!confirmed) {
@@ -1577,21 +1598,32 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
                             </span>
                           </div>
                         </div>
-                        <div className="grid grid-cols-3 gap-2 md:min-w-[260px]">
-                          <div className="rounded-lg bg-zinc-50 px-3 py-2 text-center">
-                            <p className="text-[10px] font-black uppercase text-zinc-500">Plaats</p>
-                            <p className="text-base font-black">{participant.rank ? `#${participant.rank}` : "-"}</p>
+                        <div className="grid gap-2 md:min-w-[280px]">
+                          <div className="grid grid-cols-3 gap-2">
+                            <div className="rounded-lg bg-zinc-50 px-3 py-2 text-center">
+                              <p className="text-[10px] font-black uppercase text-zinc-500">Plaats</p>
+                              <p className="text-base font-black">{participant.rank ? `#${participant.rank}` : "-"}</p>
+                            </div>
+                            <div className="rounded-lg bg-zinc-50 px-3 py-2 text-center">
+                              <p className="text-[10px] font-black uppercase text-zinc-500">Score</p>
+                              <p className="text-base font-black">
+                                {participant.score} {participant.score === 1 ? "punt" : "punten"}
+                              </p>
+                            </div>
+                            <div className="rounded-lg bg-zinc-50 px-3 py-2 text-center">
+                              <p className="text-[10px] font-black uppercase text-zinc-500">Quiz</p>
+                              <p className="text-base font-black">{participant.answered}</p>
+                            </div>
                           </div>
-                          <div className="rounded-lg bg-zinc-50 px-3 py-2 text-center">
-                            <p className="text-[10px] font-black uppercase text-zinc-500">Score</p>
-                            <p className="text-base font-black">
-                              {participant.score} {participant.score === 1 ? "punt" : "punten"}
-                            </p>
-                          </div>
-                          <div className="rounded-lg bg-zinc-50 px-3 py-2 text-center">
-                            <p className="text-[10px] font-black uppercase text-zinc-500">Quiz</p>
-                            <p className="text-base font-black">{participant.answered}</p>
-                          </div>
+                          <button
+                            className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-black text-rose-800 hover:border-rose-300 hover:bg-rose-100 disabled:opacity-60"
+                            disabled={saving}
+                            onClick={() => removeParticipantFromSession(participant.participantId, participant.label)}
+                            type="button"
+                          >
+                            <Trash2 aria-hidden className="h-4 w-4" />
+                            Verwijder deelnemer
+                          </button>
                         </div>
                       </div>
                     ))}

@@ -23,6 +23,9 @@ import {
   Trash2,
   Trophy,
   Timer,
+  UserCheck,
+  UserPlus,
+  Users,
   X,
 } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
@@ -73,7 +76,7 @@ type QuestionEditForm = {
   timeLimitSeconds: string;
 };
 
-type PresenterTab = "regie" | "vragen" | "resultaten" | "instellingen";
+type PresenterTab = "regie" | "deelnemers" | "vragen" | "resultaten" | "instellingen";
 
 function makeOptionDraft(label = "", isCorrect = false): OptionDraft {
   return {
@@ -230,6 +233,24 @@ function formatTimerSeconds(totalSeconds: number) {
   }
 
   return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+}
+
+function formatShortDateTime(value: string | null) {
+  if (!value) {
+    return "";
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  return date.toLocaleString("nl-NL", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 export default function PresenterDashboard({ id }: PresenterDashboardProps) {
@@ -664,6 +685,29 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
     }, "Presentatieflow opnieuw gestart");
   }
 
+  async function startParticipantGroup() {
+    const alreadyStarted = Boolean(payload?.presentation.participantGroupStartedAt);
+    const confirmed = window.confirm(
+      alreadyStarted
+        ? "Startgroep opnieuw vastleggen?\n\nHet huidige aantal aangemelde deelnemers wordt opnieuw als startgroep opgeslagen. Nieuwe deelnemers daarna blijven gewoon later instromen."
+        : "Starten met de huidige groep?\n\nDe huidige aangemelde deelnemers worden als startgroep opgeslagen. Nieuwe deelnemers kunnen daarna nog gewoon instromen via QR-code of link."
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    await mutate(async () => {
+      const response = await fetch(apiPath(`/api/presentations/${id}/participants/start`), {
+        method: "PATCH",
+      });
+      const data = (await response.json()) as PresenterPayload | { error: string };
+      if (!response.ok || "error" in data) {
+        throw new Error("error" in data ? data.error : "Startgroep kon niet worden vastgelegd.");
+      }
+      return data;
+    }, alreadyStarted ? "Startgroep opnieuw vastgelegd" : "Startgroep vastgelegd");
+  }
+
   async function updateScreenView(screenView: ScreenView, questionId: string | null = null) {
     await mutate(async () => {
       const response = await fetch(apiPath(`/api/presentations/${id}/screen-view`), {
@@ -882,9 +926,19 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
     payload.quizTotals.total > 0 && payload.quizTotals.finalized >= payload.quizTotals.total
       ? "Eindklassering"
       : "Tussenstand";
+  const participantGroupStartedAt = payload.presentation.participantGroupStartedAt;
+  const participantGroupStarted = Boolean(participantGroupStartedAt);
+  const participants = payload.participants;
+  const lateParticipants = participants.filter((participant) => participant.joinedAfterGroupStart);
+  const participantsWithScore = participants.filter((participant) => participant.score > 0);
+  const participantGroupStartLabel = formatShortDateTime(participantGroupStartedAt);
+  const participantGroupCount = participantGroupStarted
+    ? payload.presentation.participantGroupStartedCount ?? Math.max(participants.length - lateParticipants.length, 0)
+    : participants.length;
   const editingQuestion = payload.questions.find((question) => question.id === editingQuestionId) ?? null;
   const tabs: Array<{ id: PresenterTab; label: string; meta: string }> = [
     { id: "regie", label: "Regie", meta: isGeneralScreenVisible ? "algemeen" : "op beeld" },
+    { id: "deelnemers", label: "Deelnemers", meta: `${payload.totals.participants}` },
     { id: "vragen", label: "Vragen", meta: `${payload.questions.length}` },
     { id: "resultaten", label: "Resultaten", meta: `${payload.totals.answers}` },
     { id: "instellingen", label: "Instellingen", meta: payload.presentation.code },
@@ -903,6 +957,10 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
 
     if (tab === "regie") {
       return <SlidersHorizontal aria-hidden className={className} />;
+    }
+
+    if (tab === "deelnemers") {
+      return <Users aria-hidden className={className} />;
     }
 
     if (tab === "vragen") {
@@ -1078,7 +1136,7 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
           </div>
         ) : null}
 
-        <nav className="grid grid-cols-4 gap-1.5 rounded-lg border border-zinc-300 bg-zinc-100 p-1.5 sm:gap-2 sm:p-2">
+        <nav className="grid grid-cols-2 gap-1.5 rounded-lg border border-zinc-300 bg-zinc-100 p-1.5 sm:grid-cols-5 sm:gap-2 sm:p-2">
           {tabs.map((tab) => (
             <button className={tabClassName(tab.id)} key={tab.id} onClick={() => setPresenterTab(tab.id)} type="button">
               <span className="flex flex-col items-center gap-1 sm:flex-row sm:gap-3">
@@ -1413,6 +1471,140 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
         {presenterTab !== "regie" ? (
         <section className={`grid gap-6 ${presenterTab === "vragen" ? "xl:grid-cols-[360px_1fr]" : "xl:grid-cols-1"}`}>
           <aside className="flex flex-col gap-6">
+            <article className={`${presenterTab === "deelnemers" ? "" : "hidden"} rounded-lg border border-zinc-300 bg-white p-4 shadow-sm md:p-5`}>
+              <div className="flex flex-col gap-4 border-b border-zinc-200 pb-4 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                  <p className="text-xs font-black uppercase text-emerald-800">Deelnemers</p>
+                  <h2 className="mt-1 text-2xl font-black">Wie doet er mee?</h2>
+                  <p className="mt-2 max-w-3xl text-sm font-semibold text-zinc-600">
+                    Leg de startgroep vast zodra je wilt beginnen. De QR-code en aanmeldlink blijven daarna open voor late instromers.
+                  </p>
+                </div>
+                <button
+                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-800 px-4 py-3 text-sm font-black text-white hover:bg-emerald-900 disabled:opacity-60"
+                  disabled={saving || !participants.length}
+                  onClick={startParticipantGroup}
+                  type="button"
+                >
+                  <UserCheck aria-hidden className="h-4 w-4" />
+                  {participantGroupStarted ? "Startgroep opnieuw vastleggen" : "Start met huidige groep"}
+                </button>
+              </div>
+
+              <div className="mt-4 grid gap-2 md:grid-cols-4">
+                <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3">
+                  <p className="text-[11px] font-black uppercase text-zinc-500">Aangemeld</p>
+                  <p className="mt-1 text-2xl font-black">{participants.length}</p>
+                </div>
+                <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3">
+                  <p className="text-[11px] font-black uppercase text-zinc-500">Startgroep</p>
+                  <p className="mt-1 text-2xl font-black">{participantGroupCount}</p>
+                </div>
+                <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3">
+                  <p className="text-[11px] font-black uppercase text-zinc-500">Later ingestroomd</p>
+                  <p className="mt-1 text-2xl font-black">{participantGroupStarted ? lateParticipants.length : 0}</p>
+                </div>
+                <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3">
+                  <p className="text-[11px] font-black uppercase text-zinc-500">Met punten</p>
+                  <p className="mt-1 text-2xl font-black">{participantsWithScore.length}</p>
+                </div>
+              </div>
+
+              <div
+                className={`mt-4 rounded-lg border p-4 ${
+                  participantGroupStarted
+                    ? "border-emerald-200 bg-emerald-50 text-emerald-950"
+                    : "border-amber-200 bg-amber-50 text-amber-950"
+                }`}
+              >
+                <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                  <p className="inline-flex items-center gap-2 text-sm font-black">
+                    {participantGroupStarted ? (
+                      <UserCheck aria-hidden className="h-4 w-4" />
+                    ) : (
+                      <UserPlus aria-hidden className="h-4 w-4" />
+                    )}
+                    {participantGroupStarted
+                      ? `Startgroep vastgelegd${participantGroupStartLabel ? ` op ${participantGroupStartLabel}` : ""}`
+                      : "Quizgroep nog niet gestart"}
+                  </p>
+                  <p className="text-sm font-bold opacity-80">
+                    {participantGroupStarted
+                      ? "Late deelnemers blijven welkom en komen automatisch in de ranking."
+                      : "Wacht tot de meeste mensen binnen zijn en leg dan de startgroep vast."}
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-4 overflow-hidden rounded-lg border border-zinc-200">
+                {participants.length ? (
+                  <div className="divide-y divide-zinc-200">
+                    {participants.map((participant) => (
+                      <div
+                        className="grid gap-3 bg-white p-3 md:grid-cols-[64px_minmax(0,1fr)_auto] md:items-center md:p-4"
+                        key={participant.participantId}
+                      >
+                        <div className="flex items-center gap-3 md:block">
+                          <span className="grid h-11 w-11 place-items-center rounded-lg bg-zinc-950 text-sm font-black text-white">
+                            {participant.displayIndex}
+                          </span>
+                          <span className="md:hidden text-sm font-black">{participant.label}</span>
+                        </div>
+                        <div className="min-w-0">
+                          <h3 className="hidden truncate text-lg font-black md:block">{participant.label}</h3>
+                          <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                            <span className="rounded-md bg-zinc-100 px-2 py-1 text-xs font-bold text-zinc-700">
+                              {participant.isAnonymous ? "Anoniem" : "Naam ingevuld"}
+                            </span>
+                            {participantGroupStarted ? (
+                              <span
+                                className={`rounded-md px-2 py-1 text-xs font-black ${
+                                  participant.joinedAfterGroupStart
+                                    ? "bg-amber-100 text-amber-900"
+                                    : "bg-emerald-100 text-emerald-900"
+                                }`}
+                              >
+                                {participant.joinedAfterGroupStart ? "Later ingestroomd" : "Startgroep"}
+                              </span>
+                            ) : null}
+                            <span className="rounded-md bg-white px-2 py-1 text-xs font-semibold text-zinc-500 ring-1 ring-zinc-200">
+                              Binnen sinds {formatShortDateTime(participant.joinedAt)}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2 md:min-w-[260px]">
+                          <div className="rounded-lg bg-zinc-50 px-3 py-2 text-center">
+                            <p className="text-[10px] font-black uppercase text-zinc-500">Plaats</p>
+                            <p className="text-base font-black">{participant.rank ? `#${participant.rank}` : "-"}</p>
+                          </div>
+                          <div className="rounded-lg bg-zinc-50 px-3 py-2 text-center">
+                            <p className="text-[10px] font-black uppercase text-zinc-500">Score</p>
+                            <p className="text-base font-black">
+                              {participant.score} {participant.score === 1 ? "punt" : "punten"}
+                            </p>
+                          </div>
+                          <div className="rounded-lg bg-zinc-50 px-3 py-2 text-center">
+                            <p className="text-[10px] font-black uppercase text-zinc-500">Quiz</p>
+                            <p className="text-base font-black">{participant.answered}</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="grid min-h-[220px] place-items-center bg-zinc-50 p-6 text-center">
+                    <div>
+                      <Users aria-hidden className="mx-auto h-10 w-10 text-zinc-400" />
+                      <h3 className="mt-3 text-xl font-black">Nog niemand aangemeld</h3>
+                      <p className="mt-2 text-sm font-semibold text-zinc-600">
+                        Toon de QR-code of deel de link zodat deelnemers binnenkomen.
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </article>
+
             <article className={`${presenterTab === "instellingen" ? "" : "hidden"} rounded-lg border border-zinc-300 bg-white p-5 shadow-sm`}>
               <h2 className="mb-2 text-lg font-bold">Groot scherm bediening</h2>
               <p className="mb-4 text-sm text-zinc-600">

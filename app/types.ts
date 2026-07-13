@@ -23,6 +23,19 @@ export type LeaderboardEntry = {
   answered: number;
 };
 
+export type ParticipantSummary = {
+  participantId: string;
+  label: string;
+  isAnonymous: boolean;
+  displayIndex: number;
+  joinedAt: string;
+  updatedAt: string;
+  joinedAfterGroupStart: boolean;
+  rank: number | null;
+  score: number;
+  answered: number;
+};
+
 export type QuizTotals = {
   total: number;
   finalized: number;
@@ -73,6 +86,8 @@ export type PresenterPayload = {
     generalScreenBackgroundColor: string | null;
     generalScreenFontFamily: GeneralScreenFontFamily | null;
     generalScreenFontSize: number | null;
+    participantGroupStartedAt: string | null;
+    participantGroupStartedCount: number | null;
     activeQuestionId: string | null;
     screenQuestionId: string | null;
     screenView: ScreenView;
@@ -81,6 +96,7 @@ export type PresenterPayload = {
   };
   questions: QuestionResult[];
   activeQuestion: QuestionResult | null;
+  participants: ParticipantSummary[];
   leaderboard: LeaderboardEntry[];
   quizTotals: QuizTotals;
   totals: {

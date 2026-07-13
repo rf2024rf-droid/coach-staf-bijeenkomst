@@ -36,6 +36,8 @@ export type PresentationRow = {
   general_screen_background_color: string | null;
   general_screen_font_family: string | null;
   general_screen_font_size: number | null;
+  participant_group_started_at: string | null;
+  participant_group_started_count: number | null;
   active_question_id: string | null;
   screen_question_id: string | null;
   screen_view: ScreenView;
@@ -146,6 +148,19 @@ export type LeaderboardEntry = {
   answered: number;
 };
 
+export type ParticipantSummary = {
+  participantId: string;
+  label: string;
+  isAnonymous: boolean;
+  displayIndex: number;
+  joinedAt: string;
+  updatedAt: string;
+  joinedAfterGroupStart: boolean;
+  rank: number | null;
+  score: number;
+  answered: number;
+};
+
 export type QuizTotals = {
   total: number;
   finalized: number;
@@ -165,6 +180,8 @@ export type PresenterPayload = {
     generalScreenBackgroundColor: string | null;
     generalScreenFontFamily: ReturnType<typeof resolveGeneralScreenFontFamily> | null;
     generalScreenFontSize: number | null;
+    participantGroupStartedAt: string | null;
+    participantGroupStartedCount: number | null;
     activeQuestionId: string | null;
     screenQuestionId: string | null;
     screenView: ScreenView;
@@ -173,6 +190,7 @@ export type PresenterPayload = {
   };
   questions: QuestionResult[];
   activeQuestion: QuestionResult | null;
+  participants: ParticipantSummary[];
   leaderboard: LeaderboardEntry[];
   quizTotals: QuizTotals;
   totals: {
@@ -316,6 +334,8 @@ const schemaStatements = [
     general_screen_background_color TEXT,
     general_screen_font_family TEXT,
     general_screen_font_size INTEGER,
+    participant_group_started_at TEXT,
+    participant_group_started_count INTEGER,
     active_question_id TEXT,
     screen_question_id TEXT,
     screen_view TEXT NOT NULL DEFAULT 'question',
@@ -383,6 +403,8 @@ const schemaStatements = [
   "ALTER TABLE presentations ADD COLUMN IF NOT EXISTS general_screen_background_color TEXT",
   "ALTER TABLE presentations ADD COLUMN IF NOT EXISTS general_screen_font_family TEXT",
   "ALTER TABLE presentations ADD COLUMN IF NOT EXISTS general_screen_font_size INTEGER",
+  "ALTER TABLE presentations ADD COLUMN IF NOT EXISTS participant_group_started_at TEXT",
+  "ALTER TABLE presentations ADD COLUMN IF NOT EXISTS participant_group_started_count INTEGER",
   "ALTER TABLE presentations ADD COLUMN IF NOT EXISTS screen_view TEXT NOT NULL DEFAULT 'question'",
   "ALTER TABLE presentations ADD COLUMN IF NOT EXISTS screen_question_id TEXT",
   "ALTER TABLE questions ADD COLUMN IF NOT EXISTS finalized_at TEXT",
@@ -716,6 +738,11 @@ function mapPresentation(row: PresentationRow) {
     generalScreenBackgroundColor: normalizeHexColor(row.general_screen_background_color),
     generalScreenFontFamily: normalizeGeneralScreenFontFamily(row.general_screen_font_family),
     generalScreenFontSize: normalizeGeneralScreenFontSize(row.general_screen_font_size),
+    participantGroupStartedAt: row.participant_group_started_at,
+    participantGroupStartedCount:
+      row.participant_group_started_count === null || row.participant_group_started_count === undefined
+        ? null
+        : numberFromDb(row.participant_group_started_count),
     activeQuestionId: row.active_question_id,
     screenQuestionId: row.screen_question_id,
     screenView: row.screen_view ?? "question",
@@ -881,6 +908,86 @@ function buildLeaderboard(
       participants: leaderboard.length,
     },
   };
+}
+
+function buildParticipantSummaries(
+  profileRows: ParticipantProfileRow[],
+  responseRows: ResponseRow[],
+  leaderboard: LeaderboardEntry[],
+  groupStartedAt: string | null
+): ParticipantSummary[] {
+  const leaderboardByParticipant = new Map(leaderboard.map((entry) => [entry.participantId, entry]));
+  const groupStartedAtMs = parseTimestampMs(groupStartedAt);
+  const summaries = [...profileRows]
+    .sort((left, right) => left.display_index - right.display_index || left.created_at.localeCompare(right.created_at))
+    .map((profile) => {
+      const leaderboardEntry = leaderboardByParticipant.get(profile.participant_id);
+      const joinedAtMs = parseTimestampMs(profile.created_at);
+
+      return {
+        participantId: profile.participant_id,
+        label: profileDisplayName(profile),
+        isAnonymous: Boolean(profile.is_anonymous),
+        displayIndex: profile.display_index,
+        joinedAt: profile.created_at,
+        updatedAt: profile.updated_at,
+        joinedAfterGroupStart: Boolean(groupStartedAtMs && joinedAtMs && joinedAtMs > groupStartedAtMs),
+        rank: leaderboardEntry?.rank ?? null,
+        score: leaderboardEntry?.score ?? 0,
+        answered: leaderboardEntry?.answered ?? 0,
+      };
+    });
+
+  const seenParticipantIds = new Set(summaries.map((participant) => participant.participantId));
+  const responseOnlyParticipants = new Map<
+    string,
+    { label: string; joinedAt: string; updatedAt: string }
+  >();
+
+  for (const response of [...responseRows].reverse()) {
+    if (seenParticipantIds.has(response.participant_id)) {
+      continue;
+    }
+
+    const existing = responseOnlyParticipants.get(response.participant_id);
+    const responseName =
+      response.participant_name && response.participant_name !== "Anoniem" ? response.participant_name : "";
+    responseOnlyParticipants.set(response.participant_id, {
+      label: existing?.label || responseName,
+      joinedAt:
+        existing && existing.joinedAt.localeCompare(response.created_at) <= 0
+          ? existing.joinedAt
+          : response.created_at,
+      updatedAt:
+        existing && existing.updatedAt.localeCompare(response.updated_at) >= 0
+          ? existing.updatedAt
+          : response.updated_at,
+    });
+  }
+
+  const fallbackStart = profileRows.length + 1;
+  const fallbackSummaries = [...responseOnlyParticipants.entries()]
+    .sort((left, right) => left[1].joinedAt.localeCompare(right[1].joinedAt) || left[0].localeCompare(right[0]))
+    .map(([participantId, value], index) => {
+      const leaderboardEntry = leaderboardByParticipant.get(participantId);
+      const displayIndex = fallbackStart + index;
+      const joinedAtMs = parseTimestampMs(value.joinedAt);
+
+      return {
+        participantId,
+        label: value.label || `Deelnemer ${displayIndex}`,
+        isAnonymous: !value.label,
+        displayIndex,
+        joinedAt: value.joinedAt,
+        updatedAt: value.updatedAt,
+        joinedAfterGroupStart: Boolean(groupStartedAtMs && joinedAtMs && joinedAtMs > groupStartedAtMs),
+        rank: leaderboardEntry?.rank ?? null,
+        score: leaderboardEntry?.score ?? 0,
+        answered: leaderboardEntry?.answered ?? 0,
+      };
+    });
+
+  return [...summaries, ...fallbackSummaries];
 }
 
 function hideCorrectAnswers(question: QuestionResult | null) {
@@ -1645,6 +1752,12 @@ export async function getPresenterPayload(presentationId: string, presenterKey: 
 
   const questions = buildQuestions(questionRows, optionRows, responseRows);
   const { leaderboard, quizTotals } = buildLeaderboard(questionRows, optionRows, responseRows, profileRows);
+  const participants = buildParticipantSummaries(
+    profileRows,
+    responseRows,
+    leaderboard,
+    presentation.participant_group_started_at
+  );
 
   return {
     presentation: mapPresentation(presentation),
@@ -1652,6 +1765,7 @@ export async function getPresenterPayload(presentationId: string, presenterKey: 
     activeQuestion:
       questions.find((question) => question.id === presentation.active_question_id && question.status === "open") ??
       null,
+    participants,
     leaderboard,
     quizTotals,
     totals: {
@@ -2077,6 +2191,43 @@ export async function resetPresentationFlow(
       WHERE id = ${presentationId}
     `;
   });
+
+  invalidatePublicSessionCache(presentation.code);
+  return getPresenterPayload(presentationId, presenterKey);
+}
+
+export async function startParticipantGroup(
+  presentationId: string,
+  presenterKey: string
+) {
+  const presentation = await assertPresenter(presentationId, presenterKey);
+  const sql = getSql();
+  const timestamp = nowIso();
+  const participantCount = numberFromDb(
+    first(
+      await sql<{ count: number }[]>`
+        SELECT COUNT(DISTINCT participant_id)::int AS count
+        FROM (
+          SELECT participant_id
+          FROM participant_profiles
+          WHERE presentation_id = ${presentationId}
+          UNION
+          SELECT participant_id
+          FROM responses
+          WHERE presentation_id = ${presentationId}
+        ) AS participants
+      `
+    )?.count
+  );
+
+  await sql`
+    UPDATE presentations
+    SET
+      participant_group_started_at = ${timestamp},
+      participant_group_started_count = ${participantCount},
+      updated_at = ${timestamp}
+    WHERE id = ${presentationId}
+  `;
 
   invalidatePublicSessionCache(presentation.code);
   return getPresenterPayload(presentationId, presenterKey);

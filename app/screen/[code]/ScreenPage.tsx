@@ -433,6 +433,13 @@ export default function ScreenPage({ code }: ScreenPageProps) {
   const idleScreenText = session.presentation.idleScreenText || "Sessie Interactief";
   const activeQuestionTiming =
     activeQuestion?.type === "quiz" ? getQuestionTimingState(activeQuestion.content, "quiz", nowMs) : null;
+  const showActiveQuizTimerBar = Boolean(
+    activeQuestion?.type === "quiz" &&
+      activeQuestionTiming?.timeLimitSeconds &&
+      !activeQuestionTiming.isCountdown &&
+      !activeQuestionTiming.isExpired
+  );
+  const activeQuizTimerProgress = Math.round((activeQuestionTiming?.answerProgress ?? 0) * 100);
   const activeCorrectOption =
     activeQuestion?.type === "quiz" ? activeQuestion.options.find((option) => option.isCorrect) ?? null : null;
   const compactOpenResults =
@@ -717,6 +724,19 @@ export default function ScreenPage({ code }: ScreenPageProps) {
                   >
                     {activeQuestion.description}
                   </p>
+                ) : null}
+                {showActiveQuizTimerBar ? (
+                  <div
+                    aria-hidden="true"
+                    className="mx-auto mt-10 h-4 w-full max-w-4xl overflow-hidden rounded-full bg-zinc-800 shadow-inner ring-1 ring-white/10"
+                  >
+                    <div
+                      className={`h-full rounded-full transition-[width] duration-200 ${
+                        activeQuizTimerProgress >= 85 ? "bg-amber-300" : "bg-emerald-300"
+                      }`}
+                      style={{ width: `${activeQuizTimerProgress}%` }}
+                    />
+                  </div>
                 ) : null}
               </div>
             </div>

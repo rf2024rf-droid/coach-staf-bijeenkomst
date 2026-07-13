@@ -616,7 +616,9 @@ function normalizeQuestionContent(payload: Record<string, unknown>, type: Questi
   const required = incoming.required ?? payload.required;
   const timeLimitSeconds = cleanPositiveInteger(incoming.timeLimitSeconds ?? payload.timeLimitSeconds, 3600);
   const points = cleanPositiveInteger(incoming.points ?? payload.points, 1000);
+  const initialOptionCount = cleanPositiveInteger(incoming.initialOptionCount ?? payload.initialOptionCount, 8);
   const normalized: Record<string, unknown> = { kind };
+  const builderDraftIncomplete = incoming.builderDraftIncomplete ?? payload.builderDraftIncomplete;
 
   if (description) {
     normalized.description = description;
@@ -636,8 +638,22 @@ function normalizeQuestionContent(payload: Record<string, unknown>, type: Questi
   if (points !== null) {
     normalized.points = points;
   }
+  if (initialOptionCount !== null) {
+    normalized.initialOptionCount = initialOptionCount;
+  }
+  if (builderDraftIncomplete === true) {
+    normalized.builderDraftIncomplete = true;
+  }
 
   return JSON.stringify(normalized);
+}
+
+function isBuilderDraftIncompletePayload(payload: Record<string, unknown>) {
+  const incoming =
+    payload.content && typeof payload.content === "object" && !Array.isArray(payload.content)
+      ? (payload.content as Record<string, unknown>)
+      : {};
+  return incoming.builderDraftIncomplete === true || payload.builderDraftIncomplete === true;
 }
 
 function cleanEmail(value: unknown) {
@@ -1683,37 +1699,6 @@ export async function createPresentation(
     )
   `;
 
-  if (template === "blank") {
-    return getPresenterPayload(id, presenterKey);
-  }
-
-  if (template === "quiz") {
-    await insertQuestion(
-      id,
-      "quiz",
-      "Voorbeeld quizvraag: welk antwoord is juist?",
-      [
-        { label: "Antwoord A", isCorrect: true },
-        { label: "Antwoord B", isCorrect: false },
-        { label: "Antwoord C", isCorrect: false },
-        { label: "Antwoord D", isCorrect: false },
-      ],
-      true
-    );
-  } else {
-    await insertQuestion(id, "open", "Wat wil je vandaag zeker bespreken?", [], true);
-    await insertQuestion(
-      id,
-      "multiple",
-      "Waar wil je vandaag de meeste focus op leggen?",
-      ["Wedstrijdanalyse", "Training", "Spelersontwikkeling", "Teamafspraken"].map((label) => ({
-        label,
-        isCorrect: false,
-      })),
-      false
-    );
-  }
-
   return getPresenterPayload(id, presenterKey);
 }
 
@@ -1899,13 +1884,16 @@ export async function addQuestion(
           ? "slide"
           : "open";
   const prompt = cleanText(payload.prompt, 180);
+  const builderDraftIncomplete = isBuilderDraftIncompletePayload(payload);
 
-  if (!prompt) {
+  if (!prompt && !builderDraftIncomplete) {
     throw new AppError(400, type === "slide" ? "Titel van de slide is verplicht." : "Vraagtekst is verplicht.");
   }
 
   const options = normalizeOptionInputs(payload.options, type);
-  validateChoiceOptions(type, options);
+  if (!builderDraftIncomplete) {
+    validateChoiceOptions(type, options);
+  }
   const contentJson = normalizeQuestionContent(payload, type);
 
   const maxQuestions = limits.maxQuestions ?? (presentation.owner_user_id ? betaMaxQuestions() : null);
@@ -1923,7 +1911,9 @@ export async function addQuestion(
   }
 
   const openImmediately =
-    !presentation.active_question_id && (presentation.workflow_status ?? "published") === "published";
+    !builderDraftIncomplete &&
+    !presentation.active_question_id &&
+    (presentation.workflow_status ?? "published") === "published";
   await insertQuestion(presentation.id, type, prompt, options, openImmediately, contentJson);
   invalidatePublicSessionCache(presentation.code);
   return getPresenterPayload(presentationId, presenterKey);

@@ -116,14 +116,14 @@ const itemDefinitions: ItemDefinition[] = [
     icon: "quiz",
     title: "Meerkeuzevraag",
     description: "Een quizvraag met precies een goed antwoord.",
-    prompt: "Welke optie is juist?",
+    prompt: "",
     options: [
-      { label: "Antwoord A", isCorrect: true },
-      { label: "Antwoord B" },
-      { label: "Antwoord C" },
-      { label: "Antwoord D" },
+      { label: "" },
+      { label: "" },
+      { label: "" },
+      { label: "" },
     ],
-    content: { required: true, points: "1" },
+    content: { required: true },
   },
   {
     kind: "true_false",
@@ -132,12 +132,12 @@ const itemDefinitions: ItemDefinition[] = [
     icon: "quiz",
     title: "Waar of niet waar",
     description: "Een snelle quizvraag met twee vaste antwoordopties.",
-    prompt: "Deze stelling is waar.",
+    prompt: "",
     options: [
-      { label: "Waar", isCorrect: true },
-      { label: "Niet waar" },
+      { label: "" },
+      { label: "" },
     ],
-    content: { required: true, points: "1" },
+    content: { required: true },
   },
   {
     kind: "open_question",
@@ -146,7 +146,7 @@ const itemDefinitions: ItemDefinition[] = [
     icon: "open",
     title: "Open vraag",
     description: "Deelnemers typen een kort antwoord of reactie.",
-    prompt: "Wat wil je delen met de groep?",
+    prompt: "",
     content: { required: true },
   },
   {
@@ -156,8 +156,8 @@ const itemDefinitions: ItemDefinition[] = [
     icon: "poll",
     title: "Meerdere antwoorden mogelijk",
     description: "Voor nu als keuzelijst opgeslagen; later uitbreidbaar naar meerselectie.",
-    prompt: "Welke antwoorden passen hierbij?",
-    options: [{ label: "Optie A" }, { label: "Optie B" }, { label: "Optie C" }],
+    prompt: "",
+    options: [{ label: "" }, { label: "" }, { label: "" }],
     content: { required: true },
   },
   {
@@ -167,7 +167,7 @@ const itemDefinitions: ItemDefinition[] = [
     icon: "slide",
     title: "Titelpagina",
     description: "Een duidelijke startslide voor je sessie.",
-    prompt: "Titel van je presentatie",
+    prompt: "",
   },
   {
     kind: "text_slide",
@@ -176,8 +176,7 @@ const itemDefinitions: ItemDefinition[] = [
     icon: "slide",
     title: "Tekstslide",
     description: "Een slide met titel en korte tekst.",
-    prompt: "Belangrijk punt",
-    content: { slideBody: "Schrijf hier de kernboodschap." },
+    prompt: "",
   },
   {
     kind: "image_text",
@@ -186,7 +185,7 @@ const itemDefinitions: ItemDefinition[] = [
     icon: "image",
     title: "Afbeelding met tekst",
     description: "Een visuele slide met optionele afbeelding.",
-    prompt: "Titel bij de afbeelding",
+    prompt: "",
   },
   {
     kind: "info_slide",
@@ -195,7 +194,7 @@ const itemDefinitions: ItemDefinition[] = [
     icon: "slide",
     title: "Informatieslide",
     description: "Voor uitleg, agenda of context.",
-    prompt: "Informatie voor de groep",
+    prompt: "",
   },
   {
     kind: "chapter_slide",
@@ -204,7 +203,7 @@ const itemDefinitions: ItemDefinition[] = [
     icon: "slide",
     title: "Hoofdstukscherm",
     description: "Markeer een nieuw onderdeel in je presentatie.",
-    prompt: "Nieuw hoofdstuk",
+    prompt: "",
   },
   {
     kind: "poll",
@@ -213,8 +212,8 @@ const itemDefinitions: ItemDefinition[] = [
     icon: "poll",
     title: "Poll",
     description: "Laat deelnemers kiezen uit meerdere opties.",
-    prompt: "Waar gaat jullie voorkeur naar uit?",
-    options: [{ label: "Optie A" }, { label: "Optie B" }, { label: "Optie C" }],
+    prompt: "",
+    options: [{ label: "" }, { label: "" }, { label: "" }],
   },
   {
     kind: "statement",
@@ -223,8 +222,8 @@ const itemDefinitions: ItemDefinition[] = [
     icon: "poll",
     title: "Stelling",
     description: "Peil snel of de zaal het eens of oneens is.",
-    prompt: "Ik ben het eens met deze stelling.",
-    options: [{ label: "Eens" }, { label: "Oneens" }, { label: "Twijfel" }],
+    prompt: "",
+    options: [{ label: "" }, { label: "" }, { label: "" }],
   },
   {
     kind: "wordcloud",
@@ -233,7 +232,7 @@ const itemDefinitions: ItemDefinition[] = [
     icon: "open",
     title: "Woordwolk",
     description: "Verzamel korte woorden of reacties.",
-    prompt: "Welk woord komt als eerste bij je op?",
+    prompt: "",
     content: { required: true },
   },
   {
@@ -243,8 +242,8 @@ const itemDefinitions: ItemDefinition[] = [
     icon: "scale",
     title: "Schaalvraag",
     description: "Laat deelnemers kiezen op een schaal van 1 tot 5.",
-    prompt: "Hoe beoordeel je dit onderdeel?",
-    options: [{ label: "1" }, { label: "2" }, { label: "3" }, { label: "4" }, { label: "5" }],
+    prompt: "",
+    options: [{ label: "" }, { label: "" }, { label: "" }, { label: "" }, { label: "" }],
   },
 ];
 
@@ -324,16 +323,21 @@ function isChoiceQuestion(type: QuestionType) {
 
 function draftFromQuestion(question: QuestionResult): ItemDraft {
   const content = question.content;
+  const fallbackOptionCount =
+    typeof content.initialOptionCount === "number" && content.initialOptionCount > 0
+      ? Math.min(Math.floor(content.initialOptionCount), 8)
+      : 2;
   const options = question.options.length
     ? question.options.map((option) => ({
         id: option.id,
         label: option.label,
         isCorrect: option.isCorrect,
       }))
-    : [
-        { id: optionId(), label: "Optie A", isCorrect: question.type === "quiz" },
-        { id: optionId(), label: "Optie B", isCorrect: false },
-      ];
+    : Array.from({ length: fallbackOptionCount }, () => ({
+        id: optionId(),
+        label: "",
+        isCorrect: false,
+      }));
 
   return {
     id: question.id,
@@ -370,6 +374,8 @@ function payloadForDefinition(definition: ItemDefinition) {
       slideBody: definition.content?.slideBody ?? "",
       imageUrl: definition.content?.imageUrl ?? "",
       required: definition.content?.required ?? true,
+      builderDraftIncomplete: true,
+      initialOptionCount: definition.options?.length ?? (isChoiceQuestion(definition.type) ? 2 : null),
       points: definition.content?.points ? Number(definition.content.points) : null,
       timeLimitSeconds: definition.content?.timeLimitSeconds
         ? Number(definition.content.timeLimitSeconds)
@@ -405,6 +411,27 @@ function validateDraft(draft: ItemDraft | null) {
   return errors;
 }
 
+function validateQuestionResult(question: QuestionResult) {
+  const itemErrors: string[] = [];
+  if (question.content.builderDraftIncomplete === true) {
+    itemErrors.push("Onderdeel nog niet ingevuld.");
+  }
+  if (!question.prompt.trim()) {
+    itemErrors.push(question.type === "slide" ? "Titel ontbreekt." : "Vraagstelling ontbreekt.");
+  }
+  if (isChoiceQuestion(question.type) && question.options.filter((option) => option.label.trim()).length < 2) {
+    itemErrors.push("Te weinig antwoordopties.");
+  }
+  if (question.type === "quiz" && question.options.filter((option) => option.isCorrect).length !== 1) {
+    itemErrors.push("Geen juist antwoord geselecteerd.");
+  }
+  if (question.type === "slide" && !question.prompt.trim() && !question.description.trim()) {
+    itemErrors.push("Lege slide.");
+  }
+
+  return itemErrors;
+}
+
 function validatePresentation(payload: PresenterPayload | null) {
   const errors: Record<string, string[]> = {};
   if (!payload) {
@@ -412,19 +439,7 @@ function validatePresentation(payload: PresenterPayload | null) {
   }
 
   for (const question of payload.questions) {
-    const itemErrors: string[] = [];
-    if (!question.prompt.trim()) {
-      itemErrors.push(question.type === "slide" ? "Titel ontbreekt." : "Vraagstelling ontbreekt.");
-    }
-    if (isChoiceQuestion(question.type) && question.options.length < 2) {
-      itemErrors.push("Te weinig antwoordopties.");
-    }
-    if (question.type === "quiz" && question.options.filter((option) => option.isCorrect).length !== 1) {
-      itemErrors.push("Geen juist antwoord geselecteerd.");
-    }
-    if (question.type === "slide" && !question.prompt.trim() && !question.description.trim()) {
-      itemErrors.push("Lege slide.");
-    }
+    const itemErrors = validateQuestionResult(question);
     if (itemErrors.length) {
       errors[question.id] = itemErrors;
     }
@@ -1028,7 +1043,8 @@ export default function PresentationWizard() {
       <div className={compact ? "flex gap-2 overflow-x-auto pb-1" : "grid gap-2"}>
         {payload.questions.map((question, index) => {
           const active = question.id === activeQuestionId;
-          const errors = validationErrors[question.id] ?? [];
+          const errors = validationErrors[question.id] ?? validateQuestionResult(question);
+          const timelineTitle = question.prompt.trim() || "Nog niet ingevuld";
           return (
             <button
               className={`rounded-lg border p-3 text-left transition ${
@@ -1054,7 +1070,13 @@ export default function PresentationWizard() {
                   <span className="block text-xs font-black uppercase text-zinc-500">
                     {question.position}. {itemTitle(question)}
                   </span>
-                  <span className="mt-1 line-clamp-2 block font-black leading-snug">{question.prompt}</span>
+                  <span
+                    className={`mt-1 line-clamp-2 block font-black leading-snug ${
+                      question.prompt.trim() ? "" : "text-zinc-400"
+                    }`}
+                  >
+                    {timelineTitle}
+                  </span>
                   <span className={`mt-2 inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-bold ${errors.length ? "bg-rose-100 text-rose-800" : "bg-white text-zinc-600"}`}>
                     {errors.length ? "Onvolledig" : "Compleet"}
                   </span>
@@ -1381,6 +1403,7 @@ export default function PresentationWizard() {
                         className="mt-2 w-full rounded-lg border border-zinc-300 px-4 py-3 text-lg font-bold outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
                         maxLength={180}
                         onChange={(event) => updateDraft({ prompt: event.target.value })}
+                        placeholder={draft.type === "slide" ? "Vul een titel in" : "Vul je vraag in"}
                         value={draft.prompt}
                       />
                     </label>
@@ -1417,6 +1440,7 @@ export default function PresentationWizard() {
                                 className="min-w-0 rounded-lg border border-zinc-300 bg-white px-3 py-2 font-bold outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
                                 maxLength={90}
                                 onChange={(event) => updateOption(option.id, { label: event.target.value })}
+                                placeholder={`Antwoord ${String.fromCharCode(65 + index)}`}
                                 value={option.label}
                               />
                               <div className="flex gap-2 md:justify-end">
@@ -1461,7 +1485,7 @@ export default function PresentationWizard() {
                               updateDraft({
                                 options: [
                                   ...draft.options,
-                                  { id: optionId(), label: `Optie ${String.fromCharCode(65 + draft.options.length)}`, isCorrect: false },
+                                  { id: optionId(), label: "", isCorrect: false },
                                 ],
                               })
                             }

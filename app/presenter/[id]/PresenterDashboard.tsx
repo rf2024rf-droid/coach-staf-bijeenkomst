@@ -87,14 +87,14 @@ function makeOptionDraft(label = "", isCorrect = false): OptionDraft {
 }
 
 function defaultQuizOptions() {
-  return [makeOptionDraft("", true), makeOptionDraft("")];
+  return [makeOptionDraft(), makeOptionDraft()];
 }
 
 function createDefaultQuestionForm(): QuestionForm {
   return {
     type: "open",
     prompt: "",
-    options: "Ja\nNee\nMisschien",
+    options: "",
     quizOptions: defaultQuizOptions(),
     timeLimitSeconds: "",
   };
@@ -117,11 +117,7 @@ function optionLetter(index: number) {
 }
 
 function normalizeOptionDrafts(options: OptionDraft[]) {
-  if (options.some((option) => option.isCorrect)) {
-    return options;
-  }
-
-  return options.map((option, index) => ({ ...option, isCorrect: index === 0 }));
+  return options;
 }
 
 function QuizOptionsEditor({
@@ -167,7 +163,7 @@ function QuizOptionsEditor({
                 className="min-w-0 flex-1 rounded-lg border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
                 maxLength={90}
                 onChange={(event) => updateOption(option.id, event.target.value)}
-                placeholder={`Antwoord ${index + 1}`}
+                placeholder={`Antwoord ${optionLetter(index)}`}
                 value={option.label}
               />
             </label>
@@ -1912,6 +1908,7 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
                     className="mt-2 min-h-28 w-full resize-y rounded-lg border border-zinc-300 px-3 py-3 outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
                     id="question-options"
                     onChange={(event) => setForm((current) => ({ ...current, options: event.target.value }))}
+                    placeholder={"Antwoord A\nAntwoord B\nAntwoord C"}
                     value={form.options}
                   />
                 </>

@@ -1316,6 +1316,15 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
                       <RotateCcw aria-hidden className="h-4 w-4" />
                       Reset presentatieflow
                     </button>
+                    <button
+                      className="col-span-2 inline-flex items-center justify-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-bold text-rose-800 hover:bg-rose-100 disabled:opacity-60 md:col-span-1"
+                      disabled={saving || !payload.totals.answers}
+                      onClick={() => reset(null)}
+                      type="button"
+                    >
+                      <Trash2 aria-hidden className="h-4 w-4" />
+                      Wis alle antwoorden
+                    </button>
                   </div>
                 </div>
                 <div className="grid gap-2 md:gap-3">

@@ -135,7 +135,7 @@ function presentationTypeLabel(type: ModeratorPresentationSummary["presentationT
 }
 
 function moderatorTabClassName(active: boolean) {
-  return `rounded-lg px-4 py-3 text-left text-sm font-black transition ${
+  return `rounded-lg px-3 py-3 text-left text-sm font-black transition sm:px-4 ${
     active ? "bg-zinc-950 text-white shadow-sm" : "bg-white text-zinc-700 hover:bg-zinc-100"
   }`;
 }
@@ -582,8 +582,8 @@ export default function ModeratorDashboard({ entryMode = "users" }: ModeratorDas
     const availableModes: AuthMode[] = entryMode === "admin" ? ["admin"] : ["login", "signup"];
 
     return (
-      <main className="grid min-h-screen place-items-center bg-[#f5f5f0] px-5 py-8 text-zinc-950">
-        <section className="w-full max-w-md rounded-lg border border-zinc-300 bg-white p-6 shadow-sm">
+      <main className="grid min-h-screen place-items-center bg-[#f5f5f0] px-4 py-6 text-zinc-950 sm:px-5 sm:py-8">
+        <section className="w-full max-w-md rounded-lg border border-zinc-300 bg-white p-5 shadow-sm sm:p-6">
           <div className="mb-5 flex items-center gap-3">
             <div className="grid h-10 w-10 place-items-center rounded-lg bg-zinc-900 text-white">
               {entryMode === "admin" ? (
@@ -601,7 +601,7 @@ export default function ModeratorDashboard({ entryMode = "users" }: ModeratorDas
           </div>
 
           {availableModes.length > 1 ? (
-            <div className="mb-5 grid gap-2 sm:grid-cols-2">
+            <div className="mb-5 grid grid-cols-2 gap-2">
               {availableModes.map((mode) => (
                 <button
                   className={`rounded-lg px-3 py-3 text-sm font-black ${
@@ -775,22 +775,22 @@ export default function ModeratorDashboard({ entryMode = "users" }: ModeratorDas
 
   return (
     <main className="min-h-screen bg-[#f5f5f0] text-zinc-950">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-5 py-6 md:px-8">
-        <header className="flex flex-col gap-4 border-b border-zinc-300 pb-5 lg:flex-row lg:items-end lg:justify-between">
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 px-4 py-4 md:gap-6 md:px-8 md:py-6">
+        <header className="flex flex-col gap-4 rounded-lg border border-zinc-300 bg-white p-4 shadow-sm md:p-5 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="text-sm font-semibold uppercase text-emerald-800">Sessie Interactief</p>
-            <h1 className="mt-2 text-3xl font-black md:text-4xl">
+            <h1 className="mt-1 text-2xl font-black md:mt-2 md:text-4xl">
               {session.role === "admin" ? "Platformbeheer" : "Mijn omgeving"}
             </h1>
-            <p className="mt-2 max-w-2xl text-zinc-700">
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-700 md:text-base">
               {session.role === "admin"
                 ? "Beheer alle accounts, presentaties, QR-codes en presenter-schermen."
                 : `Ingelogd als ${session.email}. Je presentaties en quizzen blijven bewaard.`}
             </p>
           </div>
-          <div className="flex flex-col items-start gap-2 lg:items-end">
+          <div className="flex flex-col items-stretch gap-2 sm:items-start lg:items-end">
             <button
-              className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 bg-white px-4 py-3 text-sm font-bold hover:bg-zinc-50"
+              className="inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-white px-4 py-3 text-sm font-bold hover:bg-zinc-50"
               disabled={busy === "logout"}
               onClick={logout}
               type="button"
@@ -823,7 +823,7 @@ export default function ModeratorDashboard({ entryMode = "users" }: ModeratorDas
         ) : null}
 
         {session.role === "admin" ? (
-          <nav className="grid gap-2 rounded-lg border border-zinc-300 bg-zinc-100 p-2 sm:grid-cols-2">
+          <nav className="grid grid-cols-2 gap-2 rounded-lg border border-zinc-300 bg-zinc-100 p-2">
             <button
               className={moderatorTabClassName(moderatorTab === "presentations")}
               onClick={() => setModeratorTab("presentations")}
@@ -847,10 +847,10 @@ export default function ModeratorDashboard({ entryMode = "users" }: ModeratorDas
           </nav>
         ) : null}
 
-        <section className={`${session.role === "admin" && moderatorTab !== "presentations" ? "hidden" : ""} grid gap-4 rounded-lg border border-zinc-300 bg-white p-5 shadow-sm lg:grid-cols-[1fr_auto] lg:items-center`}>
+        <section className={`${session.role === "admin" && moderatorTab !== "presentations" ? "hidden" : ""} grid gap-4 rounded-lg border border-zinc-300 bg-white p-4 shadow-sm md:p-5 lg:grid-cols-[1fr_auto] lg:items-center`}>
           <div>
             <p className="text-xs font-black uppercase text-emerald-800">Startpunt</p>
-            <h2 className="mt-1 text-2xl font-black">Nieuwe presentatie maken</h2>
+            <h2 className="mt-1 text-xl font-black md:text-2xl">Nieuwe presentatie maken</h2>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-600">
               {session.role === "tester"
                 ? `Je wordt stap voor stap begeleid. Je kunt maximaal ${session.limits.maxPresentations} presentaties of quizzen maken met maximaal ${session.limits.maxQuestions} onderdelen per presentatie.`
@@ -858,7 +858,7 @@ export default function ModeratorDashboard({ entryMode = "users" }: ModeratorDas
             </p>
           </div>
           <button
-            className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-800 px-5 py-4 text-base font-black text-white hover:bg-emerald-900 disabled:opacity-60"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-800 px-5 py-4 text-base font-black text-white hover:bg-emerald-900 disabled:opacity-60 lg:w-auto"
             disabled={presentationLimitReached}
             onClick={() => router.push(builderPath())}
             type="button"
@@ -869,30 +869,30 @@ export default function ModeratorDashboard({ entryMode = "users" }: ModeratorDas
           </button>
         </section>
 
-        <section className={`${session.role === "admin" && moderatorTab !== "presentations" ? "hidden" : ""} grid gap-2 rounded-lg border border-zinc-300 bg-white/80 p-2 md:grid-cols-4`}>
-          <article className="rounded-lg bg-zinc-50 px-4 py-3">
-            <p className="text-sm font-semibold text-zinc-600">Presentaties</p>
-            <p className="mt-1 text-2xl font-black">
+        <section className={`${session.role === "admin" && moderatorTab !== "presentations" ? "hidden" : ""} grid grid-cols-2 gap-2 rounded-lg border border-zinc-300 bg-white/80 p-2 lg:grid-cols-4`}>
+          <article className="rounded-lg bg-zinc-50 p-3 md:px-4">
+            <p className="text-xs font-semibold text-zinc-600 md:text-sm">Presentaties</p>
+            <p className="mt-1 text-xl font-black md:text-2xl">
               {presentations.length}
               {session.role === "tester" && session.limits.maxPresentations ? `/${session.limits.maxPresentations}` : ""}
             </p>
           </article>
-          <article className="rounded-lg bg-zinc-50 px-4 py-3">
-            <p className="text-sm font-semibold text-zinc-600">Onderdelen</p>
-            <p className="mt-1 text-2xl font-black">{totals.items}</p>
+          <article className="rounded-lg bg-zinc-50 p-3 md:px-4">
+            <p className="text-xs font-semibold text-zinc-600 md:text-sm">Onderdelen</p>
+            <p className="mt-1 text-xl font-black md:text-2xl">{totals.items}</p>
             <p className="mt-1 text-xs font-bold text-zinc-500">
               {totals.questions} vragen / {totals.slides} slides
             </p>
           </article>
-          <article className="rounded-lg bg-zinc-50 px-4 py-3">
-            <p className="text-sm font-semibold text-zinc-600">Antwoorden</p>
-            <p className="mt-1 text-2xl font-black">{totals.answers}</p>
+          <article className="rounded-lg bg-zinc-50 p-3 md:px-4">
+            <p className="text-xs font-semibold text-zinc-600 md:text-sm">Antwoorden</p>
+            <p className="mt-1 text-xl font-black md:text-2xl">{totals.answers}</p>
           </article>
-          <article className="rounded-lg bg-zinc-50 px-4 py-3">
-            <p className="text-sm font-semibold text-zinc-600">
+          <article className="rounded-lg bg-zinc-50 p-3 md:px-4">
+            <p className="text-xs font-semibold text-zinc-600 md:text-sm">
               {session.role === "admin" ? "Gebruikersaccounts" : "Deelnemers"}
             </p>
-            <p className="mt-1 text-2xl font-black">
+            <p className="mt-1 text-xl font-black md:text-2xl">
               {session.role === "admin"
                 ? `${session.limits.accountCount}/${session.limits.maxAccounts}`
                 : totals.participants}
@@ -901,7 +901,7 @@ export default function ModeratorDashboard({ entryMode = "users" }: ModeratorDas
         </section>
 
         {session.role === "admin" && moderatorTab === "accounts" ? (
-          <section className="rounded-lg border border-zinc-300 bg-white p-5 shadow-sm">
+          <section className="rounded-lg border border-zinc-300 bg-white p-4 shadow-sm md:p-5">
             <div className="mb-5 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
               <div>
                 <p className="text-xs font-black uppercase text-emerald-800">Beheerder</p>
@@ -918,9 +918,9 @@ export default function ModeratorDashboard({ entryMode = "users" }: ModeratorDas
             ) : (
               <div className="grid gap-3">
                 {accounts.map((account) => (
-                  <article className="grid gap-4 rounded-lg border border-zinc-200 bg-zinc-50 p-4 md:grid-cols-[1fr_auto]" key={account.id}>
+                  <article className="grid gap-4 rounded-lg border border-zinc-200 bg-zinc-50 p-3 md:grid-cols-[1fr_auto] md:p-4" key={account.id}>
                     <div>
-                      <h3 className="font-black">{account.email}</h3>
+                      <h3 className="break-all font-black">{account.email}</h3>
                       <div className="mt-2 flex flex-wrap gap-2 text-sm">
                         <span className={`rounded-md px-2 py-1 font-bold ${statusClassName(account.status)}`}>
                           {statusLabel(account.status)}
@@ -935,10 +935,10 @@ export default function ModeratorDashboard({ entryMode = "users" }: ModeratorDas
                         <p>Aangemaakt {formatDate(account.createdAt)}</p>
                         <p>Laatst ingelogd {formatDate(account.lastLoginAt)}</p>
                       </div>
-                      <div className="flex flex-wrap gap-2 md:justify-end">
+                      <div className="grid grid-cols-2 gap-2 md:flex md:flex-wrap md:justify-end">
                         {account.status === "deactivated" ? (
                           <button
-                            className="inline-flex items-center gap-2 rounded-lg bg-emerald-800 px-3 py-2 text-sm font-bold text-white hover:bg-emerald-900 disabled:opacity-60"
+                            className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-800 px-3 py-2 text-sm font-bold text-white hover:bg-emerald-900 disabled:opacity-60"
                             disabled={busy === `activate-account-${account.id}`}
                             onClick={() => updateAccountStatus(account, "activate")}
                             type="button"
@@ -948,7 +948,7 @@ export default function ModeratorDashboard({ entryMode = "users" }: ModeratorDas
                           </button>
                         ) : (
                           <button
-                            className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-bold hover:bg-zinc-100 disabled:opacity-60"
+                            className="inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-bold hover:bg-zinc-100 disabled:opacity-60"
                             disabled={busy === `deactivate-account-${account.id}`}
                             onClick={() => updateAccountStatus(account, "deactivate")}
                             type="button"
@@ -958,7 +958,7 @@ export default function ModeratorDashboard({ entryMode = "users" }: ModeratorDas
                           </button>
                         )}
                         <button
-                          className="inline-flex items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-bold text-rose-800 hover:bg-rose-100 disabled:opacity-60"
+                          className="inline-flex items-center justify-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-bold text-rose-800 hover:bg-rose-100 disabled:opacity-60"
                           disabled={busy === `delete-account-${account.id}`}
                           onClick={() => deleteAccount(account)}
                           type="button"
@@ -975,7 +975,7 @@ export default function ModeratorDashboard({ entryMode = "users" }: ModeratorDas
           </section>
         ) : null}
 
-        <section className={`${session.role === "admin" && moderatorTab !== "presentations" ? "hidden" : ""} rounded-lg border border-zinc-300 bg-white p-5 shadow-sm`}>
+        <section className={`${session.role === "admin" && moderatorTab !== "presentations" ? "hidden" : ""} rounded-lg border border-zinc-300 bg-white p-4 shadow-sm md:p-5`}>
           <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <h2 className="text-lg font-black">
               {session.role === "admin" ? "Aangemaakte presentaties" : "Mijn presentaties"}
@@ -1021,7 +1021,7 @@ export default function ModeratorDashboard({ entryMode = "users" }: ModeratorDas
                 const isEditing = editingId === presentation.id;
 
                 return (
-                  <article className="rounded-lg border border-zinc-200 bg-zinc-50 p-4" key={presentation.id}>
+                  <article className="rounded-lg border border-zinc-200 bg-zinc-50 p-3 md:p-4" key={presentation.id}>
                     <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                       <div className="min-w-0 flex-1">
                         {isEditing ? (
@@ -1042,7 +1042,7 @@ export default function ModeratorDashboard({ entryMode = "users" }: ModeratorDas
                             </button>
                           </div>
                         ) : (
-                          <h3 className="truncate text-xl font-black">{presentation.title}</h3>
+                          <h3 className="break-words text-xl font-black">{presentation.title}</h3>
                         )}
 
                         <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
@@ -1078,23 +1078,23 @@ export default function ModeratorDashboard({ entryMode = "users" }: ModeratorDas
                         </p>
                       </div>
 
-                      <div className="flex flex-wrap gap-2 lg:justify-end">
+                      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:flex lg:flex-wrap lg:justify-end">
                         <a
-                          className="inline-flex items-center gap-2 rounded-lg bg-emerald-800 px-3 py-2 text-sm font-bold text-white hover:bg-emerald-900"
+                          className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-800 px-3 py-2 text-sm font-bold text-white hover:bg-emerald-900"
                           href={builderPath(presentation.id)}
                         >
                           <Pencil aria-hidden className="h-4 w-4" />
                           Bewerk
                         </a>
                         <a
-                          className="inline-flex items-center gap-2 rounded-lg bg-zinc-900 px-3 py-2 text-sm font-bold text-white hover:bg-zinc-700"
+                          className="inline-flex items-center justify-center gap-2 rounded-lg bg-zinc-900 px-3 py-2 text-sm font-bold text-white hover:bg-zinc-700"
                           href={presenterUrl}
                         >
                           <ArrowRight aria-hidden className="h-4 w-4" />
                           Regie
                         </a>
                         <a
-                          className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-bold hover:bg-zinc-100"
+                          className="inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-bold hover:bg-zinc-100"
                           href={`/screen/${presentation.code}`}
                           rel="noreferrer"
                           target="_blank"
@@ -1103,7 +1103,7 @@ export default function ModeratorDashboard({ entryMode = "users" }: ModeratorDas
                           Scherm
                         </a>
                         <button
-                          className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-bold hover:bg-zinc-100"
+                          className="inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-bold hover:bg-zinc-100"
                           onClick={() => copyValue(joinUrl, "Deelnemerslink")}
                           type="button"
                         >
@@ -1111,7 +1111,7 @@ export default function ModeratorDashboard({ entryMode = "users" }: ModeratorDas
                           Link
                         </button>
                         <button
-                          className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-bold hover:bg-zinc-100"
+                          className="inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-bold hover:bg-zinc-100"
                           onClick={() => copyValue(screenUrl, "Schermlink")}
                           type="button"
                         >
@@ -1119,7 +1119,7 @@ export default function ModeratorDashboard({ entryMode = "users" }: ModeratorDas
                           URL
                         </button>
                         <button
-                          className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-bold hover:bg-zinc-100"
+                          className="inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-bold hover:bg-zinc-100"
                           onClick={() => {
                             setEditingId(isEditing ? "" : presentation.id);
                             setTitleDraft(isEditing ? "" : presentation.title);
@@ -1130,7 +1130,7 @@ export default function ModeratorDashboard({ entryMode = "users" }: ModeratorDas
                           {isEditing ? "Annuleer" : "Naam"}
                         </button>
                         <button
-                          className="inline-flex items-center gap-2 rounded-lg bg-sky-800 px-3 py-2 text-sm font-bold text-white hover:bg-sky-900 disabled:opacity-60"
+                          className="inline-flex items-center justify-center gap-2 rounded-lg bg-sky-800 px-3 py-2 text-sm font-bold text-white hover:bg-sky-900 disabled:opacity-60"
                           disabled={busy === `duplicate-${presentation.id}` || presentationLimitReached}
                           onClick={() => duplicatePresentation(presentation.id)}
                           type="button"
@@ -1139,7 +1139,7 @@ export default function ModeratorDashboard({ entryMode = "users" }: ModeratorDas
                           Dupliceer
                         </button>
                         <button
-                          className="inline-flex items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-bold text-rose-800 hover:bg-rose-100 disabled:opacity-60"
+                          className="inline-flex items-center justify-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-bold text-rose-800 hover:bg-rose-100 disabled:opacity-60"
                           disabled={busy === `delete-${presentation.id}`}
                           onClick={() => deletePresentation(presentation.id, presentation.title)}
                           type="button"

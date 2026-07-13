@@ -447,6 +447,7 @@ export default function PresentationWizard() {
   const [draft, setDraft] = useState<ItemDraft | null>(null);
   const [dirty, setDirty] = useState(false);
   const [showAddPanel, setShowAddPanel] = useState(!requestedId);
+  const [mobileTimelineOpen, setMobileTimelineOpen] = useState(!requestedId);
   const [previewIndex, setPreviewIndex] = useState(0);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [saveCycle, setSaveCycle] = useState(0);
@@ -970,15 +971,110 @@ export default function PresentationWizard() {
     { id: "preview", label: "Voorbeeld" },
     { id: "finish", label: "Afronden" },
   ];
+  const currentStepIndex = Math.max(0, steps.findIndex((item) => item.id === step));
+  const currentStepLabel = steps[currentStepIndex]?.label ?? "Titel";
+  const progressPercent = Math.round(((currentStepIndex + 1) / steps.length) * 100);
+  const previousStep: WizardStep =
+    step === "finish" ? "preview" : step === "preview" ? "canvas" : step === "canvas" ? "type" : "title";
+  const nextStepLabel =
+    step === "finish" ? "Publiceren" : step === "canvas" ? "Afronden" : step === "preview" ? "Afronden" : "Volgende";
+
+  function goPreviousStep() {
+    setStep(previousStep);
+  }
+
+  function goNextStep() {
+    if (step === "canvas") {
+      void finishPresentation();
+      return;
+    }
+    if (step === "preview") {
+      setStep("finish");
+      return;
+    }
+    if (step === "finish") {
+      void publishPresentation();
+      return;
+    }
+    if (step === "title") {
+      if (!title.trim()) {
+        return;
+      }
+      if (payload) {
+        void patchPresentation({
+          title: title.trim(),
+          presentationType,
+          workflowStatus: payload.presentation.workflowStatus,
+        }).catch((caught) => {
+          setError(caught instanceof Error ? caught.message : "Titel kon niet worden opgeslagen.");
+        });
+      }
+      setStep("type");
+      return;
+    }
+    setStep("canvas");
+  }
+
+  function renderTimelineItems(compact = false) {
+    if (!payload?.questions.length) {
+      return (
+        <div className="rounded-lg border border-dashed border-zinc-300 p-5 text-sm font-semibold leading-6 text-zinc-600">
+          Nog geen onderdelen. Voeg je eerste vraag of slide toe.
+        </div>
+      );
+    }
+
+    return (
+      <div className={compact ? "flex gap-2 overflow-x-auto pb-1" : "grid gap-2"}>
+        {payload.questions.map((question, index) => {
+          const active = question.id === activeQuestionId;
+          const errors = validationErrors[question.id] ?? [];
+          return (
+            <button
+              className={`rounded-lg border p-3 text-left transition ${
+                compact ? "min-w-[240px]" : ""
+              } ${
+                active
+                  ? "border-emerald-600 bg-emerald-50 ring-2 ring-emerald-100"
+                  : errors.length
+                    ? "border-rose-300 bg-rose-50"
+                    : "border-zinc-200 bg-zinc-50 hover:bg-white"
+              }`}
+              draggable={!compact}
+              key={question.id}
+              onClick={() => setActiveQuestionId(question.id)}
+              onDragOver={(event) => !compact && event.preventDefault()}
+              onDragStart={() => !compact && setDraggingId(question.id)}
+              onDrop={() => !compact && draggingId && void moveItemTo(draggingId, index)}
+              type="button"
+            >
+              <span className="flex items-start gap-2">
+                <GripVertical aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-zinc-400" />
+                <span className="min-w-0 flex-1">
+                  <span className="block text-xs font-black uppercase text-zinc-500">
+                    {question.position}. {itemTitle(question)}
+                  </span>
+                  <span className="mt-1 line-clamp-2 block font-black leading-snug">{question.prompt}</span>
+                  <span className={`mt-2 inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-bold ${errors.length ? "bg-rose-100 text-rose-800" : "bg-white text-zinc-600"}`}>
+                    {errors.length ? "Onvolledig" : "Compleet"}
+                  </span>
+                </span>
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-[#f5f5f0] text-zinc-950">
-      <div className="mx-auto flex min-h-screen w-full max-w-7xl flex-col px-4 py-5 md:px-6">
-        <header className="sticky top-0 z-20 -mx-4 border-b border-zinc-300 bg-[#f5f5f0]/95 px-4 pb-4 pt-2 backdrop-blur md:-mx-6 md:px-6">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+      <div className="mx-auto flex min-h-screen w-full max-w-7xl flex-col px-4 pb-28 pt-4 md:px-6 lg:pb-5">
+        <header className="sticky top-0 z-20 -mx-4 border-b border-zinc-300 bg-[#f5f5f0]/95 px-4 py-3 backdrop-blur md:-mx-6 md:px-6">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div className="min-w-0">
               <button
-                className="mb-3 inline-flex items-center gap-2 text-sm font-bold text-zinc-600 hover:text-zinc-950"
+                className="mb-2 inline-flex items-center gap-2 text-sm font-bold text-zinc-600 hover:text-zinc-950"
                 onClick={() => router.push(dashboardPath)}
                 type="button"
               >
@@ -986,19 +1082,19 @@ export default function PresentationWizard() {
                 Terug naar dashboard
               </button>
               <p className="text-xs font-black uppercase text-emerald-800">Nieuwe presentatie maken</p>
-              <h1 className="truncate text-2xl font-black md:text-3xl">
+              <h1 className="truncate text-xl font-black md:text-3xl">
                 {title.trim() || "Naamloze presentatie"}
               </h1>
             </div>
-            <div className="grid gap-2 sm:grid-cols-3 lg:min-w-[460px]">
-              <span className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-bold">
-                Stap: {steps.find((item) => item.id === step)?.label}
+            <div className="flex flex-wrap gap-2 lg:min-w-[460px] lg:justify-end">
+              <span className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-xs font-bold md:text-sm">
+                {currentStepIndex + 1}/{steps.length} {currentStepLabel}
               </span>
-              <span className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-bold">
+              <span className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-xs font-bold md:text-sm">
                 {payload?.questions.length ?? 0} onderdelen
               </span>
               <span
-                className={`rounded-lg border px-3 py-2 text-sm font-bold ${
+                className={`rounded-lg border px-3 py-2 text-xs font-bold md:text-sm ${
                   saveState === "error"
                     ? "border-rose-200 bg-rose-50 text-rose-800"
                     : saveState === "saving"
@@ -1011,7 +1107,29 @@ export default function PresentationWizard() {
             </div>
           </div>
 
-          <nav className="mt-4 grid gap-2 sm:grid-cols-5" aria-label="Voortgang">
+          <div className="mt-3 rounded-lg border border-zinc-300 bg-white p-3 md:hidden">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-xs font-black uppercase text-zinc-500">Stap {currentStepIndex + 1}</span>
+              <span className="truncate text-sm font-black">{currentStepLabel}</span>
+            </div>
+            <div className="mt-2 h-2 overflow-hidden rounded-full bg-zinc-100">
+              <div className="h-full rounded-full bg-emerald-800" style={{ width: `${progressPercent}%` }} />
+            </div>
+            <select
+              aria-label="Ga naar stap"
+              className="mt-3 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-bold outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
+              onChange={(event) => setStep(event.target.value as WizardStep)}
+              value={step}
+            >
+              {steps.map((item, index) => (
+                <option disabled={!payload && item.id !== "title"} key={item.id} value={item.id}>
+                  {index + 1}. {item.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <nav className="mt-4 hidden gap-2 md:grid md:grid-cols-5" aria-label="Voortgang">
             {steps.map((item, index) => {
               const active = item.id === step;
               const reached = index <= steps.findIndex((candidate) => candidate.id === step);
@@ -1056,16 +1174,16 @@ export default function PresentationWizard() {
         ) : null}
 
         {step === "title" && busy !== "load" ? (
-          <section className="grid flex-1 place-items-center py-12">
+          <section className="grid flex-1 place-items-center py-6 md:py-12">
             <form className="w-full max-w-3xl" onSubmit={createDraftPresentation}>
-              <div className="rounded-lg border border-zinc-300 bg-white p-6 shadow-sm md:p-8">
+              <div className="rounded-lg border border-zinc-300 bg-white p-5 shadow-sm md:p-8">
                 <p className="text-sm font-black uppercase text-emerald-800">Stap 1</p>
-                <label className="mt-3 block text-3xl font-black md:text-5xl" htmlFor="presentation-title">
+                <label className="mt-3 block text-2xl font-black md:text-5xl" htmlFor="presentation-title">
                   Hoe heet je presentatie?
                 </label>
                 <input
                   autoFocus
-                  className="mt-8 w-full rounded-lg border-2 border-zinc-300 bg-white px-5 py-5 text-2xl font-black outline-none placeholder:text-zinc-300 focus:border-emerald-700 focus:ring-4 focus:ring-emerald-100"
+                  className="mt-6 w-full rounded-lg border-2 border-zinc-300 bg-white px-4 py-4 text-xl font-black outline-none placeholder:text-zinc-300 focus:border-emerald-700 focus:ring-4 focus:ring-emerald-100 md:mt-8 md:px-5 md:py-5 md:text-2xl"
                   id="presentation-title"
                   maxLength={90}
                   onChange={(event) => setTitle(event.target.value)}
@@ -1090,17 +1208,17 @@ export default function PresentationWizard() {
         ) : null}
 
         {step === "type" && payload ? (
-          <section className="py-8">
+          <section className="py-5 md:py-8">
             <div className="mb-6">
               <p className="text-sm font-black uppercase text-emerald-800">Stap 2</p>
-              <h2 className="mt-1 text-3xl font-black">Wat wil je maken?</h2>
+              <h2 className="mt-1 text-2xl font-black md:text-3xl">Wat wil je maken?</h2>
             </div>
             <div className="grid gap-4 lg:grid-cols-3">
               {presentationTypes.map((type) => {
                 const selected = presentationType === type.id;
                 return (
                   <button
-                    className={`group rounded-lg border p-5 text-left shadow-sm transition focus:outline-none focus:ring-4 focus:ring-emerald-100 ${
+                    className={`group rounded-lg border p-4 text-left shadow-sm transition focus:outline-none focus:ring-4 focus:ring-emerald-100 md:p-5 ${
                       selected
                         ? "border-emerald-700 bg-emerald-50 ring-2 ring-emerald-200"
                         : "border-zinc-300 bg-white hover:border-zinc-500 hover:bg-zinc-50"
@@ -1112,7 +1230,7 @@ export default function PresentationWizard() {
                     <span className={`grid h-12 w-12 place-items-center rounded-lg ${selected ? "bg-emerald-800 text-white" : "bg-zinc-950 text-white"}`}>
                       {type.icon === "quiz" ? <Trophy aria-hidden className="h-6 w-6" /> : type.icon === "combined" ? <Layers aria-hidden className="h-6 w-6" /> : <Monitor aria-hidden className="h-6 w-6" />}
                     </span>
-                    <span className="mt-5 block text-2xl font-black">{type.title}</span>
+                    <span className="mt-4 block text-xl font-black md:mt-5 md:text-2xl">{type.title}</span>
                     <span className="mt-3 block text-sm font-semibold leading-6 text-zinc-600">{type.description}</span>
                   </button>
                 );
@@ -1122,8 +1240,35 @@ export default function PresentationWizard() {
         ) : null}
 
         {step === "canvas" && payload ? (
-          <section className="grid flex-1 gap-5 py-6 lg:grid-cols-[320px_1fr]">
-            <aside className="lg:sticky lg:top-40 lg:self-start">
+          <section className="grid flex-1 gap-4 py-4 lg:grid-cols-[320px_1fr] lg:gap-5 lg:py-6">
+            <div className="rounded-lg border border-zinc-300 bg-white p-4 shadow-sm lg:hidden">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-black uppercase text-emerald-800">Tijdlijn</p>
+                  <h2 className="text-lg font-black">Vragen en slides</h2>
+                </div>
+                <button
+                  aria-label="Nieuw onderdeel"
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-800 text-white hover:bg-emerald-900"
+                  onClick={() => setShowAddPanel(true)}
+                  type="button"
+                >
+                  <Plus aria-hidden className="h-5 w-5" />
+                </button>
+              </div>
+              <details
+                className="mt-3"
+                onToggle={(event) => setMobileTimelineOpen(event.currentTarget.open)}
+                open={!payload.questions.length || mobileTimelineOpen}
+              >
+                <summary className="cursor-pointer rounded-lg bg-zinc-100 px-3 py-2 text-sm font-black text-zinc-800">
+                  {payload.questions.length ? `${payload.questions.length} onderdelen bekijken` : "Nog geen onderdelen"}
+                </summary>
+                <div className="mt-3">{renderTimelineItems(true)}</div>
+              </details>
+            </div>
+
+            <aside className="hidden lg:sticky lg:top-40 lg:block lg:self-start">
               <div className="rounded-lg border border-zinc-300 bg-white p-4 shadow-sm">
                 <div className="mb-4 flex items-center justify-between gap-3">
                   <div>
@@ -1139,49 +1284,7 @@ export default function PresentationWizard() {
                     <Plus aria-hidden className="h-5 w-5" />
                   </button>
                 </div>
-                {!payload.questions.length ? (
-                  <div className="rounded-lg border border-dashed border-zinc-300 p-5 text-sm font-semibold leading-6 text-zinc-600">
-                    Nog geen onderdelen. Voeg je eerste vraag of slide toe.
-                  </div>
-                ) : (
-                  <div className="grid gap-2">
-                    {payload.questions.map((question, index) => {
-                      const active = question.id === activeQuestionId;
-                      const errors = validationErrors[question.id] ?? [];
-                      return (
-                        <button
-                          className={`rounded-lg border p-3 text-left transition ${
-                            active
-                              ? "border-emerald-600 bg-emerald-50 ring-2 ring-emerald-100"
-                              : errors.length
-                                ? "border-rose-300 bg-rose-50"
-                                : "border-zinc-200 bg-zinc-50 hover:bg-white"
-                          }`}
-                          draggable
-                          key={question.id}
-                          onClick={() => setActiveQuestionId(question.id)}
-                          onDragOver={(event) => event.preventDefault()}
-                          onDragStart={() => setDraggingId(question.id)}
-                          onDrop={() => draggingId && void moveItemTo(draggingId, index)}
-                          type="button"
-                        >
-                          <span className="flex items-start gap-2">
-                            <GripVertical aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-zinc-400" />
-                            <span className="min-w-0 flex-1">
-                              <span className="block text-xs font-black uppercase text-zinc-500">
-                                {question.position}. {itemTitle(question)}
-                              </span>
-                              <span className="mt-1 line-clamp-2 block font-black leading-snug">{question.prompt}</span>
-                              <span className={`mt-2 inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-bold ${errors.length ? "bg-rose-100 text-rose-800" : "bg-white text-zinc-600"}`}>
-                                {errors.length ? "Onvolledig" : "Compleet"}
-                              </span>
-                            </span>
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
+                {renderTimelineItems()}
               </div>
             </aside>
 
@@ -1301,23 +1404,8 @@ export default function PresentationWizard() {
 
                     {isChoiceQuestion(draft.type) ? (
                       <section>
-                        <div className="mb-3 flex items-center justify-between gap-3">
+                        <div className="mb-3">
                           <h3 className="text-sm font-black uppercase text-zinc-600">Antwoordopties</h3>
-                          <button
-                            className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-bold hover:bg-zinc-50"
-                            onClick={() =>
-                              updateDraft({
-                                options: [
-                                  ...draft.options,
-                                  { id: optionId(), label: `Optie ${String.fromCharCode(65 + draft.options.length)}`, isCorrect: false },
-                                ],
-                              })
-                            }
-                            type="button"
-                          >
-                            <Plus aria-hidden className="h-4 w-4" />
-                            Optie
-                          </button>
                         </div>
                         <div className="grid gap-3">
                           {draft.options.map((option, index) => (
@@ -1367,6 +1455,21 @@ export default function PresentationWizard() {
                               </div>
                             </div>
                           ))}
+                          <button
+                            className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-zinc-300 bg-white px-3 py-3 text-sm font-black text-zinc-700 hover:border-emerald-500 hover:bg-emerald-50"
+                            onClick={() =>
+                              updateDraft({
+                                options: [
+                                  ...draft.options,
+                                  { id: optionId(), label: `Optie ${String.fromCharCode(65 + draft.options.length)}`, isCorrect: false },
+                                ],
+                              })
+                            }
+                            type="button"
+                          >
+                            <Plus aria-hidden className="h-4 w-4" />
+                            Optie toevoegen
+                          </button>
                         </div>
                       </section>
                     ) : null}
@@ -1593,29 +1696,23 @@ export default function PresentationWizard() {
 
       {payload ? (
         <footer className="fixed inset-x-0 bottom-0 z-30 border-t border-zinc-300 bg-white/95 px-4 py-3 shadow-2xl backdrop-blur lg:hidden">
-          <div className="mx-auto flex max-w-7xl gap-2">
+          <div className="mx-auto grid max-w-7xl grid-cols-[1fr_1.25fr] gap-2">
             <button
-              className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-white px-3 py-3 text-sm font-bold"
-              onClick={() => setStep(step === "title" ? "title" : step === "type" ? "title" : "canvas")}
+              className="inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-white px-3 py-3 text-sm font-bold disabled:opacity-50"
+              disabled={step === "title"}
+              onClick={goPreviousStep}
               type="button"
             >
               <ArrowLeft aria-hidden className="h-4 w-4" />
               Vorige
             </button>
             <button
-              className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-emerald-800 px-3 py-3 text-sm font-black text-white"
-              onClick={() =>
-                step === "canvas"
-                  ? void finishPresentation()
-                  : step === "preview"
-                    ? setStep("finish")
-                    : step === "finish"
-                      ? void publishPresentation()
-                      : setStep("canvas")
-              }
+              className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-800 px-3 py-3 text-sm font-black text-white disabled:opacity-60"
+              disabled={busy === "finish" || busy === "publish" || (step === "title" && !title.trim())}
+              onClick={goNextStep}
               type="button"
             >
-              {step === "finish" ? "Publiceren" : step === "canvas" ? "Afronden" : "Volgende"}
+              {nextStepLabel}
               <ArrowRight aria-hidden className="h-4 w-4" />
             </button>
           </div>

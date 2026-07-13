@@ -19,6 +19,7 @@ import {
   Plus,
   Save,
   Settings,
+  Timer,
   Trash2,
   Trophy,
   X,
@@ -114,8 +115,8 @@ const itemDefinitions: ItemDefinition[] = [
     group: "quiz",
     type: "quiz",
     icon: "quiz",
-    title: "Meerkeuzevraag",
-    description: "Een quizvraag met precies een goed antwoord.",
+    title: "Meerkeuze quizvraag",
+    description: "Met timer, juist antwoord, punten en ranking.",
     prompt: "",
     options: [
       { label: "" },
@@ -130,8 +131,8 @@ const itemDefinitions: ItemDefinition[] = [
     group: "quiz",
     type: "quiz",
     icon: "quiz",
-    title: "Waar of niet waar",
-    description: "Een snelle quizvraag met twee vaste antwoordopties.",
+    title: "Waar of niet waar quiz",
+    description: "Snelle quizvraag met timer, juist antwoord en ranking.",
     prompt: "",
     options: [
       { label: "" },
@@ -151,11 +152,11 @@ const itemDefinitions: ItemDefinition[] = [
   },
   {
     kind: "multi_answer",
-    group: "quiz",
+    group: "interactive",
     type: "multiple",
     icon: "poll",
-    title: "Meerdere antwoorden mogelijk",
-    description: "Voor nu als keuzelijst opgeslagen; later uitbreidbaar naar meerselectie.",
+    title: "Multiple choice",
+    description: "Interactieve keuzevraag zonder juist antwoord en zonder ranking.",
     prompt: "",
     options: [{ label: "" }, { label: "" }, { label: "" }],
     content: { required: true },
@@ -211,7 +212,7 @@ const itemDefinitions: ItemDefinition[] = [
     type: "multiple",
     icon: "poll",
     title: "Poll",
-    description: "Laat deelnemers kiezen uit meerdere opties.",
+    description: "Laat deelnemers kiezen uit opties, zonder ranking.",
     prompt: "",
     options: [{ label: "" }, { label: "" }, { label: "" }],
   },
@@ -221,7 +222,7 @@ const itemDefinitions: ItemDefinition[] = [
     type: "multiple",
     icon: "poll",
     title: "Stelling",
-    description: "Peil snel of de zaal het eens of oneens is.",
+    description: "Peil snel de zaal, zonder juist antwoord of ranking.",
     prompt: "",
     options: [{ label: "" }, { label: "" }, { label: "" }],
   },
@@ -315,6 +316,15 @@ function iconFor(definition: ItemDefinition) {
     return <CircleDot aria-hidden className="h-5 w-5" />;
   }
   return <FileText aria-hidden className="h-5 w-5" />;
+}
+
+function resizeTextarea(element: HTMLTextAreaElement | null) {
+  if (!element) {
+    return;
+  }
+
+  element.style.height = "auto";
+  element.style.height = `${element.scrollHeight}px`;
 }
 
 function isChoiceQuestion(type: QuestionType) {
@@ -478,6 +488,7 @@ export default function PresentationWizard() {
   const draftRevisionRef = useRef(0);
   const savingDraftRef = useRef(false);
   const queuedSaveRef = useRef(false);
+  const promptTextareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   const activeQuestion = useMemo(
     () => payload?.questions.find((question) => question.id === activeQuestionId) ?? null,
@@ -543,6 +554,10 @@ export default function PresentationWizard() {
   useEffect(() => {
     activeQuestionIdRef.current = activeQuestionId;
   }, [activeQuestionId]);
+
+  useEffect(() => {
+    resizeTextarea(promptTextareaRef.current);
+  }, [draft?.id, draft?.prompt]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -1336,6 +1351,14 @@ export default function PresentationWizard() {
                   ].map(([label, definitions]) => (
                     <div className="mb-5 last:mb-0" key={label as string}>
                       <h3 className="mb-3 text-sm font-black uppercase text-zinc-500">{label as string}</h3>
+                      {(label as string) === "Quizvragen" ? (
+                        <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm font-bold leading-6 text-amber-950">
+                          <span className="inline-flex items-center gap-2">
+                            <Timer aria-hidden className="h-4 w-4 shrink-0" />
+                            Quizvragen zijn vragen op timer en tellen mee voor de ranking.
+                          </span>
+                        </div>
+                      ) : null}
                       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                         {(definitions as ItemDefinition[]).map((definition) => (
                           <button
@@ -1351,6 +1374,21 @@ export default function PresentationWizard() {
                             <span className="mt-3 block font-black">{definition.title}</span>
                             <span className="mt-1 block text-sm font-semibold leading-6 text-zinc-600">
                               {definition.description}
+                            </span>
+                            <span
+                              className={`mt-3 inline-flex rounded-md px-2 py-1 text-xs font-black ${
+                                definition.type === "quiz"
+                                  ? "bg-amber-100 text-amber-900"
+                                  : definition.type === "multiple"
+                                    ? "bg-sky-100 text-sky-900"
+                                    : "bg-white text-zinc-600"
+                              }`}
+                            >
+                              {definition.type === "quiz"
+                                ? "Timer + ranking"
+                                : definition.type === "multiple"
+                                  ? "Geen ranking"
+                                  : "Open reactie"}
                             </span>
                           </button>
                         ))}
@@ -1395,15 +1433,33 @@ export default function PresentationWizard() {
                   </div>
 
                   <div className="grid gap-5">
+                    {draft.type === "quiz" ? (
+                      <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm font-bold leading-6 text-amber-950">
+                        <span className="inline-flex items-center gap-2">
+                          <Timer aria-hidden className="h-4 w-4 shrink-0" />
+                          Quizvraag met timer en ranking. Stel de tijd in bij Geavanceerde instellingen.
+                        </span>
+                      </div>
+                    ) : draft.type === "multiple" ? (
+                      <div className="rounded-lg border border-sky-200 bg-sky-50 p-3 text-sm font-bold leading-6 text-sky-950">
+                        Multiple choice voor interactie. Deze vraag telt niet mee in de ranking.
+                      </div>
+                    ) : null}
+
                     <label className="block">
                       <span className="text-sm font-black uppercase text-zinc-600">
                         {draft.type === "slide" ? "Titel van de slide" : "Vraagstelling"}
                       </span>
-                      <input
-                        className="mt-2 w-full rounded-lg border border-zinc-300 px-4 py-3 text-lg font-bold outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
+                      <textarea
+                        ref={promptTextareaRef}
+                        className="mt-2 min-h-[56px] w-full resize-none overflow-hidden rounded-lg border border-zinc-300 px-4 py-3 text-lg font-bold leading-7 outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
                         maxLength={180}
-                        onChange={(event) => updateDraft({ prompt: event.target.value })}
+                        onChange={(event) => {
+                          resizeTextarea(event.currentTarget);
+                          updateDraft({ prompt: event.target.value });
+                        }}
                         placeholder={draft.type === "slide" ? "Vul een titel in" : "Vul je vraag in"}
+                        rows={1}
                         value={draft.prompt}
                       />
                     </label>

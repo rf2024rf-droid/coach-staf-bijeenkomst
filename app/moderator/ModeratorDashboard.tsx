@@ -21,6 +21,20 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import {
+  ActionButton,
+  Badge,
+  CompactRow,
+  DangerButton,
+  EmptyState,
+  MetricBadge,
+  OverflowMenu,
+  PageHeader,
+  Panel,
+  SectionHeader,
+  StatusBadge,
+  type Tone,
+} from "@/app/components/design-system";
 import type {
   ModeratorAccountSummary,
   ModeratorPresentationSummary,
@@ -92,17 +106,17 @@ function statusLabel(status: ModeratorAccountSummary["status"]) {
   return "Wacht op mailactivatie";
 }
 
-function statusClassName(status: ModeratorAccountSummary["status"]) {
+function statusTone(status: ModeratorAccountSummary["status"]): Tone {
   if (status === "active") {
-    return "bg-emerald-100 text-emerald-900";
+    return "emerald";
   }
   if (status === "deactivated") {
-    return "bg-rose-100 text-rose-900";
+    return "rose";
   }
   if (status === "deleted") {
-    return "bg-zinc-200 text-zinc-700";
+    return "zinc";
   }
-  return "bg-amber-100 text-amber-900";
+  return "amber";
 }
 
 function presentationStatusLabel(status: ModeratorPresentationSummary["workflowStatus"]) {
@@ -115,14 +129,14 @@ function presentationStatusLabel(status: ModeratorPresentationSummary["workflowS
   return "Concept";
 }
 
-function presentationStatusClassName(status: ModeratorPresentationSummary["workflowStatus"]) {
+function presentationStatusTone(status: ModeratorPresentationSummary["workflowStatus"]): Tone {
   if (status === "published") {
-    return "bg-emerald-100 text-emerald-900";
+    return "emerald";
   }
   if (status === "completed") {
-    return "bg-sky-100 text-sky-900";
+    return "sky";
   }
-  return "bg-amber-100 text-amber-900";
+  return "amber";
 }
 
 function presentationTypeLabel(type: ModeratorPresentationSummary["presentationType"]) {
@@ -776,50 +790,50 @@ export default function ModeratorDashboard({ entryMode = "users" }: ModeratorDas
 
   return (
     <main className="min-h-screen bg-[#f5f5f0] text-zinc-950">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-3 px-3 py-3 md:gap-6 md:px-8 md:py-6">
-        <header className="flex flex-col gap-3 rounded-lg border border-zinc-300 bg-white p-3 shadow-sm md:p-5 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <p className="text-sm font-semibold uppercase text-emerald-800">Sessie Interactief</p>
-            <h1 className="mt-1 text-2xl font-black md:mt-2 md:text-4xl">
-              {session.role === "admin" ? "Platformbeheer" : "Mijn omgeving"}
-            </h1>
-            <p className="mt-2 hidden max-w-2xl text-sm leading-6 text-zinc-700 sm:block md:text-base">
-              {session.role === "admin"
-                ? "Beheer alle accounts, presentaties, QR-codes en presenter-schermen."
-                : `Ingelogd als ${session.email}. Je presentaties en quizzen blijven bewaard.`}
-            </p>
-            <div className="mt-2 flex flex-wrap gap-1.5 sm:hidden">
-              <span className="rounded-md bg-zinc-100 px-2 py-1 text-xs font-black text-zinc-700">
-                {presentations.length} presentaties
-              </span>
-              <span className="rounded-md bg-zinc-100 px-2 py-1 text-xs font-black text-zinc-700">
-                {totals.items} onderdelen
-              </span>
-            </div>
-          </div>
-          <div className="flex flex-col items-stretch gap-2 sm:items-start lg:items-end">
-            <button
-              className="inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-white px-4 py-3 text-sm font-bold hover:bg-zinc-50"
-              disabled={busy === "logout"}
-              onClick={logout}
-              type="button"
-            >
-              <LogOut aria-hidden className="h-4 w-4" />
-              Uitloggen
-            </button>
-            {session.role === "tester" ? (
-              <button
-                className="inline-flex items-center gap-1 text-xs font-bold text-zinc-500 underline-offset-4 hover:text-rose-700 hover:underline disabled:opacity-60"
-                disabled={busy === "delete-own-account"}
-                onClick={deleteOwnAccount}
-                type="button"
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-3 px-3 py-3 md:gap-4 md:px-8 md:py-5">
+        <PageHeader
+          actions={
+            <>
+              <ActionButton
+                disabled={busy === "logout"}
+                icon={<LogOut aria-hidden className="h-4 w-4" />}
+                onClick={logout}
+                variant="secondary"
               >
-                <Trash2 aria-hidden className="h-3.5 w-3.5" />
-                {busy === "delete-own-account" ? "Verwijderen..." : "Account verwijderen"}
-              </button>
-            ) : null}
-          </div>
-        </header>
+                Uitloggen
+              </ActionButton>
+              {session.role === "tester" ? (
+                <DangerButton
+                  className="text-xs"
+                  disabled={busy === "delete-own-account"}
+                  icon={<Trash2 aria-hidden className="h-3.5 w-3.5" />}
+                  onClick={deleteOwnAccount}
+                  size="sm"
+                >
+                  {busy === "delete-own-account" ? "Verwijderen..." : "Account verwijderen"}
+                </DangerButton>
+              ) : null}
+            </>
+          }
+          eyebrow="Sessie Interactief"
+          metrics={
+            <>
+              <MetricBadge label="Presentaties" value={presentations.length} />
+              <MetricBadge label="Onderdelen" value={totals.items} />
+              <MetricBadge label="Antwoorden" value={totals.answers} />
+              <MetricBadge
+                label={session.role === "admin" ? "Accounts" : "Deelnemers"}
+                value={session.role === "admin" ? `${session.limits.accountCount}/${session.limits.maxAccounts}` : totals.participants}
+              />
+            </>
+          }
+          subtitle={
+            session.role === "admin"
+              ? "Beheer accounts, presentaties, QR-codes en presenter-schermen vanuit een rustig overzicht."
+              : `Ingelogd als ${session.email}. Je presentaties en quizzen blijven bewaard.`
+          }
+          title={session.role === "admin" ? "Platformbeheer" : "Mijn omgeving"}
+        />
 
         {notice || error ? (
           <div
@@ -856,173 +870,135 @@ export default function ModeratorDashboard({ entryMode = "users" }: ModeratorDas
           </nav>
         ) : null}
 
-        <section className={`${session.role === "admin" && moderatorTab !== "presentations" ? "hidden" : ""} grid gap-3 rounded-lg border border-zinc-300 bg-white p-3 shadow-sm md:p-5 lg:grid-cols-[1fr_auto] lg:items-center`}>
-          <div>
-            <p className="text-xs font-black uppercase text-emerald-800">Startpunt</p>
-            <h2 className="mt-1 text-xl font-black md:text-2xl">Nieuwe presentatie maken</h2>
-            <p className="mt-2 hidden max-w-2xl text-sm leading-6 text-zinc-600 sm:block">
-              {session.role === "tester"
-                ? `Je wordt stap voor stap begeleid. Je kunt maximaal ${session.limits.maxPresentations} presentaties of quizzen maken met maximaal ${session.limits.maxQuestions} onderdelen per presentatie.`
-                : "Maak stap voor stap een presentatie, quiz of combinatie met vragen en slides."}
-            </p>
-          </div>
-          <button
-            className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-800 px-4 py-3 text-sm font-black text-white hover:bg-emerald-900 disabled:opacity-60 md:px-5 md:py-4 md:text-base lg:w-auto"
-            disabled={presentationLimitReached}
-            onClick={() => router.push(builderPath())}
-            type="button"
-          >
-            <Plus aria-hidden className="h-5 w-5" />
-            Nieuwe presentatie maken
-            <ArrowRight aria-hidden className="h-5 w-5" />
-          </button>
-        </section>
-
-        <section className={`${session.role === "admin" && moderatorTab !== "presentations" ? "hidden" : ""} hidden grid-cols-2 gap-2 rounded-lg border border-zinc-300 bg-white/80 p-2 sm:grid lg:grid-cols-4`}>
-          <article className="rounded-lg bg-zinc-50 p-3 md:px-4">
-            <p className="text-xs font-semibold text-zinc-600 md:text-sm">Presentaties</p>
-            <p className="mt-1 text-xl font-black md:text-2xl">
-              {presentations.length}
-              {session.role === "tester" && session.limits.maxPresentations ? `/${session.limits.maxPresentations}` : ""}
-            </p>
-          </article>
-          <article className="rounded-lg bg-zinc-50 p-3 md:px-4">
-            <p className="text-xs font-semibold text-zinc-600 md:text-sm">Onderdelen</p>
-            <p className="mt-1 text-xl font-black md:text-2xl">{totals.items}</p>
-            <p className="mt-1 text-xs font-bold text-zinc-500">
-              {totals.questions} vragen / {totals.slides} slides
-            </p>
-          </article>
-          <article className="rounded-lg bg-zinc-50 p-3 md:px-4">
-            <p className="text-xs font-semibold text-zinc-600 md:text-sm">Antwoorden</p>
-            <p className="mt-1 text-xl font-black md:text-2xl">{totals.answers}</p>
-          </article>
-          <article className="rounded-lg bg-zinc-50 p-3 md:px-4">
-            <p className="text-xs font-semibold text-zinc-600 md:text-sm">
-              {session.role === "admin" ? "Gebruikersaccounts" : "Deelnemers"}
-            </p>
-            <p className="mt-1 text-xl font-black md:text-2xl">
-              {session.role === "admin"
-                ? `${session.limits.accountCount}/${session.limits.maxAccounts}`
-                : totals.participants}
-            </p>
-          </article>
-        </section>
+        <Panel className={session.role === "admin" && moderatorTab !== "presentations" ? "hidden" : ""}>
+          <SectionHeader
+            actions={
+              <ActionButton
+                disabled={presentationLimitReached}
+                icon={<Plus aria-hidden className="h-5 w-5" />}
+                onClick={() => router.push(builderPath())}
+                trailingIcon={<ArrowRight aria-hidden className="h-4 w-4" />}
+                variant="success"
+              >
+                Nieuwe presentatie
+              </ActionButton>
+            }
+            eyebrow="Startpunt"
+            subtitle={
+              session.role === "tester"
+                ? `Maximaal ${session.limits.maxPresentations} presentaties of quizzen met maximaal ${session.limits.maxQuestions} onderdelen per presentatie.`
+                : "Maak stap voor stap een presentatie, quiz of combinatie met vragen en slides."
+            }
+            title="Nieuwe presentatie maken"
+          />
+        </Panel>
 
         {session.role === "admin" && moderatorTab === "accounts" ? (
-          <section className="rounded-lg border border-zinc-300 bg-white p-4 shadow-sm md:p-5">
-            <div className="mb-5 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
-              <div>
-                <p className="text-xs font-black uppercase text-emerald-800">Beheerder</p>
-                <h2 className="text-lg font-black">Aangemelde accounts</h2>
-              </div>
-              <span className="rounded-md bg-zinc-100 px-3 py-2 text-sm font-bold text-zinc-700">
-                {accounts.length}/{session.limits.maxAccounts} gebruikersaccounts
-              </span>
-            </div>
+          <Panel>
+            <SectionHeader
+              actions={<MetricBadge label="Gebruikersaccounts" value={`${accounts.length}/${session.limits.maxAccounts}`} />}
+              eyebrow="Beheerder"
+              title="Aangemelde accounts"
+            />
             {!accounts.length ? (
-              <div className="rounded-lg border border-dashed border-zinc-300 p-6 text-center text-zinc-600">
-                Nog geen gebruikersaccounts aangemaakt.
-              </div>
+              <EmptyState
+                description="Nieuwe testgebruikers verschijnen hier zodra ze hun account hebben aangemaakt."
+                title="Nog geen gebruikersaccounts"
+              />
             ) : (
-              <div className="grid gap-3">
+              <div className="mt-3 overflow-hidden rounded-lg border border-zinc-200 md:mt-4">
                 {accounts.map((account) => (
-                  <article className="grid gap-4 rounded-lg border border-zinc-200 bg-zinc-50 p-3 md:grid-cols-[1fr_auto] md:p-4" key={account.id}>
-                    <div>
-                      <h3 className="break-all font-black">{account.email}</h3>
-                      <div className="mt-2 flex flex-wrap gap-2 text-sm">
-                        <span className={`rounded-md px-2 py-1 font-bold ${statusClassName(account.status)}`}>
-                          {statusLabel(account.status)}
-                        </span>
-                        <span className="rounded-md bg-white px-2 py-1 text-zinc-700">
-                          {account.totals.presentations} presentaties
-                        </span>
-                      </div>
-                    </div>
-                    <div className="flex flex-col gap-3 md:items-end">
-                      <div className="text-sm text-zinc-600 md:text-right">
-                        <p>Aangemaakt {formatDate(account.createdAt)}</p>
-                        <p>Laatst ingelogd {formatDate(account.lastLoginAt)}</p>
-                      </div>
-                      <div className="grid grid-cols-2 gap-2 md:flex md:flex-wrap md:justify-end">
+                  <CompactRow
+                    actions={
+                      <>
                         {account.status === "deactivated" ? (
-                          <button
-                            className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-800 px-3 py-2 text-sm font-bold text-white hover:bg-emerald-900 disabled:opacity-60"
+                          <ActionButton
                             disabled={busy === `activate-account-${account.id}`}
+                            icon={<CheckCircle2 aria-hidden className="h-4 w-4" />}
                             onClick={() => updateAccountStatus(account, "activate")}
-                            type="button"
+                            size="sm"
+                            variant="success"
                           >
-                            <CheckCircle2 aria-hidden className="h-4 w-4" />
                             Activeer
-                          </button>
+                          </ActionButton>
                         ) : (
-                          <button
-                            className="inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-bold hover:bg-zinc-100 disabled:opacity-60"
+                          <ActionButton
                             disabled={busy === `deactivate-account-${account.id}`}
+                            icon={<Ban aria-hidden className="h-4 w-4" />}
                             onClick={() => updateAccountStatus(account, "deactivate")}
-                            type="button"
+                            size="sm"
                           >
-                            <Ban aria-hidden className="h-4 w-4" />
                             Deactiveer
-                          </button>
+                          </ActionButton>
                         )}
-                        <button
-                          className="inline-flex items-center justify-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-bold text-rose-800 hover:bg-rose-100 disabled:opacity-60"
+                        <DangerButton
                           disabled={busy === `delete-account-${account.id}`}
+                          icon={<Trash2 aria-hidden className="h-4 w-4" />}
                           onClick={() => deleteAccount(account)}
-                          type="button"
+                          size="sm"
                         >
-                          <Trash2 aria-hidden className="h-4 w-4" />
                           Verwijder
-                        </button>
-                      </div>
-                    </div>
-                  </article>
+                        </DangerButton>
+                      </>
+                    }
+                    key={account.id}
+                    meta={
+                      <>
+                        <StatusBadge tone={statusTone(account.status)}>{statusLabel(account.status)}</StatusBadge>
+                        <Badge>{account.totals.presentations} presentaties</Badge>
+                      </>
+                    }
+                    title={account.email}
+                  >
+                    <p className="mt-2 text-sm font-semibold text-zinc-600">
+                      Aangemaakt {formatDate(account.createdAt)} · Laatst ingelogd {formatDate(account.lastLoginAt)}
+                    </p>
+                  </CompactRow>
                 ))}
               </div>
             )}
-          </section>
+          </Panel>
         ) : null}
 
-        <section className={`${session.role === "admin" && moderatorTab !== "presentations" ? "hidden" : ""} rounded-lg border border-zinc-300 bg-white p-4 shadow-sm md:p-5`}>
-          <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <h2 className="text-lg font-black">
-              {session.role === "admin" ? "Aangemaakte presentaties" : "Mijn presentaties"}
-            </h2>
-            <label className="relative block w-full md:w-80">
-              <Search aria-hidden className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
-              <input
-                className="w-full rounded-lg border border-zinc-300 py-3 pl-10 pr-3 outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="Zoek op titel, code of eigenaar"
-                value={query}
-              />
-            </label>
-          </div>
+        <Panel className={session.role === "admin" && moderatorTab !== "presentations" ? "hidden" : ""}>
+          <SectionHeader
+            actions={
+              <label className="relative block w-full md:w-80">
+                <Search aria-hidden className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
+                <input
+                  className="w-full rounded-lg border border-zinc-300 py-2.5 pl-10 pr-3 text-sm font-bold outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder="Zoek op titel, code of eigenaar"
+                  value={query}
+                />
+              </label>
+            }
+            eyebrow="Overzicht"
+            title={session.role === "admin" ? "Aangemaakte presentaties" : "Mijn presentaties"}
+          />
 
           {!filtered.length ? (
-            <div className="rounded-lg border border-dashed border-zinc-300 p-8 text-center text-zinc-600">
-              <h3 className="text-xl font-black text-zinc-950">
-                {presentations.length ? "Geen presentaties gevonden" : "Je eerste presentatie staat klaar om gemaakt te worden"}
-              </h3>
-              <p className="mx-auto mt-2 max-w-xl text-sm font-semibold leading-6">
-                {presentations.length
+            <EmptyState
+              action={
+                !presentations.length ? (
+                  <ActionButton
+                    icon={<Plus aria-hidden className="h-5 w-5" />}
+                    onClick={() => router.push(builderPath())}
+                    variant="success"
+                  >
+                    Nieuwe presentatie maken
+                  </ActionButton>
+                ) : null
+              }
+              description={
+                presentations.length
                   ? "Pas je zoekopdracht aan om andere sessies te tonen."
-                  : "Start met een titel, kies daarna het type en voeg stap voor stap vragen of slides toe."}
-              </p>
-              {!presentations.length ? (
-                <button
-                  className="mt-5 inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-800 px-5 py-3 font-black text-white hover:bg-emerald-900"
-                  onClick={() => router.push(builderPath())}
-                  type="button"
-                >
-                  <Plus aria-hidden className="h-5 w-5" />
-                  Nieuwe presentatie maken
-                </button>
-              ) : null}
-            </div>
+                  : "Start met een titel, kies daarna het type en voeg stap voor stap vragen of slides toe."
+              }
+              title={presentations.length ? "Geen presentaties gevonden" : "Je eerste presentatie staat klaar om gemaakt te worden"}
+            />
           ) : (
-            <div className="grid gap-2 md:gap-4">
+            <div className="mt-3 overflow-hidden rounded-lg border border-zinc-200 md:mt-4">
               {filtered.map((presentation) => {
                 const presenterUrl = `/presenter/${presentation.id}`;
                 const joinUrl = `${origin}/join/${presentation.code}`;
@@ -1041,46 +1017,32 @@ export default function ModeratorDashboard({ entryMode = "users" }: ModeratorDas
                               onChange={(event) => setTitleDraft(event.target.value)}
                               value={titleDraft}
                             />
-                            <button
-                              className="rounded-lg bg-emerald-800 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-900 disabled:opacity-60"
+                            <ActionButton
                               disabled={busy === `rename-${presentation.id}`}
                               onClick={() => renamePresentation(presentation.id)}
-                              type="button"
+                              size="sm"
+                              variant="success"
                             >
                               Opslaan
-                            </button>
+                            </ActionButton>
                           </div>
                         ) : (
                           <h3 className="break-words text-base font-black leading-snug md:text-xl">{presentation.title}</h3>
                         )}
 
                         <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs md:mt-3 md:gap-2 md:text-sm">
-                          <span className="rounded-md bg-zinc-900 px-2 py-1 font-mono font-black text-white">
-                            {presentation.code}
-                          </span>
-                          {session.role === "admin" ? (
-                            <span className="rounded-md bg-emerald-50 px-2 py-1 font-bold text-emerald-900">
-                              {presentation.ownerEmail ?? "Beheerder"}
-                            </span>
-                          ) : null}
-                          <span className="rounded-md bg-zinc-900 px-2 py-1 font-bold text-white">
-                            {presentationTypeLabel(presentation.presentationType)}
-                          </span>
-                          <span className={`rounded-md px-2 py-1 font-bold ${presentationStatusClassName(presentation.workflowStatus)}`}>
+                          <Badge tone="black">{presentation.code}</Badge>
+                          {session.role === "admin" ? <Badge tone="emerald">{presentation.ownerEmail ?? "Beheerder"}</Badge> : null}
+                          <Badge tone="black">{presentationTypeLabel(presentation.presentationType)}</Badge>
+                          <StatusBadge tone={presentationStatusTone(presentation.workflowStatus)}>
                             {presentationStatusLabel(presentation.workflowStatus)}
-                          </span>
-                          <span className="rounded-md bg-white px-2 py-1 text-zinc-700">
-                            {presentation.totals.items} onderdelen
-                          </span>
-                          <span className="hidden rounded-md bg-white px-2 py-1 text-zinc-700 sm:inline-flex">
+                          </StatusBadge>
+                          <Badge>{presentation.totals.items} onderdelen</Badge>
+                          <Badge className="hidden sm:inline-flex">
                             {presentation.totals.questions} vragen / {presentation.totals.slides} slides
-                          </span>
-                          <span className="hidden rounded-md bg-white px-2 py-1 text-zinc-700 sm:inline-flex">
-                            {presentation.totals.answers} antwoorden
-                          </span>
-                          <span className="rounded-md bg-white px-2 py-1 text-zinc-700">
-                            {presentation.totals.participants} deelnemers
-                          </span>
+                          </Badge>
+                          <Badge className="hidden sm:inline-flex">{presentation.totals.answers} antwoorden</Badge>
+                          <Badge>{presentation.totals.participants} deelnemers</Badge>
                         </div>
                         <p className="mt-2 text-xs text-zinc-600 md:mt-3 md:text-sm">
                           Laatste wijziging {formatDate(presentation.updatedAt)}
@@ -1088,26 +1050,21 @@ export default function ModeratorDashboard({ entryMode = "users" }: ModeratorDas
                       </div>
 
                       <div className="grid grid-cols-[1fr_1fr_auto] gap-2 md:hidden">
-                        <a
-                          className="inline-flex items-center justify-center gap-2 rounded-lg bg-zinc-900 px-3 py-2.5 text-sm font-bold text-white hover:bg-zinc-700"
+                        <ActionButton
                           href={presenterUrl}
+                          icon={<ArrowRight aria-hidden className="h-4 w-4" />}
+                          variant="primary"
                         >
-                          <ArrowRight aria-hidden className="h-4 w-4" />
                           Regie
-                        </a>
-                        <a
-                          className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-800 px-3 py-2.5 text-sm font-bold text-white hover:bg-emerald-900"
+                        </ActionButton>
+                        <ActionButton
                           href={builderPath(presentation.id)}
+                          icon={<Pencil aria-hidden className="h-4 w-4" />}
+                          variant="success"
                         >
-                          <Pencil aria-hidden className="h-4 w-4" />
                           Bewerk
-                        </a>
-                        <details className="relative">
-                          <summary className="grid h-full min-h-10 cursor-pointer list-none place-items-center rounded-lg border border-zinc-300 bg-white px-3 text-zinc-800 [&::-webkit-details-marker]:hidden">
-                            <MoreHorizontal aria-hidden className="h-5 w-5" />
-                            <span className="sr-only">Meer acties</span>
-                          </summary>
-                          <div className="absolute right-0 z-20 mt-2 grid w-48 gap-1 rounded-lg border border-zinc-200 bg-white p-2 shadow-xl">
+                        </ActionButton>
+                        <OverflowMenu summary={<MoreHorizontal aria-hidden className="h-5 w-5" />}>
                             <a
                               className="inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-bold hover:bg-zinc-100"
                               href={`/screen/${presentation.code}`}
@@ -1154,79 +1111,75 @@ export default function ModeratorDashboard({ entryMode = "users" }: ModeratorDas
                               <Trash2 aria-hidden className="h-4 w-4" />
                               Verwijder
                             </button>
-                          </div>
-                        </details>
+                        </OverflowMenu>
                       </div>
 
                       <div className="hidden gap-2 md:grid md:grid-cols-3 lg:flex lg:flex-wrap lg:justify-end">
-                        <a
-                          className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-800 px-3 py-2 text-sm font-bold text-white hover:bg-emerald-900"
+                        <ActionButton
                           href={builderPath(presentation.id)}
+                          icon={<Pencil aria-hidden className="h-4 w-4" />}
+                          size="sm"
+                          variant="success"
                         >
-                          <Pencil aria-hidden className="h-4 w-4" />
                           Bewerk
-                        </a>
-                        <a
-                          className="inline-flex items-center justify-center gap-2 rounded-lg bg-zinc-900 px-3 py-2 text-sm font-bold text-white hover:bg-zinc-700"
+                        </ActionButton>
+                        <ActionButton
                           href={presenterUrl}
+                          icon={<ArrowRight aria-hidden className="h-4 w-4" />}
+                          size="sm"
+                          variant="primary"
                         >
-                          <ArrowRight aria-hidden className="h-4 w-4" />
                           Regie
-                        </a>
-                        <a
-                          className="inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-bold hover:bg-zinc-100"
+                        </ActionButton>
+                        <ActionButton
+                          external
                           href={`/screen/${presentation.code}`}
-                          rel="noreferrer"
-                          target="_blank"
+                          icon={<Monitor aria-hidden className="h-4 w-4" />}
+                          size="sm"
                         >
-                          <Monitor aria-hidden className="h-4 w-4" />
                           Scherm
-                        </a>
-                        <button
-                          className="inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-bold hover:bg-zinc-100"
+                        </ActionButton>
+                        <ActionButton
+                          icon={<Copy aria-hidden className="h-4 w-4" />}
                           onClick={() => copyValue(joinUrl, "Deelnemerslink")}
-                          type="button"
+                          size="sm"
                         >
-                          <Copy aria-hidden className="h-4 w-4" />
                           Link
-                        </button>
-                        <button
-                          className="inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-bold hover:bg-zinc-100"
+                        </ActionButton>
+                        <ActionButton
+                          icon={<ExternalLink aria-hidden className="h-4 w-4" />}
                           onClick={() => copyValue(screenUrl, "Schermlink")}
-                          type="button"
+                          size="sm"
                         >
-                          <ExternalLink aria-hidden className="h-4 w-4" />
                           URL
-                        </button>
-                        <button
-                          className="inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-bold hover:bg-zinc-100"
+                        </ActionButton>
+                        <ActionButton
+                          icon={<Pencil aria-hidden className="h-4 w-4" />}
                           onClick={() => {
                             setEditingId(isEditing ? "" : presentation.id);
                             setTitleDraft(isEditing ? "" : presentation.title);
                           }}
-                          type="button"
+                          size="sm"
                         >
-                          <Pencil aria-hidden className="h-4 w-4" />
                           {isEditing ? "Annuleer" : "Naam"}
-                        </button>
-                        <button
-                          className="inline-flex items-center justify-center gap-2 rounded-lg bg-sky-800 px-3 py-2 text-sm font-bold text-white hover:bg-sky-900 disabled:opacity-60"
+                        </ActionButton>
+                        <ActionButton
                           disabled={busy === `duplicate-${presentation.id}` || presentationLimitReached}
+                          icon={<Copy aria-hidden className="h-4 w-4" />}
                           onClick={() => duplicatePresentation(presentation.id)}
-                          type="button"
+                          size="sm"
+                          variant="info"
                         >
-                          <Copy aria-hidden className="h-4 w-4" />
                           Dupliceer
-                        </button>
-                        <button
-                          className="inline-flex items-center justify-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-bold text-rose-800 hover:bg-rose-100 disabled:opacity-60"
+                        </ActionButton>
+                        <DangerButton
                           disabled={busy === `delete-${presentation.id}`}
+                          icon={<Trash2 aria-hidden className="h-4 w-4" />}
                           onClick={() => deletePresentation(presentation.id, presentation.title)}
-                          type="button"
+                          size="sm"
                         >
-                          <Trash2 aria-hidden className="h-4 w-4" />
                           Verwijder
-                        </button>
+                        </DangerButton>
                       </div>
                     </div>
                   </article>
@@ -1234,7 +1187,7 @@ export default function ModeratorDashboard({ entryMode = "users" }: ModeratorDas
               })}
             </div>
           )}
-        </section>
+        </Panel>
       </div>
     </main>
   );

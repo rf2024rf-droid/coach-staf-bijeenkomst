@@ -26,6 +26,17 @@ import {
 } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import {
+  ActionButton,
+  Badge,
+  DangerButton,
+  EmptyState,
+  IconButton,
+  MetricBadge,
+  Panel,
+  SectionHeader,
+  StatusBadge,
+} from "@/app/components/design-system";
 import type {
   PresentationKind,
   PresentationWorkflowStatus,
@@ -1048,9 +1059,11 @@ export default function PresentationWizard() {
   function renderTimelineItems(compact = false) {
     if (!payload?.questions.length) {
       return (
-        <div className="rounded-lg border border-dashed border-zinc-300 p-5 text-sm font-semibold leading-6 text-zinc-600">
-          Nog geen onderdelen. Voeg je eerste vraag of slide toe.
-        </div>
+        <EmptyState
+          className="min-h-36 p-4"
+          description="Voeg je eerste vraag of slide toe."
+          title="Nog geen onderdelen"
+        />
       );
     }
 
@@ -1092,9 +1105,9 @@ export default function PresentationWizard() {
                   >
                     {timelineTitle}
                   </span>
-                  <span className={`mt-2 inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-bold ${errors.length ? "bg-rose-100 text-rose-800" : "bg-white text-zinc-600"}`}>
+                  <StatusBadge className="mt-2" tone={errors.length ? "rose" : "emerald"}>
                     {errors.length ? "Onvolledig" : "Compleet"}
-                  </span>
+                  </StatusBadge>
                 </span>
               </span>
             </button>
@@ -1110,37 +1123,26 @@ export default function PresentationWizard() {
         <header className="sticky top-0 z-20 -mx-3 border-b border-zinc-300 bg-[#f5f5f0]/95 px-3 py-2.5 backdrop-blur md:-mx-6 md:px-6 md:py-3">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div className="min-w-0">
-              <button
-                className="mb-2 inline-flex items-center gap-2 text-sm font-bold text-zinc-600 hover:text-zinc-950"
+              <ActionButton
+                className="mb-2 px-0"
+                icon={<ArrowLeft aria-hidden className="h-4 w-4" />}
                 onClick={() => router.push(dashboardPath)}
-                type="button"
+                size="sm"
+                variant="ghost"
               >
-                <ArrowLeft aria-hidden className="h-4 w-4" />
                 Terug naar dashboard
-              </button>
+              </ActionButton>
               <p className="text-xs font-black uppercase text-emerald-800">Nieuwe presentatie maken</p>
               <h1 className="truncate text-xl font-black md:text-3xl">
                 {title.trim() || "Naamloze presentatie"}
               </h1>
             </div>
             <div className="flex flex-wrap gap-2 lg:min-w-[460px] lg:justify-end">
-              <span className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-xs font-bold md:text-sm">
-                {currentStepIndex + 1}/{steps.length} {currentStepLabel}
-              </span>
-              <span className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-xs font-bold md:text-sm">
-                {payload?.questions.length ?? 0} onderdelen
-              </span>
-              <span
-                className={`rounded-lg border px-3 py-2 text-xs font-bold md:text-sm ${
-                  saveState === "error"
-                    ? "border-rose-200 bg-rose-50 text-rose-800"
-                    : saveState === "saving"
-                      ? "border-amber-200 bg-amber-50 text-amber-900"
-                      : "border-emerald-200 bg-emerald-50 text-emerald-900"
-                }`}
-              >
+              <MetricBadge label="Stap" value={`${currentStepIndex + 1}/${steps.length} ${currentStepLabel}`} />
+              <MetricBadge label="Onderdelen" value={payload?.questions.length ?? 0} />
+              <StatusBadge tone={saveState === "error" ? "rose" : saveState === "saving" ? "amber" : "emerald"}>
                 {saveLabel(saveState)}
-              </span>
+              </StatusBadge>
             </div>
           </div>
 
@@ -1201,7 +1203,7 @@ export default function PresentationWizard() {
         {step === "title" && busy !== "load" ? (
           <section className="grid flex-1 place-items-center py-4 md:py-12">
             <form className="w-full max-w-3xl" onSubmit={createDraftPresentation}>
-              <div className="rounded-lg border border-zinc-300 bg-white p-4 shadow-sm md:p-8">
+              <Panel className="p-4 md:p-8">
                 <p className="text-sm font-black uppercase text-emerald-800">Stap 1</p>
                 <label className="mt-2 block text-xl font-black md:mt-3 md:text-5xl" htmlFor="presentation-title">
                   Hoe heet je presentatie?
@@ -1215,19 +1217,23 @@ export default function PresentationWizard() {
                   placeholder="Kennisquiz Reggeborgh 2026"
                   value={title}
                 />
-                <button
-                  className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-800 px-4 py-3 text-base font-black text-white hover:bg-emerald-900 disabled:opacity-60 md:mt-6 md:w-auto md:px-5 md:py-4 md:text-lg"
+                <ActionButton
+                  className="mt-5 w-full md:mt-6 md:w-auto"
                   disabled={(busy === "create" || busy === "title") || !title.trim()}
+                  icon={
+                    busy === "create" || busy === "title" ? (
+                      <Loader2 aria-hidden className="h-5 w-5 animate-spin" />
+                    ) : (
+                      <ArrowRight aria-hidden className="h-5 w-5" />
+                    )
+                  }
+                  size="lg"
                   type="submit"
+                  variant="success"
                 >
-                  {busy === "create" || busy === "title" ? (
-                    <Loader2 aria-hidden className="h-5 w-5 animate-spin" />
-                  ) : (
-                    <ArrowRight aria-hidden className="h-5 w-5" />
-                  )}
                   {payload ? "Titel opslaan" : "Maak concept en ga verder"}
-                </button>
-              </div>
+                </ActionButton>
+              </Panel>
             </form>
           </section>
         ) : null}
@@ -1266,20 +1272,18 @@ export default function PresentationWizard() {
 
         {step === "canvas" && payload ? (
           <section className="grid flex-1 gap-3 py-3 lg:grid-cols-[320px_1fr] lg:gap-5 lg:py-6">
-            <div className="rounded-lg border border-zinc-300 bg-white p-3 shadow-sm lg:hidden">
+            <Panel className="lg:hidden">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="text-xs font-black uppercase text-emerald-800">Tijdlijn</p>
                   <h2 className="text-lg font-black">Vragen en slides</h2>
                 </div>
-                <button
+                <IconButton
                   aria-label="Nieuw onderdeel"
-                  className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-800 text-white hover:bg-emerald-900"
+                  icon={<Plus aria-hidden className="h-5 w-5" />}
                   onClick={() => setShowAddPanel(true)}
-                  type="button"
-                >
-                  <Plus aria-hidden className="h-5 w-5" />
-                </button>
+                  variant="success"
+                />
               </div>
               <details
                 className="mt-3"
@@ -1291,47 +1295,46 @@ export default function PresentationWizard() {
                 </summary>
                 <div className="mt-3">{renderTimelineItems(true)}</div>
               </details>
-            </div>
+            </Panel>
 
             <aside className="hidden lg:sticky lg:top-40 lg:block lg:self-start">
-              <div className="rounded-lg border border-zinc-300 bg-white p-4 shadow-sm">
-                <div className="mb-4 flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-xs font-black uppercase text-emerald-800">Tijdlijn</p>
-                    <h2 className="text-lg font-black">Vragen en slides</h2>
-                  </div>
-                  <button
-                    className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-800 text-white hover:bg-emerald-900"
-                    onClick={() => setShowAddPanel((current) => !current)}
-                    type="button"
-                    aria-label="Nieuw onderdeel"
-                  >
-                    <Plus aria-hidden className="h-5 w-5" />
-                  </button>
-                </div>
+              <Panel>
+                <SectionHeader
+                  actions={
+                    <IconButton
+                      aria-label="Nieuw onderdeel"
+                      icon={<Plus aria-hidden className="h-5 w-5" />}
+                      onClick={() => setShowAddPanel((current) => !current)}
+                      variant="success"
+                    />
+                  }
+                  className="mb-4"
+                  eyebrow="Tijdlijn"
+                  title="Vragen en slides"
+                />
                 {renderTimelineItems()}
-              </div>
+              </Panel>
             </aside>
 
             <div className="flex flex-col gap-3 md:gap-5">
               {showAddPanel || !payload.questions.length ? (
-                <section className="rounded-lg border border-zinc-300 bg-white p-3 shadow-sm md:p-5">
-                  <div className="mb-3 flex flex-col gap-2 md:mb-5 md:flex-row md:items-end md:justify-between">
-                    <div>
-                      <p className="text-xs font-black uppercase text-emerald-800">Onderdeel toevoegen</p>
-                      <h2 className="text-xl font-black md:text-2xl">Voeg een vraag of slide toe</h2>
-                    </div>
-                    {payload.questions.length ? (
-                      <button
-                        className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-bold hover:bg-zinc-50"
-                        onClick={() => setShowAddPanel(false)}
-                        type="button"
-                      >
-                        <X aria-hidden className="h-4 w-4" />
-                        Sluit
-                      </button>
-                    ) : null}
-                  </div>
+                <Panel>
+                  <SectionHeader
+                    actions={
+                      payload.questions.length ? (
+                        <ActionButton
+                          icon={<X aria-hidden className="h-4 w-4" />}
+                          onClick={() => setShowAddPanel(false)}
+                          size="sm"
+                        >
+                          Sluit
+                        </ActionButton>
+                      ) : null
+                    }
+                    className="mb-3 md:mb-5"
+                    eyebrow="Onderdeel toevoegen"
+                    title="Voeg een vraag of slide toe"
+                  />
                   {[
                     ["Quizvragen", groupedDefinitions.quiz],
                     ["Presentatieslides", groupedDefinitions.slides],
@@ -1363,62 +1366,53 @@ export default function PresentationWizard() {
                             <span className="mt-1 hidden text-sm font-semibold leading-6 text-zinc-600 sm:block">
                               {definition.description}
                             </span>
-                            <span
-                              className={`mt-3 inline-flex rounded-md px-2 py-1 text-xs font-black ${
-                                definition.type === "quiz"
-                                  ? "bg-amber-100 text-amber-900"
-                                  : definition.type === "multiple"
-                                    ? "bg-sky-100 text-sky-900"
-                                    : "bg-white text-zinc-600"
-                              }`}
-                            >
+                            <Badge className="mt-3" tone={definition.type === "quiz" ? "amber" : definition.type === "multiple" ? "sky" : "zinc"}>
                               {definition.type === "quiz"
                                 ? "Timer + ranking"
                                 : definition.type === "multiple"
                                   ? "Geen ranking"
                                   : "Open reactie"}
-                            </span>
+                            </Badge>
                           </button>
                         ))}
                       </div>
                     </div>
                   ))}
-                </section>
+                </Panel>
               ) : null}
 
               {draft ? (
-                <section className="rounded-lg border border-zinc-300 bg-white p-3 shadow-sm md:p-5">
-                  <div className="mb-3 flex flex-col gap-3 border-b border-zinc-200 pb-3 md:mb-5 md:flex-row md:items-start md:justify-between md:pb-4">
-                    <div>
-                      <p className="text-xs font-black uppercase text-emerald-800">{itemDefinition(draft.kind).title}</p>
-                      <h2 className="text-xl font-black md:text-2xl">Onderdeel bewerken</h2>
-                      {validationErrors[draft.id]?.length ? (
-                        <p className="mt-2 text-sm font-bold text-rose-700">
-                          {validationErrors[draft.id].join(" ")}
-                        </p>
-                      ) : null}
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-bold hover:bg-zinc-50"
-                        disabled={busy === `duplicate-${draft.id}`}
-                        onClick={() => activeQuestion && void duplicateItem(activeQuestion)}
-                        type="button"
-                      >
-                        <Copy aria-hidden className="h-4 w-4" />
-                        Dupliceer
-                      </button>
-                      <button
-                        className="inline-flex items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-bold text-rose-800 hover:bg-rose-100"
-                        disabled={busy === `delete-${draft.id}`}
-                        onClick={() => activeQuestion && void deleteItem(activeQuestion)}
-                        type="button"
-                      >
-                        <Trash2 aria-hidden className="h-4 w-4" />
-                        Verwijder
-                      </button>
-                    </div>
-                  </div>
+                <Panel>
+                  <SectionHeader
+                    actions={
+                      <>
+                        <ActionButton
+                          disabled={busy === `duplicate-${draft.id}`}
+                          icon={<Copy aria-hidden className="h-4 w-4" />}
+                          onClick={() => activeQuestion && void duplicateItem(activeQuestion)}
+                          size="sm"
+                        >
+                          Dupliceer
+                        </ActionButton>
+                        <DangerButton
+                          disabled={busy === `delete-${draft.id}`}
+                          icon={<Trash2 aria-hidden className="h-4 w-4" />}
+                          onClick={() => activeQuestion && void deleteItem(activeQuestion)}
+                          size="sm"
+                        >
+                          Verwijder
+                        </DangerButton>
+                      </>
+                    }
+                    className="mb-3 md:mb-5"
+                    eyebrow={itemDefinition(draft.kind).title}
+                    subtitle={
+                      validationErrors[draft.id]?.length ? (
+                        <span className="font-bold text-rose-700">{validationErrors[draft.id].join(" ")}</span>
+                      ) : null
+                    }
+                    title="Onderdeel bewerken"
+                  />
 
                   <div className="grid gap-3 md:gap-5">
                     {draft.type === "quiz" ? (
@@ -1507,24 +1501,23 @@ export default function PresentationWizard() {
                                     Juist
                                   </label>
                                 ) : null}
-                                <button
-                                  className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-rose-200 bg-rose-50 text-rose-800 hover:bg-rose-100 disabled:opacity-40"
+                                <IconButton
+                                  aria-label="Optie verwijderen"
                                   disabled={draft.options.length <= 2}
+                                  icon={<Trash2 aria-hidden className="h-4 w-4" />}
                                   onClick={() =>
                                     updateDraft({
                                       options: draft.options.filter((current) => current.id !== option.id),
                                     })
                                   }
-                                  type="button"
-                                  aria-label="Optie verwijderen"
-                                >
-                                  <Trash2 aria-hidden className="h-4 w-4" />
-                                </button>
+                                  variant="danger"
+                                />
                               </div>
                             </div>
                           ))}
-                          <button
-                            className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-zinc-300 bg-white px-3 py-2.5 text-sm font-black text-zinc-700 hover:border-emerald-500 hover:bg-emerald-50 md:py-3"
+                          <ActionButton
+                            className="w-full border-dashed"
+                            icon={<Plus aria-hidden className="h-4 w-4" />}
                             onClick={() =>
                               updateDraft({
                                 options: [
@@ -1533,11 +1526,9 @@ export default function PresentationWizard() {
                                 ],
                               })
                             }
-                            type="button"
                           >
-                            <Plus aria-hidden className="h-4 w-4" />
                             Optie toevoegen
-                          </button>
+                          </ActionButton>
                         </div>
                       </section>
                     ) : null}
@@ -1597,7 +1588,7 @@ export default function PresentationWizard() {
                       </div>
                     </details>
                   </div>
-                </section>
+                </Panel>
               ) : null}
             </div>
           </section>
@@ -1684,22 +1675,15 @@ export default function PresentationWizard() {
 
         {step === "finish" && payload ? (
           <section className="grid flex-1 place-items-center py-8">
-            <div className="w-full max-w-4xl rounded-lg border border-zinc-300 bg-white p-6 shadow-sm md:p-8">
+            <Panel className="w-full max-w-4xl p-4 md:p-8">
               <p className="text-sm font-black uppercase text-emerald-800">Samenvatting</p>
               <h2 className="mt-2 text-3xl font-black">{payload.presentation.title}</h2>
-              <div className="mt-5 grid gap-3 md:grid-cols-3">
-                <div className="rounded-lg bg-zinc-50 p-4">
-                  <p className="text-sm font-bold text-zinc-600">Type</p>
-                  <p className="mt-1 text-xl font-black">{typeLabel(payload.presentation.presentationType)}</p>
-                </div>
-                <div className="rounded-lg bg-zinc-50 p-4">
-                  <p className="text-sm font-bold text-zinc-600">Onderdelen</p>
-                  <p className="mt-1 text-xl font-black">{payload.questions.length}</p>
-                </div>
-                <div className="rounded-lg bg-zinc-50 p-4">
-                  <p className="text-sm font-bold text-zinc-600">Status</p>
-                  <p className="mt-1 text-xl font-black">{workflowLabel(payload.presentation.workflowStatus)}</p>
-                </div>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <MetricBadge label="Type" value={typeLabel(payload.presentation.presentationType)} />
+                <MetricBadge label="Onderdelen" value={payload.questions.length} />
+                <StatusBadge tone={payload.presentation.workflowStatus === "published" ? "emerald" : "amber"}>
+                  {workflowLabel(payload.presentation.workflowStatus)}
+                </StatusBadge>
               </div>
 
               {payload.presentation.workflowStatus === "published" ? (
@@ -1711,53 +1695,47 @@ export default function PresentationWizard() {
                       readOnly
                       value={joinLink}
                     />
-                    <button
-                      className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-800 px-4 py-3 font-bold text-white hover:bg-emerald-900"
+                    <ActionButton
+                      icon={<Copy aria-hidden className="h-4 w-4" />}
                       onClick={() => void copyValue(joinLink, "Deelnemerslink")}
-                      type="button"
+                      variant="success"
                     >
-                      <Copy aria-hidden className="h-4 w-4" />
                       Kopieer
-                    </button>
+                    </ActionButton>
                   </div>
                 </div>
               ) : null}
 
               <div className="mt-6 flex flex-col gap-3 md:flex-row md:justify-end">
-                <button
-                  className="inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-white px-4 py-3 font-bold hover:bg-zinc-50"
+                <ActionButton
+                  icon={<Pencil aria-hidden className="h-4 w-4" />}
                   onClick={() => setStep("canvas")}
-                  type="button"
                 >
-                  <Pencil aria-hidden className="h-4 w-4" />
                   Terug naar editor
-                </button>
-                <button
-                  className="inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-white px-4 py-3 font-bold hover:bg-zinc-50"
+                </ActionButton>
+                <ActionButton
+                  icon={<Eye aria-hidden className="h-4 w-4" />}
                   onClick={() => setStep("preview")}
-                  type="button"
                 >
-                  <Eye aria-hidden className="h-4 w-4" />
                   Voorbeeld bekijken
-                </button>
-                <a
-                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-zinc-950 px-4 py-3 font-black text-white hover:bg-zinc-800"
+                </ActionButton>
+                <ActionButton
                   href={`/presenter/${payload.presentation.id}`}
+                  icon={<Monitor aria-hidden className="h-4 w-4" />}
+                  variant="primary"
                 >
-                  <Monitor aria-hidden className="h-4 w-4" />
                   Naar regie
-                </a>
-                <button
-                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-800 px-4 py-3 font-black text-white hover:bg-emerald-900 disabled:opacity-60"
+                </ActionButton>
+                <ActionButton
                   disabled={busy === "publish"}
+                  icon={busy === "publish" ? <Loader2 aria-hidden className="h-4 w-4 animate-spin" /> : <CheckCircle2 aria-hidden className="h-4 w-4" />}
                   onClick={() => void publishPresentation()}
-                  type="button"
+                  variant="success"
                 >
-                  {busy === "publish" ? <Loader2 aria-hidden className="h-4 w-4 animate-spin" /> : <CheckCircle2 aria-hidden className="h-4 w-4" />}
                   Publiceren
-                </button>
+                </ActionButton>
               </div>
-            </div>
+            </Panel>
           </section>
         ) : null}
       </div>
@@ -1765,24 +1743,23 @@ export default function PresentationWizard() {
       {payload ? (
         <footer className="fixed inset-x-0 bottom-0 z-30 border-t border-zinc-300 bg-white/95 px-4 py-3 shadow-2xl backdrop-blur lg:hidden">
           <div className="mx-auto grid max-w-7xl grid-cols-[1fr_1.25fr] gap-2">
-            <button
-              className="inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-white px-3 py-3 text-sm font-bold disabled:opacity-50"
+            <ActionButton
               disabled={step === "title"}
+              icon={<ArrowLeft aria-hidden className="h-4 w-4" />}
               onClick={goPreviousStep}
-              type="button"
+              size="lg"
             >
-              <ArrowLeft aria-hidden className="h-4 w-4" />
               Vorige
-            </button>
-            <button
-              className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-800 px-3 py-3 text-sm font-black text-white disabled:opacity-60"
+            </ActionButton>
+            <ActionButton
               disabled={busy === "finish" || busy === "publish" || (step === "title" && !title.trim())}
               onClick={goNextStep}
-              type="button"
+              size="lg"
+              trailingIcon={<ArrowRight aria-hidden className="h-4 w-4" />}
+              variant="success"
             >
               {nextStepLabel}
-              <ArrowRight aria-hidden className="h-4 w-4" />
-            </button>
+            </ActionButton>
           </div>
         </footer>
       ) : null}
@@ -1791,55 +1768,46 @@ export default function PresentationWizard() {
         <div className="sticky bottom-0 z-20 mt-auto hidden border-t border-zinc-300 bg-[#f5f5f0]/95 py-4 backdrop-blur lg:block">
           <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 md:px-6">
             <div className="flex flex-wrap gap-2">
-              <button
-                className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 bg-white px-4 py-3 font-bold hover:bg-zinc-50"
+              <ActionButton
+                icon={<Save aria-hidden className="h-4 w-4" />}
                 onClick={() => void patchPresentation({ title: title.trim(), presentationType, workflowStatus: "concept" })}
-                type="button"
               >
-                <Save aria-hidden className="h-4 w-4" />
                 Opslaan als concept
-              </button>
-              <button
-                className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 bg-white px-4 py-3 font-bold hover:bg-zinc-50"
+              </ActionButton>
+              <ActionButton
+                icon={<Eye aria-hidden className="h-4 w-4" />}
                 onClick={() => {
                   setPreviewIndex(0);
                   setStep("preview");
                 }}
-                type="button"
               >
-                <Eye aria-hidden className="h-4 w-4" />
                 Voorbeeld bekijken
-              </button>
+              </ActionButton>
               {screenLink ? (
-                <a
-                  className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 bg-white px-4 py-3 font-bold hover:bg-zinc-50"
+                <ActionButton
+                  external
                   href={screenLink}
-                  rel="noreferrer"
-                  target="_blank"
+                  icon={<Monitor aria-hidden className="h-4 w-4" />}
                 >
-                  <Monitor aria-hidden className="h-4 w-4" />
                   Groot scherm
-                </a>
+                </ActionButton>
               ) : null}
             </div>
             <div className="flex flex-wrap gap-2">
-              <button
-                className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 bg-white px-4 py-3 font-bold hover:bg-zinc-50"
+              <ActionButton
+                icon={<Plus aria-hidden className="h-4 w-4" />}
                 onClick={() => setShowAddPanel(true)}
-                type="button"
               >
-                <Plus aria-hidden className="h-4 w-4" />
                 Nieuw onderdeel
-              </button>
-              <button
-                className="inline-flex items-center gap-2 rounded-lg bg-emerald-800 px-5 py-3 font-black text-white hover:bg-emerald-900 disabled:opacity-60"
+              </ActionButton>
+              <ActionButton
                 disabled={busy === "finish"}
+                icon={<ListChecks aria-hidden className="h-4 w-4" />}
                 onClick={() => void finishPresentation()}
-                type="button"
+                variant="success"
               >
-                <ListChecks aria-hidden className="h-4 w-4" />
                 Presentatie afronden
-              </button>
+              </ActionButton>
             </div>
           </div>
         </div>

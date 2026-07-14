@@ -17,6 +17,7 @@ import {
   QrCode as QrCodeIcon,
   RotateCcw,
   Save,
+  Search,
   Settings,
   SlidersHorizontal,
   Square,
@@ -259,6 +260,7 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
   const [origin] = useState(() => (typeof window === "undefined" ? "" : window.location.origin));
   const [form, setForm] = useState<QuestionForm>(() => createDefaultQuestionForm());
   const [presenterTab, setPresenterTab] = useState<PresenterTab>("regie");
+  const [participantQuery, setParticipantQuery] = useState("");
   const [editingQuestionId, setEditingQuestionId] = useState("");
   const [editForm, setEditForm] = useState<QuestionEditForm>(() => ({
     prompt: "",
@@ -976,6 +978,13 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
   const participantGroupStartedAt = payload.presentation.participantGroupStartedAt;
   const participantGroupStarted = Boolean(participantGroupStartedAt);
   const participants = payload.participants;
+  const participantSearch = participantQuery.trim().toLowerCase();
+  const filteredParticipants = participantSearch
+    ? participants.filter((participant) =>
+        participant.label.toLowerCase().includes(participantSearch) ||
+        String(participant.displayIndex).includes(participantSearch)
+      )
+    : participants;
   const lateParticipants = participants.filter((participant) => participant.joinedAfterGroupStart);
   const participantsWithScore = participants.filter((participant) => participant.score > 0);
   const participantGroupStartLabel = formatShortDateTime(participantGroupStartedAt);
@@ -983,6 +992,14 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
     ? payload.presentation.participantGroupStartedCount ?? Math.max(participants.length - lateParticipants.length, 0)
     : participants.length;
   const editingQuestion = payload.questions.find((question) => question.id === editingQuestionId) ?? null;
+  const mobileResultsQuestion = activeQuestion ?? screenQuestion ?? currentFlowQuestion;
+  const mobileResultsVisible = Boolean(
+    mobileResultsQuestion &&
+      payload.presentation.screenView === "results" &&
+      payload.presentation.screenQuestionId === mobileResultsQuestion.id
+  );
+  const mobilePrimaryQuestion = activeQuestion ?? nextQuestion ?? payload.questions[0] ?? null;
+  const mobileAnswerCount = activeQuestion?.answerCount ?? screenQuestion?.answerCount ?? payload.totals.answers;
   const tabs: Array<{ id: PresenterTab; label: string; meta: string }> = [
     { id: "regie", label: "Regie", meta: isGeneralScreenVisible ? "algemeen" : "op beeld" },
     { id: "deelnemers", label: "Deelnemers", meta: `${payload.totals.participants}` },
@@ -992,7 +1009,7 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
   ];
 
   function tabClassName(tab: PresenterTab) {
-    return `rounded-lg px-2 py-2 text-center text-xs font-black transition sm:px-4 sm:py-3 sm:text-left sm:text-sm ${
+    return `rounded-lg px-1.5 py-2 text-center text-[11px] font-black transition sm:px-4 sm:py-3 sm:text-left sm:text-sm ${
       presenterTab === tab
         ? "bg-zinc-950 text-white shadow-sm"
         : "bg-white text-zinc-700 hover:bg-zinc-100"
@@ -1102,11 +1119,27 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
     normalizeGeneralScreenFontSize(generalFontSizeInputValue) === null;
 
   return (
-    <main className={`min-h-screen bg-[#f4f4ef] text-zinc-950 ${activeQuestion ? "pb-56 md:pb-40" : ""}`}>
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 px-3 py-3 md:gap-5 md:px-8 md:py-5">
-        <header className="rounded-lg border border-zinc-300 bg-white p-4 shadow-sm md:p-5">
+    <main className={`min-h-screen bg-[#f4f4ef] text-zinc-950 ${presenterTab === "regie" ? "pb-28 md:pb-40" : activeQuestion ? "pb-56 md:pb-40" : ""}`}>
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-3 px-3 py-3 md:gap-5 md:px-8 md:py-5">
+        <header className="rounded-lg border border-zinc-300 bg-white p-3 shadow-sm md:p-5">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-          <div className="min-w-0">
+          {presenterTab === "regie" ? (
+            <div className="md:hidden">
+              <div className="flex items-center justify-between gap-3">
+                <p className="inline-flex items-center gap-2 text-[11px] font-black uppercase text-emerald-800">
+                  <span className="h-2 w-2 rounded-full bg-emerald-700" />
+                  {screenViewLabel(payload.presentation.screenView)}
+                </p>
+                <span className="rounded-md bg-zinc-100 px-2 py-1 text-xs font-black text-zinc-700">
+                  {mobileAnswerCount} antwoorden
+                </span>
+              </div>
+              <h1 className="mt-2 line-clamp-2 text-lg font-black leading-snug">
+                {activeQuestion?.prompt ?? screenQuestion?.prompt ?? screenState.detail}
+              </h1>
+            </div>
+          ) : null}
+          <div className={`${presenterTab === "regie" ? "hidden md:block" : ""} min-w-0`}>
             <p className="text-sm font-semibold uppercase text-emerald-800">Sessie Interactief</p>
             <h1 className="mt-1 break-words text-2xl font-black leading-tight md:mt-2 md:text-4xl">{payload.presentation.title}</h1>
             <div className="mt-3 flex flex-wrap items-center gap-1.5 md:gap-2">
@@ -1130,7 +1163,7 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
               </span>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-end">
+          <div className={`${presenterTab === "regie" ? "hidden md:grid" : "grid"} grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-end`}>
             <a
               className="inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-bold hover:bg-zinc-50"
               href="/moderator"
@@ -1183,12 +1216,12 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
           </div>
         ) : null}
 
-        <nav className="grid grid-cols-2 gap-1.5 rounded-lg border border-zinc-300 bg-zinc-100 p-1.5 sm:grid-cols-5 sm:gap-2 sm:p-2">
+        <nav className="grid grid-cols-5 gap-1 rounded-lg border border-zinc-300 bg-zinc-100 p-1 sm:gap-2 sm:p-2">
           {tabs.map((tab) => (
             <button className={tabClassName(tab.id)} key={tab.id} onClick={() => setPresenterTab(tab.id)} type="button">
               <span className="flex flex-col items-center gap-1 sm:flex-row sm:gap-3">
                 <span
-                  className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg sm:h-10 sm:w-10 ${
+                  className={`grid h-7 w-7 shrink-0 place-items-center rounded-lg sm:h-10 sm:w-10 ${
                     presenterTab === tab.id ? "bg-white/10 text-white" : "bg-zinc-100 text-zinc-700"
                   }`}
                 >
@@ -1206,11 +1239,11 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
         </nav>
 
         {presenterTab === "regie" ? (
-          <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px] xl:gap-5">
-            <div className="flex flex-col gap-4 md:gap-5">
-              <article className={`rounded-lg border p-4 shadow-sm md:p-5 ${screenToneClass}`}>
-                <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-stretch">
-                  <div className="min-w-0 rounded-lg border border-black/10 bg-white/70 p-4">
+          <section className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_340px] xl:gap-5">
+            <div className="flex flex-col gap-3 md:gap-5">
+              <article className={`rounded-lg border p-3 shadow-sm md:p-5 ${screenToneClass}`}>
+                <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-stretch">
+                  <div className="min-w-0 rounded-lg border border-black/10 bg-white/70 p-3 md:p-4">
                     <p className="inline-flex items-center gap-2 text-xs font-black uppercase">
                       <span className="h-2.5 w-2.5 rounded-full bg-current" />
                       Nu op beeld
@@ -1218,16 +1251,16 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
                     <h2 className="mt-2 text-xl font-black leading-tight md:text-2xl">{screenState.label}</h2>
                     <p className="mt-2 line-clamp-3 text-sm font-semibold opacity-80">{screenState.detail}</p>
 
-                    <div className="mt-4 grid grid-cols-3 gap-2">
-                      <div className="rounded-lg bg-white px-3 py-2">
+                    <div className="mt-3 grid grid-cols-3 gap-1.5 md:mt-4 md:gap-2">
+                      <div className="rounded-lg bg-white px-2 py-2 md:px-3">
                         <p className="text-[11px] font-black uppercase text-zinc-500">Vragen</p>
                         <p className="text-lg font-black text-zinc-950">{payload.totals.questions}</p>
                       </div>
-                      <div className="rounded-lg bg-white px-3 py-2">
+                      <div className="rounded-lg bg-white px-2 py-2 md:px-3">
                         <p className="text-[11px] font-black uppercase text-zinc-500">Antwoorden</p>
                         <p className="text-lg font-black text-zinc-950">{payload.totals.answers}</p>
                       </div>
-                      <div className="rounded-lg bg-white px-3 py-2">
+                      <div className="rounded-lg bg-white px-2 py-2 md:px-3">
                         <p className="text-[11px] font-black uppercase text-zinc-500">Deelnemers</p>
                         <p className="text-lg font-black text-zinc-950">{payload.totals.participants}</p>
                       </div>
@@ -1259,7 +1292,7 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
                     ) : null}
                   </div>
 
-                  <div className="rounded-lg border border-black/10 bg-white p-3 text-zinc-950 shadow-sm md:p-4">
+                  <div className="hidden rounded-lg border border-black/10 bg-white p-3 text-zinc-950 shadow-sm md:block md:p-4">
                     <p className="text-xs font-black uppercase text-zinc-500">Regieknoppen</p>
                     <button
                       className={`mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg px-4 py-4 text-base font-black text-white disabled:opacity-50 ${
@@ -1462,7 +1495,7 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
               </article>
             </div>
 
-            <aside className="flex flex-col gap-4 md:gap-5">
+            <aside className="hidden flex-col gap-4 md:flex md:gap-5">
               <article className="rounded-lg border border-zinc-800 bg-zinc-950 p-4 text-white shadow-sm md:p-5">
                 <div className="flex items-center justify-between gap-3">
                   <div>
@@ -1527,16 +1560,41 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
         {presenterTab !== "regie" ? (
         <section className={`grid gap-6 ${presenterTab === "vragen" ? "xl:grid-cols-[360px_1fr]" : "xl:grid-cols-1"}`}>
           <aside className="flex flex-col gap-6">
-            <article className={`${presenterTab === "deelnemers" ? "" : "hidden"} rounded-lg border border-zinc-300 bg-white p-4 shadow-sm md:p-5`}>
-              <div className="flex flex-col gap-4 border-b border-zinc-200 pb-4 lg:flex-row lg:items-start lg:justify-between">
+            <article className={`${presenterTab === "deelnemers" ? "" : "hidden"} rounded-lg border border-zinc-300 bg-white p-3 shadow-sm md:p-5`}>
+              <div className="flex flex-col gap-3 border-b border-zinc-200 pb-3 lg:flex-row lg:items-start lg:justify-between">
                 <div>
                   <p className="text-xs font-black uppercase text-emerald-800">Deelnemers</p>
-                  <h2 className="mt-1 text-2xl font-black">Wie doet er mee?</h2>
-                  <p className="mt-2 max-w-3xl text-sm font-semibold text-zinc-600">
+                  <h2 className="mt-1 text-xl font-black md:text-2xl">Wie doet er mee?</h2>
+                  <p className="mt-2 hidden max-w-3xl text-sm font-semibold text-zinc-600 sm:block">
                     Leg de startgroep vast zodra je wilt beginnen. De QR-code en aanmeldlink blijven daarna open voor late instromers.
                   </p>
                 </div>
-                <div className="flex flex-col gap-2 sm:flex-row lg:flex-col xl:flex-row">
+                <details className="sm:hidden">
+                  <summary className="cursor-pointer rounded-lg border border-zinc-300 bg-zinc-50 px-3 py-2 text-center text-sm font-black text-zinc-800">
+                    Beheer
+                  </summary>
+                  <div className="mt-2 grid gap-2">
+                    <button
+                      className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-800 px-3 py-2.5 text-sm font-black text-white hover:bg-emerald-900 disabled:opacity-60"
+                      disabled={saving || !participants.length}
+                      onClick={startParticipantGroup}
+                      type="button"
+                    >
+                      <UserCheck aria-hidden className="h-4 w-4" />
+                      {participantGroupStarted ? "Startgroep opnieuw" : "Start groep"}
+                    </button>
+                    <button
+                      className="inline-flex items-center justify-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2.5 text-sm font-black text-rose-800 hover:border-rose-300 hover:bg-rose-100 disabled:opacity-60"
+                      disabled={saving || !participants.length}
+                      onClick={removeAllParticipantsFromSession}
+                      type="button"
+                    >
+                      <Trash2 aria-hidden className="h-4 w-4" />
+                      Alle deelnemers verwijderen
+                    </button>
+                  </div>
+                </details>
+                <div className="hidden flex-col gap-2 sm:flex sm:flex-row lg:flex-col xl:flex-row">
                   <button
                     className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-800 px-4 py-3 text-sm font-black text-white hover:bg-emerald-900 disabled:opacity-60"
                     disabled={saving || !participants.length}
@@ -1558,27 +1616,27 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
                 </div>
               </div>
 
-              <div className="mt-4 grid gap-2 md:grid-cols-4">
-                <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3">
+              <div className="mt-3 grid grid-cols-4 gap-1.5 md:mt-4 md:gap-2">
+                <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-2 md:p-3">
                   <p className="text-[11px] font-black uppercase text-zinc-500">Aangemeld</p>
-                  <p className="mt-1 text-2xl font-black">{participants.length}</p>
+                  <p className="mt-1 text-lg font-black md:text-2xl">{participants.length}</p>
                 </div>
-                <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3">
+                <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-2 md:p-3">
                   <p className="text-[11px] font-black uppercase text-zinc-500">Startgroep</p>
-                  <p className="mt-1 text-2xl font-black">{participantGroupCount}</p>
+                  <p className="mt-1 text-lg font-black md:text-2xl">{participantGroupCount}</p>
                 </div>
-                <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3">
-                  <p className="text-[11px] font-black uppercase text-zinc-500">Later ingestroomd</p>
-                  <p className="mt-1 text-2xl font-black">{participantGroupStarted ? lateParticipants.length : 0}</p>
+                <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-2 md:p-3">
+                  <p className="text-[11px] font-black uppercase text-zinc-500">Later</p>
+                  <p className="mt-1 text-lg font-black md:text-2xl">{participantGroupStarted ? lateParticipants.length : 0}</p>
                 </div>
-                <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3">
-                  <p className="text-[11px] font-black uppercase text-zinc-500">Met punten</p>
-                  <p className="mt-1 text-2xl font-black">{participantsWithScore.length}</p>
+                <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-2 md:p-3">
+                  <p className="text-[11px] font-black uppercase text-zinc-500">Punten</p>
+                  <p className="mt-1 text-lg font-black md:text-2xl">{participantsWithScore.length}</p>
                 </div>
               </div>
 
               <div
-                className={`mt-4 rounded-lg border p-4 ${
+                className={`mt-3 rounded-lg border p-3 md:mt-4 md:p-4 ${
                   participantGroupStarted
                     ? "border-emerald-200 bg-emerald-50 text-emerald-950"
                     : "border-amber-200 bg-amber-50 text-amber-950"
@@ -1603,16 +1661,26 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
                 </div>
               </div>
 
-              <div className="mt-4 overflow-hidden rounded-lg border border-zinc-200">
-                {participants.length ? (
+              <label className="relative mt-3 block md:mt-4">
+                <Search aria-hidden className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
+                <input
+                  className="w-full rounded-lg border border-zinc-300 bg-white py-2.5 pl-9 pr-3 text-sm font-bold outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
+                  onChange={(event) => setParticipantQuery(event.target.value)}
+                  placeholder="Zoek deelnemer"
+                  value={participantQuery}
+                />
+              </label>
+
+              <div className="mt-3 overflow-hidden rounded-lg border border-zinc-200 md:mt-4">
+                {filteredParticipants.length ? (
                   <div className="divide-y divide-zinc-200">
-                    {participants.map((participant) => (
+                    {filteredParticipants.map((participant) => (
                       <div
-                        className="grid gap-3 bg-white p-3 md:grid-cols-[64px_minmax(0,1fr)_auto] md:items-center md:p-4"
+                        className="grid gap-2 bg-white p-2.5 md:grid-cols-[64px_minmax(0,1fr)_auto] md:items-center md:gap-3 md:p-4"
                         key={participant.participantId}
                       >
                         <div className="flex items-center gap-3 md:block">
-                          <span className="grid h-11 w-11 place-items-center rounded-lg bg-zinc-950 text-sm font-black text-white">
+                          <span className="grid h-9 w-9 place-items-center rounded-lg bg-zinc-950 text-xs font-black text-white md:h-11 md:w-11 md:text-sm">
                             {participant.displayIndex}
                           </span>
                           <span className="md:hidden text-sm font-black">{participant.label}</span>
@@ -1634,24 +1702,24 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
                                 {participant.joinedAfterGroupStart ? "Later ingestroomd" : "Startgroep"}
                               </span>
                             ) : null}
-                            <span className="rounded-md bg-white px-2 py-1 text-xs font-semibold text-zinc-500 ring-1 ring-zinc-200">
+                            <span className="hidden rounded-md bg-white px-2 py-1 text-xs font-semibold text-zinc-500 ring-1 ring-zinc-200 sm:inline-flex">
                               Binnen sinds {formatShortDateTime(participant.joinedAt)}
                             </span>
                           </div>
                         </div>
                         <div className="grid gap-2 md:min-w-[280px]">
                           <div className="grid grid-cols-3 gap-2">
-                            <div className="rounded-lg bg-zinc-50 px-3 py-2 text-center">
+                            <div className="rounded-lg bg-zinc-50 px-2 py-1.5 text-center md:px-3 md:py-2">
                               <p className="text-[10px] font-black uppercase text-zinc-500">Plaats</p>
                               <p className="text-base font-black">{participant.rank ? `#${participant.rank}` : "-"}</p>
                             </div>
-                            <div className="rounded-lg bg-zinc-50 px-3 py-2 text-center">
+                            <div className="rounded-lg bg-zinc-50 px-2 py-1.5 text-center md:px-3 md:py-2">
                               <p className="text-[10px] font-black uppercase text-zinc-500">Score</p>
                               <p className="text-base font-black">
                                 {participant.score} {participant.score === 1 ? "punt" : "punten"}
                               </p>
                             </div>
-                            <div className="rounded-lg bg-zinc-50 px-3 py-2 text-center">
+                            <div className="rounded-lg bg-zinc-50 px-2 py-1.5 text-center md:px-3 md:py-2">
                               <p className="text-[10px] font-black uppercase text-zinc-500">Quiz</p>
                               <p className="text-base font-black">{participant.answered}</p>
                             </div>
@@ -1663,19 +1731,24 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
                             type="button"
                           >
                             <Trash2 aria-hidden className="h-4 w-4" />
-                            Verwijder deelnemer
+                            <span className="hidden md:inline">Verwijder deelnemer</span>
+                            <span className="md:hidden">Verwijder</span>
                           </button>
                         </div>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <div className="grid min-h-[220px] place-items-center bg-zinc-50 p-6 text-center">
+                  <div className="grid min-h-[180px] place-items-center bg-zinc-50 p-5 text-center">
                     <div>
                       <Users aria-hidden className="mx-auto h-10 w-10 text-zinc-400" />
-                      <h3 className="mt-3 text-xl font-black">Nog niemand aangemeld</h3>
+                      <h3 className="mt-3 text-xl font-black">
+                        {participants.length ? "Geen deelnemer gevonden" : "Nog niemand aangemeld"}
+                      </h3>
                       <p className="mt-2 text-sm font-semibold text-zinc-600">
-                        Toon de QR-code of deel de link zodat deelnemers binnenkomen.
+                        {participants.length
+                          ? "Pas je zoekopdracht aan om de deelnemer te vinden."
+                          : "Toon de QR-code of deel de link zodat deelnemers binnenkomen."}
                       </p>
                     </div>
                   </div>
@@ -2383,10 +2456,73 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
         </div>
       ) : null}
 
+      {presenterTab === "regie" ? (
+        <section
+          aria-label="Mobiele regiebediening"
+          className="fixed inset-x-0 bottom-0 z-50 border-t border-zinc-300 bg-white/95 px-2 pb-2 pt-2 text-zinc-950 shadow-2xl backdrop-blur md:hidden"
+        >
+          <div className="mx-auto max-w-xl">
+            <div className="mb-2 flex items-center justify-between gap-3 px-1">
+              <p className="min-w-0 truncate text-xs font-black uppercase text-zinc-600">
+                {activeQuestion ? "Live vraag" : screenViewLabel(payload.presentation.screenView)}
+              </p>
+              <p className="shrink-0 text-xs font-black text-zinc-700">{mobileAnswerCount} antwoorden</p>
+            </div>
+            <div className="grid grid-cols-4 gap-1.5">
+              <button
+                className={`inline-flex min-h-12 flex-col items-center justify-center gap-1 rounded-lg px-2 py-2 text-[11px] font-black disabled:opacity-40 ${
+                  activeQuestion ? "bg-amber-700 text-white" : "bg-emerald-800 text-white"
+                }`}
+                disabled={saving || (!activeQuestion && !mobilePrimaryQuestion)}
+                onClick={() => (activeQuestion ? activate(null) : mobilePrimaryQuestion && activate(mobilePrimaryQuestion.id))}
+                type="button"
+              >
+                {activeQuestion ? <Square aria-hidden className="h-4 w-4" /> : <Play aria-hidden className="h-4 w-4" />}
+                {activeQuestion ? "Stop" : "Live"}
+              </button>
+              <button
+                className={`inline-flex min-h-12 flex-col items-center justify-center gap-1 rounded-lg px-2 py-2 text-[11px] font-black disabled:opacity-40 ${
+                  mobileResultsVisible ? "bg-zinc-950 text-white" : "bg-sky-800 text-white"
+                }`}
+                disabled={saving || !mobileResultsQuestion}
+                onClick={() =>
+                  mobileResultsQuestion &&
+                  updateScreenView(
+                    mobileResultsVisible ? "question" : "results",
+                    mobileResultsVisible ? null : mobileResultsQuestion.id
+                  )
+                }
+                type="button"
+              >
+                <BarChart3 aria-hidden className="h-4 w-4" />
+                {mobileResultsVisible ? "Sluit" : "Resultaten"}
+              </button>
+              <button
+                className="inline-flex min-h-12 flex-col items-center justify-center gap-1 rounded-lg bg-zinc-900 px-2 py-2 text-[11px] font-black text-white disabled:opacity-40"
+                disabled={saving || !nextQuestion}
+                onClick={() => nextQuestion && activate(nextQuestion.id)}
+                type="button"
+              >
+                <ArrowDown aria-hidden className="h-4 w-4" />
+                Volgende
+              </button>
+              <button
+                className="inline-flex min-h-12 flex-col items-center justify-center gap-1 rounded-lg border border-zinc-300 bg-white px-2 py-2 text-[11px] font-black text-zinc-800"
+                onClick={() => setPresenterTab("instellingen")}
+                type="button"
+              >
+                <Settings aria-hidden className="h-4 w-4" />
+                Meer
+              </button>
+            </div>
+          </div>
+        </section>
+      ) : null}
+
       {activeQuestion ? (
         <section
           aria-label="Live commandocentrum"
-          className="fixed inset-x-2 bottom-2 z-50 mx-auto max-w-6xl rounded-lg border border-zinc-700 bg-zinc-950 p-2 text-white shadow-2xl shadow-zinc-950/30 md:bottom-4 md:p-3"
+          className="fixed inset-x-2 bottom-2 z-50 mx-auto hidden max-w-6xl rounded-lg border border-zinc-700 bg-zinc-950 p-2 text-white shadow-2xl shadow-zinc-950/30 md:block md:bottom-4 md:p-3"
         >
           <div className="grid gap-2 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
             <div className="flex min-w-0 items-center gap-2 md:gap-3">

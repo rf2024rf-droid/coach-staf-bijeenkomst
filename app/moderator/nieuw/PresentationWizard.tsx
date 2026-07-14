@@ -1106,8 +1106,8 @@ export default function PresentationWizard() {
 
   return (
     <main className="min-h-screen bg-[#f5f5f0] text-zinc-950">
-      <div className="mx-auto flex min-h-screen w-full max-w-7xl flex-col px-4 pb-28 pt-4 md:px-6 lg:pb-5">
-        <header className="sticky top-0 z-20 -mx-4 border-b border-zinc-300 bg-[#f5f5f0]/95 px-4 py-3 backdrop-blur md:-mx-6 md:px-6">
+      <div className="mx-auto flex min-h-screen w-full max-w-7xl flex-col px-3 pb-24 pt-3 md:px-6 lg:pb-5">
+        <header className="sticky top-0 z-20 -mx-3 border-b border-zinc-300 bg-[#f5f5f0]/95 px-3 py-2.5 backdrop-blur md:-mx-6 md:px-6 md:py-3">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div className="min-w-0">
               <button
@@ -1144,7 +1144,7 @@ export default function PresentationWizard() {
             </div>
           </div>
 
-          <div className="mt-3 rounded-lg border border-zinc-300 bg-white p-3 md:hidden">
+          <div className="mt-2 md:hidden">
             <div className="flex items-center justify-between gap-3">
               <span className="text-xs font-black uppercase text-zinc-500">Stap {currentStepIndex + 1}</span>
               <span className="truncate text-sm font-black">{currentStepLabel}</span>
@@ -1152,18 +1152,6 @@ export default function PresentationWizard() {
             <div className="mt-2 h-2 overflow-hidden rounded-full bg-zinc-100">
               <div className="h-full rounded-full bg-emerald-800" style={{ width: `${progressPercent}%` }} />
             </div>
-            <select
-              aria-label="Ga naar stap"
-              className="mt-3 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-bold outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
-              onChange={(event) => setStep(event.target.value as WizardStep)}
-              value={step}
-            >
-              {steps.map((item, index) => (
-                <option disabled={!payload && item.id !== "title"} key={item.id} value={item.id}>
-                  {index + 1}. {item.label}
-                </option>
-              ))}
-            </select>
           </div>
 
           <nav className="mt-4 hidden gap-2 md:grid md:grid-cols-5" aria-label="Voortgang">
@@ -1211,16 +1199,16 @@ export default function PresentationWizard() {
         ) : null}
 
         {step === "title" && busy !== "load" ? (
-          <section className="grid flex-1 place-items-center py-6 md:py-12">
+          <section className="grid flex-1 place-items-center py-4 md:py-12">
             <form className="w-full max-w-3xl" onSubmit={createDraftPresentation}>
-              <div className="rounded-lg border border-zinc-300 bg-white p-5 shadow-sm md:p-8">
+              <div className="rounded-lg border border-zinc-300 bg-white p-4 shadow-sm md:p-8">
                 <p className="text-sm font-black uppercase text-emerald-800">Stap 1</p>
-                <label className="mt-3 block text-2xl font-black md:text-5xl" htmlFor="presentation-title">
+                <label className="mt-2 block text-xl font-black md:mt-3 md:text-5xl" htmlFor="presentation-title">
                   Hoe heet je presentatie?
                 </label>
                 <input
                   autoFocus
-                  className="mt-6 w-full rounded-lg border-2 border-zinc-300 bg-white px-4 py-4 text-xl font-black outline-none placeholder:text-zinc-300 focus:border-emerald-700 focus:ring-4 focus:ring-emerald-100 md:mt-8 md:px-5 md:py-5 md:text-2xl"
+                  className="mt-4 w-full rounded-lg border-2 border-zinc-300 bg-white px-3 py-3 text-lg font-black outline-none placeholder:text-zinc-300 focus:border-emerald-700 focus:ring-4 focus:ring-emerald-100 md:mt-8 md:px-5 md:py-5 md:text-2xl"
                   id="presentation-title"
                   maxLength={90}
                   onChange={(event) => setTitle(event.target.value)}
@@ -1228,7 +1216,7 @@ export default function PresentationWizard() {
                   value={title}
                 />
                 <button
-                  className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-800 px-5 py-4 text-lg font-black text-white hover:bg-emerald-900 disabled:opacity-60 md:w-auto"
+                  className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-800 px-4 py-3 text-base font-black text-white hover:bg-emerald-900 disabled:opacity-60 md:mt-6 md:w-auto md:px-5 md:py-4 md:text-lg"
                   disabled={(busy === "create" || busy === "title") || !title.trim()}
                   type="submit"
                 >
@@ -1245,17 +1233,17 @@ export default function PresentationWizard() {
         ) : null}
 
         {step === "type" && payload ? (
-          <section className="py-5 md:py-8">
-            <div className="mb-6">
+          <section className="py-4 md:py-8">
+            <div className="mb-4 md:mb-6">
               <p className="text-sm font-black uppercase text-emerald-800">Stap 2</p>
-              <h2 className="mt-1 text-2xl font-black md:text-3xl">Wat wil je maken?</h2>
+              <h2 className="mt-1 text-xl font-black md:text-3xl">Wat wil je maken?</h2>
             </div>
-            <div className="grid gap-4 lg:grid-cols-3">
+            <div className="grid gap-2 md:gap-4 lg:grid-cols-3">
               {presentationTypes.map((type) => {
                 const selected = presentationType === type.id;
                 return (
                   <button
-                    className={`group rounded-lg border p-4 text-left shadow-sm transition focus:outline-none focus:ring-4 focus:ring-emerald-100 md:p-5 ${
+                    className={`group rounded-lg border p-3 text-left shadow-sm transition focus:outline-none focus:ring-4 focus:ring-emerald-100 md:p-5 ${
                       selected
                         ? "border-emerald-700 bg-emerald-50 ring-2 ring-emerald-200"
                         : "border-zinc-300 bg-white hover:border-zinc-500 hover:bg-zinc-50"
@@ -1264,11 +1252,11 @@ export default function PresentationWizard() {
                     onClick={() => void choosePresentationType(type.id)}
                     type="button"
                   >
-                    <span className={`grid h-12 w-12 place-items-center rounded-lg ${selected ? "bg-emerald-800 text-white" : "bg-zinc-950 text-white"}`}>
+                    <span className={`grid h-10 w-10 place-items-center rounded-lg md:h-12 md:w-12 ${selected ? "bg-emerald-800 text-white" : "bg-zinc-950 text-white"}`}>
                       {type.icon === "quiz" ? <Trophy aria-hidden className="h-6 w-6" /> : type.icon === "combined" ? <Layers aria-hidden className="h-6 w-6" /> : <Monitor aria-hidden className="h-6 w-6" />}
                     </span>
-                    <span className="mt-4 block text-xl font-black md:mt-5 md:text-2xl">{type.title}</span>
-                    <span className="mt-3 block text-sm font-semibold leading-6 text-zinc-600">{type.description}</span>
+                    <span className="mt-3 block text-lg font-black md:mt-5 md:text-2xl">{type.title}</span>
+                    <span className="mt-2 hidden text-sm font-semibold leading-6 text-zinc-600 sm:block md:mt-3">{type.description}</span>
                   </button>
                 );
               })}
@@ -1277,8 +1265,8 @@ export default function PresentationWizard() {
         ) : null}
 
         {step === "canvas" && payload ? (
-          <section className="grid flex-1 gap-4 py-4 lg:grid-cols-[320px_1fr] lg:gap-5 lg:py-6">
-            <div className="rounded-lg border border-zinc-300 bg-white p-4 shadow-sm lg:hidden">
+          <section className="grid flex-1 gap-3 py-3 lg:grid-cols-[320px_1fr] lg:gap-5 lg:py-6">
+            <div className="rounded-lg border border-zinc-300 bg-white p-3 shadow-sm lg:hidden">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="text-xs font-black uppercase text-emerald-800">Tijdlijn</p>
@@ -1325,13 +1313,13 @@ export default function PresentationWizard() {
               </div>
             </aside>
 
-            <div className="flex flex-col gap-5">
+            <div className="flex flex-col gap-3 md:gap-5">
               {showAddPanel || !payload.questions.length ? (
-                <section className="rounded-lg border border-zinc-300 bg-white p-5 shadow-sm">
-                  <div className="mb-5 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+                <section className="rounded-lg border border-zinc-300 bg-white p-3 shadow-sm md:p-5">
+                  <div className="mb-3 flex flex-col gap-2 md:mb-5 md:flex-row md:items-end md:justify-between">
                     <div>
                       <p className="text-xs font-black uppercase text-emerald-800">Onderdeel toevoegen</p>
-                      <h2 className="text-2xl font-black">Voeg je eerste vraag of slide toe</h2>
+                      <h2 className="text-xl font-black md:text-2xl">Voeg een vraag of slide toe</h2>
                     </div>
                     {payload.questions.length ? (
                       <button
@@ -1349,30 +1337,30 @@ export default function PresentationWizard() {
                     ["Presentatieslides", groupedDefinitions.slides],
                     ["Interactieve onderdelen", groupedDefinitions.interactive],
                   ].map(([label, definitions]) => (
-                    <div className="mb-5 last:mb-0" key={label as string}>
-                      <h3 className="mb-3 text-sm font-black uppercase text-zinc-500">{label as string}</h3>
+                    <div className="mb-4 last:mb-0 md:mb-5" key={label as string}>
+                      <h3 className="mb-2 text-xs font-black uppercase text-zinc-500 md:mb-3 md:text-sm">{label as string}</h3>
                       {(label as string) === "Quizvragen" ? (
-                        <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm font-bold leading-6 text-amber-950">
+                        <div className="mb-2 rounded-lg border border-amber-200 bg-amber-50 p-2.5 text-xs font-bold leading-5 text-amber-950 md:mb-3 md:p-3 md:text-sm md:leading-6">
                           <span className="inline-flex items-center gap-2">
                             <Timer aria-hidden className="h-4 w-4 shrink-0" />
                             Quizvragen zijn vragen op timer en tellen mee voor de ranking.
                           </span>
                         </div>
                       ) : null}
-                      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                      <div className="grid gap-2 md:grid-cols-2 md:gap-3 xl:grid-cols-3">
                         {(definitions as ItemDefinition[]).map((definition) => (
                           <button
-                            className="rounded-lg border border-zinc-200 bg-zinc-50 p-4 text-left transition hover:border-emerald-500 hover:bg-emerald-50 focus:outline-none focus:ring-4 focus:ring-emerald-100 disabled:opacity-60"
+                            className="rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-left transition hover:border-emerald-500 hover:bg-emerald-50 focus:outline-none focus:ring-4 focus:ring-emerald-100 disabled:opacity-60 md:p-4"
                             disabled={busy === `add-${definition.kind}`}
                             key={definition.kind}
                             onClick={() => void addItem(definition.kind)}
                             type="button"
                           >
-                            <span className="grid h-10 w-10 place-items-center rounded-lg bg-zinc-950 text-white">
+                            <span className="grid h-9 w-9 place-items-center rounded-lg bg-zinc-950 text-white md:h-10 md:w-10">
                               {iconFor(definition)}
                             </span>
-                            <span className="mt-3 block font-black">{definition.title}</span>
-                            <span className="mt-1 block text-sm font-semibold leading-6 text-zinc-600">
+                            <span className="mt-2 block font-black md:mt-3">{definition.title}</span>
+                            <span className="mt-1 hidden text-sm font-semibold leading-6 text-zinc-600 sm:block">
                               {definition.description}
                             </span>
                             <span
@@ -1399,11 +1387,11 @@ export default function PresentationWizard() {
               ) : null}
 
               {draft ? (
-                <section className="rounded-lg border border-zinc-300 bg-white p-5 shadow-sm">
-                  <div className="mb-5 flex flex-col gap-3 border-b border-zinc-200 pb-4 md:flex-row md:items-start md:justify-between">
+                <section className="rounded-lg border border-zinc-300 bg-white p-3 shadow-sm md:p-5">
+                  <div className="mb-3 flex flex-col gap-3 border-b border-zinc-200 pb-3 md:mb-5 md:flex-row md:items-start md:justify-between md:pb-4">
                     <div>
                       <p className="text-xs font-black uppercase text-emerald-800">{itemDefinition(draft.kind).title}</p>
-                      <h2 className="text-2xl font-black">Onderdeel bewerken</h2>
+                      <h2 className="text-xl font-black md:text-2xl">Onderdeel bewerken</h2>
                       {validationErrors[draft.id]?.length ? (
                         <p className="mt-2 text-sm font-bold text-rose-700">
                           {validationErrors[draft.id].join(" ")}
@@ -1432,16 +1420,16 @@ export default function PresentationWizard() {
                     </div>
                   </div>
 
-                  <div className="grid gap-5">
+                  <div className="grid gap-3 md:gap-5">
                     {draft.type === "quiz" ? (
-                      <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm font-bold leading-6 text-amber-950">
+                      <div className="rounded-lg border border-amber-200 bg-amber-50 p-2.5 text-xs font-bold leading-5 text-amber-950 md:p-3 md:text-sm md:leading-6">
                         <span className="inline-flex items-center gap-2">
                           <Timer aria-hidden className="h-4 w-4 shrink-0" />
                           Quizvraag met timer en ranking. Stel de tijd in bij Geavanceerde instellingen.
                         </span>
                       </div>
                     ) : draft.type === "multiple" ? (
-                      <div className="rounded-lg border border-sky-200 bg-sky-50 p-3 text-sm font-bold leading-6 text-sky-950">
+                      <div className="rounded-lg border border-sky-200 bg-sky-50 p-2.5 text-xs font-bold leading-5 text-sky-950 md:p-3 md:text-sm md:leading-6">
                         Multiple choice voor interactie. Deze vraag telt niet mee in de ranking.
                       </div>
                     ) : null}
@@ -1452,7 +1440,7 @@ export default function PresentationWizard() {
                       </span>
                       <textarea
                         ref={promptTextareaRef}
-                        className="mt-2 min-h-[56px] w-full resize-none overflow-hidden rounded-lg border border-zinc-300 px-4 py-3 text-lg font-bold leading-7 outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
+                        className="mt-2 min-h-[48px] w-full resize-none overflow-hidden rounded-lg border border-zinc-300 px-3 py-2.5 text-base font-bold leading-6 outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100 md:min-h-[56px] md:px-4 md:py-3 md:text-lg md:leading-7"
                         maxLength={180}
                         onChange={(event) => {
                           resizeTextarea(event.currentTarget);
@@ -1469,7 +1457,7 @@ export default function PresentationWizard() {
                         {draft.type === "slide" ? "Tekst op de slide" : "Optionele toelichting"}
                       </span>
                       <textarea
-                        className="mt-2 min-h-28 w-full resize-y rounded-lg border border-zinc-300 px-4 py-3 text-base outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
+                        className="mt-2 min-h-24 w-full resize-y rounded-lg border border-zinc-300 px-3 py-2.5 text-sm outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100 md:min-h-28 md:px-4 md:py-3 md:text-base"
                         maxLength={draft.type === "slide" ? 900 : 500}
                         onChange={(event) =>
                           draft.type === "slide"
@@ -1486,14 +1474,14 @@ export default function PresentationWizard() {
                         <div className="mb-3">
                           <h3 className="text-sm font-black uppercase text-zinc-600">Antwoordopties</h3>
                         </div>
-                        <div className="grid gap-3">
+                        <div className="grid gap-2 md:gap-3">
                           {draft.options.map((option, index) => (
-                            <div className="grid gap-2 rounded-lg border border-zinc-200 bg-zinc-50 p-3 md:grid-cols-[auto_1fr_auto]" key={option.id}>
-                              <div className="grid h-10 w-10 place-items-center rounded-lg bg-zinc-950 font-black text-white">
+                            <div className="grid gap-2 rounded-lg border border-zinc-200 bg-zinc-50 p-2.5 md:grid-cols-[auto_1fr_auto] md:p-3" key={option.id}>
+                              <div className="grid h-9 w-9 place-items-center rounded-lg bg-zinc-950 text-sm font-black text-white md:h-10 md:w-10 md:text-base">
                                 {String.fromCharCode(65 + index)}
                               </div>
                               <input
-                                className="min-w-0 rounded-lg border border-zinc-300 bg-white px-3 py-2 font-bold outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
+                                className="min-w-0 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-bold outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100 md:text-base"
                                 maxLength={90}
                                 onChange={(event) => updateOption(option.id, { label: event.target.value })}
                                 placeholder={`Antwoord ${String.fromCharCode(65 + index)}`}
@@ -1536,7 +1524,7 @@ export default function PresentationWizard() {
                             </div>
                           ))}
                           <button
-                            className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-zinc-300 bg-white px-3 py-3 text-sm font-black text-zinc-700 hover:border-emerald-500 hover:bg-emerald-50"
+                            className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-zinc-300 bg-white px-3 py-2.5 text-sm font-black text-zinc-700 hover:border-emerald-500 hover:bg-emerald-50 md:py-3"
                             onClick={() =>
                               updateDraft({
                                 options: [
@@ -1554,13 +1542,13 @@ export default function PresentationWizard() {
                       </section>
                     ) : null}
 
-                    <details className="rounded-lg border border-zinc-200 bg-zinc-50 p-4">
+                    <details className="rounded-lg border border-zinc-200 bg-zinc-50 p-3 md:p-4">
                       <summary className="flex cursor-pointer items-center gap-2 font-black">
                         <Settings aria-hidden className="h-4 w-4" />
                         Geavanceerde instellingen
                       </summary>
-                      <div className="mt-4 grid gap-4 md:grid-cols-2">
-                        <label className="flex items-center gap-3 rounded-lg border border-zinc-200 bg-white px-3 py-3 text-sm font-bold">
+                      <div className="mt-3 grid gap-3 md:mt-4 md:grid-cols-2 md:gap-4">
+                        <label className="flex items-center gap-3 rounded-lg border border-zinc-200 bg-white px-3 py-2.5 text-sm font-bold md:py-3">
                           <input
                             checked={draft.required}
                             className="h-4 w-4 accent-emerald-700"

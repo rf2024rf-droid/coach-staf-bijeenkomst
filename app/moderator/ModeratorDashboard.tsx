@@ -11,6 +11,7 @@ import {
   LogOut,
   MailCheck,
   Monitor,
+  MoreHorizontal,
   Pencil,
   Plus,
   Search,
@@ -775,18 +776,26 @@ export default function ModeratorDashboard({ entryMode = "users" }: ModeratorDas
 
   return (
     <main className="min-h-screen bg-[#f5f5f0] text-zinc-950">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 px-4 py-4 md:gap-6 md:px-8 md:py-6">
-        <header className="flex flex-col gap-4 rounded-lg border border-zinc-300 bg-white p-4 shadow-sm md:p-5 lg:flex-row lg:items-end lg:justify-between">
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-3 px-3 py-3 md:gap-6 md:px-8 md:py-6">
+        <header className="flex flex-col gap-3 rounded-lg border border-zinc-300 bg-white p-3 shadow-sm md:p-5 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="text-sm font-semibold uppercase text-emerald-800">Sessie Interactief</p>
             <h1 className="mt-1 text-2xl font-black md:mt-2 md:text-4xl">
               {session.role === "admin" ? "Platformbeheer" : "Mijn omgeving"}
             </h1>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-700 md:text-base">
+            <p className="mt-2 hidden max-w-2xl text-sm leading-6 text-zinc-700 sm:block md:text-base">
               {session.role === "admin"
                 ? "Beheer alle accounts, presentaties, QR-codes en presenter-schermen."
                 : `Ingelogd als ${session.email}. Je presentaties en quizzen blijven bewaard.`}
             </p>
+            <div className="mt-2 flex flex-wrap gap-1.5 sm:hidden">
+              <span className="rounded-md bg-zinc-100 px-2 py-1 text-xs font-black text-zinc-700">
+                {presentations.length} presentaties
+              </span>
+              <span className="rounded-md bg-zinc-100 px-2 py-1 text-xs font-black text-zinc-700">
+                {totals.items} onderdelen
+              </span>
+            </div>
           </div>
           <div className="flex flex-col items-stretch gap-2 sm:items-start lg:items-end">
             <button
@@ -847,18 +856,18 @@ export default function ModeratorDashboard({ entryMode = "users" }: ModeratorDas
           </nav>
         ) : null}
 
-        <section className={`${session.role === "admin" && moderatorTab !== "presentations" ? "hidden" : ""} grid gap-4 rounded-lg border border-zinc-300 bg-white p-4 shadow-sm md:p-5 lg:grid-cols-[1fr_auto] lg:items-center`}>
+        <section className={`${session.role === "admin" && moderatorTab !== "presentations" ? "hidden" : ""} grid gap-3 rounded-lg border border-zinc-300 bg-white p-3 shadow-sm md:p-5 lg:grid-cols-[1fr_auto] lg:items-center`}>
           <div>
             <p className="text-xs font-black uppercase text-emerald-800">Startpunt</p>
             <h2 className="mt-1 text-xl font-black md:text-2xl">Nieuwe presentatie maken</h2>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-600">
+            <p className="mt-2 hidden max-w-2xl text-sm leading-6 text-zinc-600 sm:block">
               {session.role === "tester"
                 ? `Je wordt stap voor stap begeleid. Je kunt maximaal ${session.limits.maxPresentations} presentaties of quizzen maken met maximaal ${session.limits.maxQuestions} onderdelen per presentatie.`
                 : "Maak stap voor stap een presentatie, quiz of combinatie met vragen en slides."}
             </p>
           </div>
           <button
-            className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-800 px-5 py-4 text-base font-black text-white hover:bg-emerald-900 disabled:opacity-60 lg:w-auto"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-800 px-4 py-3 text-sm font-black text-white hover:bg-emerald-900 disabled:opacity-60 md:px-5 md:py-4 md:text-base lg:w-auto"
             disabled={presentationLimitReached}
             onClick={() => router.push(builderPath())}
             type="button"
@@ -869,7 +878,7 @@ export default function ModeratorDashboard({ entryMode = "users" }: ModeratorDas
           </button>
         </section>
 
-        <section className={`${session.role === "admin" && moderatorTab !== "presentations" ? "hidden" : ""} grid grid-cols-2 gap-2 rounded-lg border border-zinc-300 bg-white/80 p-2 lg:grid-cols-4`}>
+        <section className={`${session.role === "admin" && moderatorTab !== "presentations" ? "hidden" : ""} hidden grid-cols-2 gap-2 rounded-lg border border-zinc-300 bg-white/80 p-2 sm:grid lg:grid-cols-4`}>
           <article className="rounded-lg bg-zinc-50 p-3 md:px-4">
             <p className="text-xs font-semibold text-zinc-600 md:text-sm">Presentaties</p>
             <p className="mt-1 text-xl font-black md:text-2xl">
@@ -1013,7 +1022,7 @@ export default function ModeratorDashboard({ entryMode = "users" }: ModeratorDas
               ) : null}
             </div>
           ) : (
-            <div className="grid gap-4">
+            <div className="grid gap-2 md:gap-4">
               {filtered.map((presentation) => {
                 const presenterUrl = `/presenter/${presentation.id}`;
                 const joinUrl = `${origin}/join/${presentation.code}`;
@@ -1022,7 +1031,7 @@ export default function ModeratorDashboard({ entryMode = "users" }: ModeratorDas
 
                 return (
                   <article className="rounded-lg border border-zinc-200 bg-zinc-50 p-3 md:p-4" key={presentation.id}>
-                    <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                       <div className="min-w-0 flex-1">
                         {isEditing ? (
                           <div className="flex flex-col gap-2 sm:flex-row">
@@ -1042,10 +1051,10 @@ export default function ModeratorDashboard({ entryMode = "users" }: ModeratorDas
                             </button>
                           </div>
                         ) : (
-                          <h3 className="break-words text-xl font-black">{presentation.title}</h3>
+                          <h3 className="break-words text-base font-black leading-snug md:text-xl">{presentation.title}</h3>
                         )}
 
-                        <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+                        <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs md:mt-3 md:gap-2 md:text-sm">
                           <span className="rounded-md bg-zinc-900 px-2 py-1 font-mono font-black text-white">
                             {presentation.code}
                           </span>
@@ -1063,22 +1072,93 @@ export default function ModeratorDashboard({ entryMode = "users" }: ModeratorDas
                           <span className="rounded-md bg-white px-2 py-1 text-zinc-700">
                             {presentation.totals.items} onderdelen
                           </span>
-                          <span className="rounded-md bg-white px-2 py-1 text-zinc-700">
+                          <span className="hidden rounded-md bg-white px-2 py-1 text-zinc-700 sm:inline-flex">
                             {presentation.totals.questions} vragen / {presentation.totals.slides} slides
                           </span>
-                          <span className="rounded-md bg-white px-2 py-1 text-zinc-700">
+                          <span className="hidden rounded-md bg-white px-2 py-1 text-zinc-700 sm:inline-flex">
                             {presentation.totals.answers} antwoorden
                           </span>
                           <span className="rounded-md bg-white px-2 py-1 text-zinc-700">
                             {presentation.totals.participants} deelnemers
                           </span>
                         </div>
-                        <p className="mt-3 text-sm text-zinc-600">
+                        <p className="mt-2 text-xs text-zinc-600 md:mt-3 md:text-sm">
                           Laatste wijziging {formatDate(presentation.updatedAt)}
                         </p>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:flex lg:flex-wrap lg:justify-end">
+                      <div className="grid grid-cols-[1fr_1fr_auto] gap-2 md:hidden">
+                        <a
+                          className="inline-flex items-center justify-center gap-2 rounded-lg bg-zinc-900 px-3 py-2.5 text-sm font-bold text-white hover:bg-zinc-700"
+                          href={presenterUrl}
+                        >
+                          <ArrowRight aria-hidden className="h-4 w-4" />
+                          Regie
+                        </a>
+                        <a
+                          className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-800 px-3 py-2.5 text-sm font-bold text-white hover:bg-emerald-900"
+                          href={builderPath(presentation.id)}
+                        >
+                          <Pencil aria-hidden className="h-4 w-4" />
+                          Bewerk
+                        </a>
+                        <details className="relative">
+                          <summary className="grid h-full min-h-10 cursor-pointer list-none place-items-center rounded-lg border border-zinc-300 bg-white px-3 text-zinc-800 [&::-webkit-details-marker]:hidden">
+                            <MoreHorizontal aria-hidden className="h-5 w-5" />
+                            <span className="sr-only">Meer acties</span>
+                          </summary>
+                          <div className="absolute right-0 z-20 mt-2 grid w-48 gap-1 rounded-lg border border-zinc-200 bg-white p-2 shadow-xl">
+                            <a
+                              className="inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-bold hover:bg-zinc-100"
+                              href={`/screen/${presentation.code}`}
+                              rel="noreferrer"
+                              target="_blank"
+                            >
+                              <Monitor aria-hidden className="h-4 w-4" />
+                              Scherm
+                            </a>
+                            <button
+                              className="inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-bold hover:bg-zinc-100"
+                              onClick={() => copyValue(joinUrl, "Deelnemerslink")}
+                              type="button"
+                            >
+                              <Copy aria-hidden className="h-4 w-4" />
+                              Link kopiëren
+                            </button>
+                            <button
+                              className="inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-bold hover:bg-zinc-100"
+                              onClick={() => {
+                                setEditingId(isEditing ? "" : presentation.id);
+                                setTitleDraft(isEditing ? "" : presentation.title);
+                              }}
+                              type="button"
+                            >
+                              <Pencil aria-hidden className="h-4 w-4" />
+                              Naam wijzigen
+                            </button>
+                            <button
+                              className="inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-bold hover:bg-zinc-100 disabled:opacity-60"
+                              disabled={busy === `duplicate-${presentation.id}` || presentationLimitReached}
+                              onClick={() => duplicatePresentation(presentation.id)}
+                              type="button"
+                            >
+                              <Copy aria-hidden className="h-4 w-4" />
+                              Dupliceer
+                            </button>
+                            <button
+                              className="inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-bold text-rose-800 hover:bg-rose-50 disabled:opacity-60"
+                              disabled={busy === `delete-${presentation.id}`}
+                              onClick={() => deletePresentation(presentation.id, presentation.title)}
+                              type="button"
+                            >
+                              <Trash2 aria-hidden className="h-4 w-4" />
+                              Verwijder
+                            </button>
+                          </div>
+                        </details>
+                      </div>
+
+                      <div className="hidden gap-2 md:grid md:grid-cols-3 lg:flex lg:flex-wrap lg:justify-end">
                         <a
                           className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-800 px-3 py-2 text-sm font-bold text-white hover:bg-emerald-900"
                           href={builderPath(presentation.id)}

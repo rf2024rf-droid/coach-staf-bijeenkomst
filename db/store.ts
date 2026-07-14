@@ -201,6 +201,8 @@ export type PresenterPayload = {
 };
 
 export type PublicSessionPayload = {
+  stateVersion: string;
+  statusVersion: string;
   presentation: {
     id: string;
     title: string;
@@ -232,6 +234,21 @@ export type PublicSessionPayload = {
     questions: number;
     answers: number;
   };
+};
+
+export type PublicSessionStatusPayload = {
+  code: string;
+  activeQuestionId: string | null;
+  screenQuestionId: string | null;
+  screenView: ScreenView;
+  stateVersion: string;
+  responseVersion: string;
+  version: string;
+  answers: number;
+  activeAnswers: number;
+  screenAnswers: number;
+  participants: number;
+  updatedAt: string | null;
 };
 
 export type ModeratorPresentationSummary = {
@@ -289,6 +306,8 @@ type PublicSessionBase = {
   leaderboard: LeaderboardEntry[];
   quizTotals: QuizTotals;
   participantLabels: Map<string, string>;
+  stateVersion: string;
+  statusVersion: string;
 };
 
 type PublicSessionCacheEntry = {
@@ -465,6 +484,53 @@ function getSql() {
 
 function publicSessionCacheMs() {
   return positiveIntegerEnv("PUBLIC_SESSION_CACHE_MS", 1500, 0, 5000);
+}
+
+function latestTimestamp<T>(items: T[], selector: (item: T) => string | null | undefined) {
+  return items.reduce((latest, item) => {
+    const value = selector(item);
+    if (!value) {
+      return latest;
+    }
+
+    return !latest || value > latest ? value : latest;
+  }, "");
+}
+
+function buildPublicStatusVersions(input: {
+  activeQuestionId: string | null;
+  answers: number;
+  activeAnswers: number;
+  participants: number;
+  participantsUpdatedAt: string | null;
+  presentationUpdatedAt: string | null;
+  questionsUpdatedAt: string | null;
+  responsesUpdatedAt: string | null;
+  screenQuestionId: string | null;
+  screenAnswers: number;
+  screenView: ScreenView;
+}) {
+  const stateVersion = [
+    input.presentationUpdatedAt ?? "",
+    input.questionsUpdatedAt ?? "",
+    input.participantsUpdatedAt ?? "",
+    input.participants,
+    input.activeQuestionId ?? "",
+    input.screenView,
+    input.screenQuestionId ?? "",
+  ].join("|");
+  const responseVersion = [
+    input.responsesUpdatedAt ?? "",
+    input.answers,
+    input.activeAnswers,
+    input.screenAnswers,
+  ].join("|");
+
+  return {
+    stateVersion,
+    responseVersion,
+    version: `${stateVersion}::${responseVersion}`,
+  };
 }
 
 function invalidatePublicSessionCache(codeInput: string | null | undefined) {
@@ -2427,6 +2493,106 @@ export async function removeAllParticipants(
   return getPresenterPayload(presentationId, presenterKey);
 }
 
+export async function getPublicSessionStatus(codeInput: string): Promise<PublicSessionStatusPayload> {
+  await ensureSchema();
+
+  const code = normalizeCode(codeInput);
+  const row = first(
+    await getSql()<
+      Array<{
+        active_question_id: string | null;
+        active_answers: number;
+        answers: number;
+        code: string;
+        participants: number;
+        participants_updated_at: string | null;
+        questions_updated_at: string | null;
+        responses_updated_at: string | null;
+        screen_answers: number;
+        screen_question_id: string | null;
+        screen_view: ScreenView;
+        updated_at: string | null;
+      }>
+    >`
+      SELECT
+        p.code,
+        p.active_question_id,
+        p.screen_question_id,
+        p.screen_view,
+        p.updated_at,
+        (
+          SELECT MAX(updated_at)
+          FROM questions
+          WHERE presentation_id = p.id
+        ) AS questions_updated_at,
+        (
+          SELECT MAX(updated_at)
+          FROM responses
+          WHERE presentation_id = p.id
+        ) AS responses_updated_at,
+        (
+          SELECT COUNT(*)::int
+          FROM responses
+          WHERE presentation_id = p.id
+        ) AS answers,
+        (
+          SELECT COUNT(*)::int
+          FROM responses
+          WHERE presentation_id = p.id AND question_id = p.active_question_id
+        ) AS active_answers,
+        (
+          SELECT COUNT(*)::int
+          FROM responses
+          WHERE presentation_id = p.id AND question_id = p.screen_question_id
+        ) AS screen_answers,
+        (
+          SELECT MAX(updated_at)
+          FROM participant_profiles
+          WHERE presentation_id = p.id
+        ) AS participants_updated_at,
+        (
+          SELECT COUNT(*)::int
+          FROM participant_profiles
+          WHERE presentation_id = p.id
+        ) AS participants
+      FROM presentations p
+      WHERE p.code = ${code}
+    `
+  );
+
+  if (!row) {
+    throw new AppError(404, "Sessie niet gevonden.");
+  }
+
+  const screenView = row.screen_view ?? "question";
+  const versions = buildPublicStatusVersions({
+    activeQuestionId: row.active_question_id,
+    activeAnswers: numberFromDb(row.active_answers),
+    answers: numberFromDb(row.answers),
+    participants: numberFromDb(row.participants),
+    participantsUpdatedAt: row.participants_updated_at,
+    presentationUpdatedAt: row.updated_at,
+    questionsUpdatedAt: row.questions_updated_at,
+    responsesUpdatedAt: row.responses_updated_at,
+    screenAnswers: numberFromDb(row.screen_answers),
+    screenQuestionId: row.screen_question_id,
+    screenView,
+  });
+
+  return {
+    code: row.code,
+    activeQuestionId: row.active_question_id,
+    screenQuestionId: row.screen_question_id,
+    screenView,
+    ...versions,
+    answers: numberFromDb(row.answers),
+    activeAnswers: numberFromDb(row.active_answers),
+    screenAnswers: numberFromDb(row.screen_answers),
+    participants: numberFromDb(row.participants),
+    updatedAt: row.updated_at,
+  };
+}
+
 async function loadPublicSessionBase(codeInput: string): Promise<PublicSessionBase> {
   await ensureSchema();
 
@@ -2471,6 +2637,24 @@ async function loadPublicSessionBase(codeInput: string): Promise<PublicSessionBa
     questions.find((question) => question.id === presentation.active_question_id && question.status === "open") ??
     null;
   const screenQuestion = questions.find((question) => question.id === presentation.screen_question_id) ?? null;
+  const screenView = presentation.screen_view ?? "question";
+  const versions = buildPublicStatusVersions({
+    activeQuestionId: presentation.active_question_id,
+    activeAnswers: presentation.active_question_id
+      ? responseRows.filter((response) => response.question_id === presentation.active_question_id).length
+      : 0,
+    answers: responseRows.length,
+    participants: profileRows.length,
+    participantsUpdatedAt: latestTimestamp(profileRows, (profile) => profile.updated_at),
+    presentationUpdatedAt: presentation.updated_at,
+    questionsUpdatedAt: latestTimestamp(questionRows, (question) => question.updated_at),
+    responsesUpdatedAt: latestTimestamp(responseRows, (response) => response.updated_at),
+    screenAnswers: presentation.screen_question_id
+      ? responseRows.filter((response) => response.question_id === presentation.screen_question_id).length
+      : 0,
+    screenQuestionId: presentation.screen_question_id,
+    screenView,
+  });
 
   return {
     presentation,
@@ -2481,6 +2665,8 @@ async function loadPublicSessionBase(codeInput: string): Promise<PublicSessionBa
     leaderboard,
     quizTotals,
     participantLabels,
+    stateVersion: versions.stateVersion,
+    statusVersion: versions.version,
   };
 }
 
@@ -2522,6 +2708,8 @@ export async function getPublicSession(codeInput: string, participantIdInput?: u
     leaderboard,
     quizTotals,
     participantLabels,
+    stateVersion,
+    statusVersion,
   } = await getPublicSessionBase(codeInput);
   const participantId = cleanText(participantIdInput, 80);
   const participantLabel = participantId ? participantLabels.get(participantId) ?? null : null;
@@ -2554,6 +2742,8 @@ export async function getPublicSession(codeInput: string, participantIdInput?: u
       : null;
 
   return {
+    stateVersion,
+    statusVersion,
     presentation: {
       id: presentation.id,
       title: presentation.title,

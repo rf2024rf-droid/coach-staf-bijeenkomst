@@ -107,6 +107,8 @@ export type PresenterPayload = {
 };
 
 export type PublicSessionPayload = {
+  stateVersion: string;
+  statusVersion: string;
   presentation: {
     id: string;
     title: string;
@@ -138,6 +140,21 @@ export type PublicSessionPayload = {
     questions: number;
     answers: number;
   };
+};
+
+export type PublicSessionStatusPayload = {
+  code: string;
+  activeQuestionId: string | null;
+  screenQuestionId: string | null;
+  screenView: ScreenView;
+  stateVersion: string;
+  responseVersion: string;
+  version: string;
+  answers: number;
+  activeAnswers: number;
+  screenAnswers: number;
+  participants: number;
+  updatedAt: string | null;
 };
 
 export type ModeratorPresentationSummary = {

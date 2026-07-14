@@ -2,7 +2,7 @@
 
 import { CheckCircle2, Loader2, Pencil, Send, ShieldCheck, UserRound, XCircle } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { PublicSessionPayload, QuestionType } from "@/app/types";
+import type { PublicSessionPayload, PublicSessionStatusPayload, QuestionType } from "@/app/types";
 import { getQuestionTimingState } from "@/lib/questionTiming";
 
 type ParticipantPageProps = {
@@ -47,6 +47,35 @@ function SubmissionStatusDot({ visible }: { visible: boolean }) {
       title="Antwoord ontvangen"
     />
   );
+}
+
+function participantPollDelayMs(session: PublicSessionPayload | null) {
+  if (!session) {
+    return 2000;
+  }
+
+  const activeQuestion = session.activeQuestion;
+  if (session.screenView === "results") {
+    return 1800;
+  }
+  if (activeQuestion?.type === "quiz") {
+    const timing = getQuestionTimingState(activeQuestion.content, "quiz", Date.now());
+    if (timing.isCountdown) {
+      return 1000;
+    }
+    if (timing.isExpired) {
+      return 1500;
+    }
+    return 2400;
+  }
+  if (activeQuestion) {
+    return 2400;
+  }
+  if (session.screenView === "qr" || session.screenView === "ranking") {
+    return 4000;
+  }
+
+  return 7000;
 }
 
 type IdentityMode = "name" | "anonymous";
@@ -97,6 +126,8 @@ export default function ParticipantPage({ code }: ParticipantPageProps) {
   const [textAnswer, setTextAnswer] = useState("");
   const [selectedOptionId, setSelectedOptionId] = useState("");
   const lastActiveQuestionId = useRef("");
+  const lastStateVersionRef = useRef("");
+  const sessionRef = useRef<PublicSessionPayload | null>(null);
   const identityKnownRef = useRef(storedIdentity.mode === "anonymous" || Boolean(storedIdentity.displayName.trim()));
   const registrationErrorRef = useRef(false);
   const choiceSequenceRef = useRef(0);
@@ -107,6 +138,12 @@ export default function ParticipantPage({ code }: ParticipantPageProps) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [nowMs, setNowMs] = useState(() => Date.now());
+
+  const applySession = useCallback((nextSession: PublicSessionPayload) => {
+    sessionRef.current = nextSession;
+    lastStateVersionRef.current = nextSession.stateVersion;
+    setSession(nextSession);
+  }, []);
 
   const load = useCallback(
     async (silent = false) => {
@@ -130,7 +167,7 @@ export default function ParticipantPage({ code }: ParticipantPageProps) {
           lastActiveQuestionId.current = activeId;
         }
 
-        setSession(data);
+        applySession(data);
         if (data.participantLabel) {
           identityKnownRef.current = true;
           if (!editingIdentity && !registrationErrorRef.current) {
@@ -151,8 +188,30 @@ export default function ParticipantPage({ code }: ParticipantPageProps) {
         }
       }
     },
-    [editingIdentity, normalizedCode, participantId]
+    [applySession, editingIdentity, normalizedCode, participantId]
   );
+
+  const checkForUpdates = useCallback(async () => {
+    const currentSession = sessionRef.current;
+    if (!currentSession) {
+      await load(true);
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/session/${normalizedCode}/status`, { cache: "no-store" });
+      const data = (await response.json()) as PublicSessionStatusPayload | { error: string };
+      if (!response.ok || "error" in data) {
+        throw new Error("error" in data ? data.error : "Sessie kon niet worden gecontroleerd.");
+      }
+
+      if (!lastStateVersionRef.current || data.stateVersion !== lastStateVersionRef.current) {
+        await load(true);
+      }
+    } catch {
+      await load(true);
+    }
+  }, [load, normalizedCode]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -163,12 +222,25 @@ export default function ParticipantPage({ code }: ParticipantPageProps) {
   }, [load]);
 
   useEffect(() => {
-    const timer = window.setInterval(() => {
-      void load(true);
-    }, 1800);
+    let cancelled = false;
+    let timer: number | undefined;
 
-    return () => window.clearInterval(timer);
-  }, [load]);
+    const tick = async () => {
+      await checkForUpdates();
+      if (!cancelled) {
+        timer = window.setTimeout(tick, participantPollDelayMs(sessionRef.current));
+      }
+    };
+
+    timer = window.setTimeout(tick, participantPollDelayMs(sessionRef.current));
+
+    return () => {
+      cancelled = true;
+      if (timer) {
+        window.clearTimeout(timer);
+      }
+    };
+  }, [checkForUpdates]);
 
   useEffect(() => {
     const timer = window.setInterval(() => setNowMs(Date.now()), 200);
@@ -199,7 +271,7 @@ export default function ParticipantPage({ code }: ParticipantPageProps) {
       if (!response.ok || "error" in data) {
         throw new Error("error" in data ? data.error : "Antwoord kon niet worden verzonden.");
       }
-      setSession(data);
+      applySession(data);
       setSubmittedQuestionId(data.activeQuestion?.id ?? session.activeQuestion.id);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Antwoord kon niet worden verzonden.");
@@ -240,7 +312,7 @@ export default function ParticipantPage({ code }: ParticipantPageProps) {
 
       if (clientSequence >= latestChoiceAcknowledgedSequenceRef.current) {
         latestChoiceAcknowledgedSequenceRef.current = clientSequence;
-        setSession(data);
+        applySession(data);
         setSubmittedQuestionId(data.activeQuestion?.id ?? session.activeQuestion.id);
       }
     } catch (caught) {
@@ -300,7 +372,7 @@ export default function ParticipantPage({ code }: ParticipantPageProps) {
       if (anonymous) {
         setDisplayName("");
       }
-      setSession(data);
+      applySession(data);
       setError("");
     } catch (caught) {
       registrationErrorRef.current = true;

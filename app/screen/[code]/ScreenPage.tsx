@@ -1,9 +1,9 @@
 "use client";
 
 import { BarChart3, CheckCircle2, Loader2, QrCode as QrCodeIcon, Trophy, Users } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { QrCode } from "@/app/components/QrCode";
-import type { PublicSessionPayload, QuestionResult } from "@/app/types";
+import type { PublicSessionPayload, PublicSessionStatusPayload, QuestionResult } from "@/app/types";
 import {
   getGeneralScreenFontOption,
   getGeneralScreenPalette,
@@ -55,6 +55,20 @@ function screenQuestionLabel(question: QuestionResult) {
     return "Open antwoord";
   }
   return "Multiple choice";
+}
+
+function screenPollDelayMs(session: PublicSessionPayload | null) {
+  if (!session) {
+    return 1500;
+  }
+  if (session.activeQuestion || session.screenView === "results" || session.screenView === "qr") {
+    return 1500;
+  }
+  if (session.screenView === "ranking") {
+    return 2000;
+  }
+
+  return 3000;
 }
 
 function SpotlightResults({ question }: { question: QuestionResult }) {
@@ -361,8 +375,16 @@ export default function ScreenPage({ code }: ScreenPageProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [nowMs, setNowMs] = useState(() => Date.now());
+  const lastStatusVersionRef = useRef("");
+  const sessionRef = useRef<PublicSessionPayload | null>(null);
 
   const joinLink = origin ? `${origin}/join/${normalizedCode}` : "";
+
+  const applySession = useCallback((nextSession: PublicSessionPayload) => {
+    sessionRef.current = nextSession;
+    lastStatusVersionRef.current = nextSession.statusVersion;
+    setSession(nextSession);
+  }, []);
 
   const load = useCallback(
     async (silent = false) => {
@@ -372,7 +394,7 @@ export default function ScreenPage({ code }: ScreenPageProps) {
         if (!response.ok || "error" in data) {
           throw new Error("error" in data ? data.error : "Sessie kon niet worden geladen.");
         }
-        setSession(data);
+        applySession(data);
         setError("");
       } catch (caught) {
         setError(caught instanceof Error ? caught.message : "Sessie kon niet worden geladen.");
@@ -382,8 +404,30 @@ export default function ScreenPage({ code }: ScreenPageProps) {
         }
       }
     },
-    [normalizedCode]
+    [applySession, normalizedCode]
   );
+
+  const checkForUpdates = useCallback(async () => {
+    const currentSession = sessionRef.current;
+    if (!currentSession) {
+      await load(true);
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/session/${normalizedCode}/status`, { cache: "no-store" });
+      const data = (await response.json()) as PublicSessionStatusPayload | { error: string };
+      if (!response.ok || "error" in data) {
+        throw new Error("error" in data ? data.error : "Sessie kon niet worden gecontroleerd.");
+      }
+
+      if (!lastStatusVersionRef.current || data.version !== lastStatusVersionRef.current) {
+        await load(true);
+      }
+    } catch {
+      await load(true);
+    }
+  }, [load, normalizedCode]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -394,12 +438,25 @@ export default function ScreenPage({ code }: ScreenPageProps) {
   }, [load]);
 
   useEffect(() => {
-    const timer = window.setInterval(() => {
-      void load(true);
-    }, 1500);
+    let cancelled = false;
+    let timer: number | undefined;
 
-    return () => window.clearInterval(timer);
-  }, [load]);
+    const tick = async () => {
+      await checkForUpdates();
+      if (!cancelled) {
+        timer = window.setTimeout(tick, screenPollDelayMs(sessionRef.current));
+      }
+    };
+
+    timer = window.setTimeout(tick, screenPollDelayMs(sessionRef.current));
+
+    return () => {
+      cancelled = true;
+      if (timer) {
+        window.clearTimeout(timer);
+      }
+    };
+  }, [checkForUpdates]);
 
   useEffect(() => {
     const timer = window.setInterval(() => setNowMs(Date.now()), 200);

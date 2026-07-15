@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, LogIn, ShieldCheck, Users } from "lucide-react";
+import { ArrowRight, Hash, LogIn } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 
@@ -17,88 +17,46 @@ export default function Home() {
   }
 
   return (
-    <main className="liquid-app min-h-screen text-white">
-      <div className="mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-6 px-5 py-6 md:px-8">
-        <header className="flex flex-col gap-4 border-b border-white/15 pb-6 md:flex-row md:items-end md:justify-between">
-          <div>
-            <p className="text-sm font-semibold uppercase text-emerald-800">Sessie Interactief</p>
-            <h1 className="mt-2 text-3xl font-black md:text-5xl">Startpunt voor sessies</h1>
-            <p className="mt-3 max-w-2xl leading-7 text-zinc-300">
-              Gebruikers beheren presentaties met hun eigen account. Deelnemers gebruiken alleen de sessiecode of QR-code.
-            </p>
+    <main className="liquid-participant grid min-h-screen place-items-center px-4 py-8 text-white sm:px-6">
+      <div className="w-full max-w-lg">
+        <header className="mb-6 text-center">
+          <div className="mx-auto grid h-12 w-12 place-items-center rounded-lg border border-emerald-300/25 bg-emerald-400/12 text-emerald-200 shadow-lg shadow-black/20">
+            <LogIn aria-hidden className="h-6 w-6" />
           </div>
-          <div className="flex flex-wrap gap-2">
-            <a
-              className="liquid-button inline-flex items-center justify-center gap-2 rounded-lg border border-emerald-300/50 bg-emerald-400 px-4 py-3 font-bold text-black hover:bg-emerald-300"
-              href="/moderator"
-            >
-              <ShieldCheck aria-hidden className="h-5 w-5" />
-              Gebruiker login
-            </a>
-            <a
-              className="liquid-button inline-flex items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/[0.065] px-4 py-3 font-bold text-white hover:bg-white/[0.11]"
-              href="/beheerder"
-            >
-              Beheerder login
-            </a>
-          </div>
+          <p className="mt-5 text-xs font-black uppercase text-emerald-300">Sessie Interactief</p>
+          <h1 className="mt-2 text-3xl font-black leading-tight sm:text-4xl">Doe mee met de sessie</h1>
+          <p className="mx-auto mt-3 max-w-md text-sm font-semibold leading-6 text-zinc-300 sm:text-base">
+            Vul de sessiecode in die op het grote scherm staat.
+          </p>
         </header>
 
-        <section className="grid flex-1 items-start gap-6 lg:grid-cols-[1fr_0.9fr]">
-          <article className="glass-surface rounded-lg p-6">
-            <div className="mb-5 flex items-center gap-3">
-              <div className="grid h-11 w-11 place-items-center rounded-lg bg-emerald-800 text-white">
-                <ShieldCheck aria-hidden className="h-6 w-6" />
-              </div>
-              <div>
-                <p className="text-xs font-black uppercase text-emerald-800">Gebruikers</p>
-                <h2 className="text-xl font-black">Eigen sessies beheren</h2>
-              </div>
-            </div>
-            <p className="leading-7 text-zinc-300">
-              Log in om presentaties aan te maken, bestaande sessies te openen, QR-codes te
-              behouden en het grote scherm te bedienen.
-            </p>
-            <a
-              className="liquid-button mt-6 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-white/20 bg-white/[0.11] px-4 py-3 font-bold text-white hover:bg-white/[0.17] sm:w-auto"
-              href="/moderator"
-            >
-              Open gebruikersomgeving
-              <ArrowRight aria-hidden className="h-5 w-5" />
-            </a>
-          </article>
-
-          <form className="glass-surface rounded-lg p-6" onSubmit={joinPresentation}>
-            <div className="mb-5 flex items-center gap-3">
-              <div className="grid h-11 w-11 place-items-center rounded-lg bg-sky-800 text-white">
-                <Users aria-hidden className="h-6 w-6" />
-              </div>
-              <div>
-                <p className="text-xs font-black uppercase text-sky-800">Deelnemer</p>
-                <h2 className="text-xl font-black">Meedoen met een sessie</h2>
-              </div>
-            </div>
-
-            <label className="block text-sm font-semibold text-zinc-200" htmlFor="join-code">
-              Sessiecode
-            </label>
-            <input
-              className="glass-field mt-2 w-full rounded-lg px-4 py-3 text-center text-2xl font-black uppercase outline-none focus:border-sky-300/70 focus:ring-2 focus:ring-sky-300/15"
-              id="join-code"
-              maxLength={12}
-              onChange={(event) => setJoinCode(event.target.value)}
-              placeholder="ABC123"
-              value={joinCode}
-            />
-            <button
-              className="liquid-button mt-5 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-sky-200/50 bg-sky-300 px-4 py-3 font-bold text-black hover:bg-sky-200"
-              type="submit"
-            >
-              <LogIn aria-hidden className="h-5 w-5" />
-              Open deelnemersscherm
-            </button>
-          </form>
-        </section>
+        <form className="glass-surface rounded-lg p-4 sm:p-6" onSubmit={joinPresentation}>
+          <label className="flex items-center gap-2 text-sm font-bold text-zinc-200" htmlFor="join-code">
+            <Hash aria-hidden className="h-4 w-4 text-emerald-300" />
+            Sessiecode
+          </label>
+          <input
+            autoCapitalize="characters"
+            autoComplete="off"
+            autoCorrect="off"
+            className="glass-field mt-2 w-full rounded-lg px-4 py-4 text-center font-mono text-3xl font-black uppercase outline-none focus:border-emerald-300/70 focus:ring-2 focus:ring-emerald-300/15"
+            id="join-code"
+            inputMode="text"
+            maxLength={12}
+            onChange={(event) => setJoinCode(event.target.value)}
+            placeholder="ABC123"
+            spellCheck={false}
+            value={joinCode}
+          />
+          <button
+            className="liquid-button mt-4 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-lg border border-emerald-300/50 bg-emerald-400 px-4 py-3 font-black text-black hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-45"
+            disabled={!joinCode.replace(/[^a-z0-9]/gi, "")}
+            type="submit"
+          >
+            Deelnemen
+            <ArrowRight aria-hidden className="h-5 w-5" />
+          </button>
+        </form>
       </div>
     </main>
   );

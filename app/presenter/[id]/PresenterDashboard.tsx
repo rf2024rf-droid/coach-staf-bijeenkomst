@@ -961,10 +961,10 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
         : 0
     : 0;
   const activeQuizTimerToneClass = activeQuizTiming?.isExpired
-    ? "border-amber-300 bg-amber-50 text-amber-950"
+    ? "border-amber-300/35 bg-amber-400/12 text-amber-100"
     : activeQuizTiming?.isCountdown
-      ? "border-sky-300 bg-sky-50 text-sky-950"
-      : "border-emerald-300 bg-emerald-50 text-emerald-950";
+      ? "border-sky-300/35 bg-sky-400/12 text-sky-100"
+      : "border-emerald-300/35 bg-emerald-400/12 text-emerald-100";
   const activeQuizTimerBarClass = activeQuizTiming?.isExpired
     ? "bg-amber-500"
     : activeQuizTiming?.isCountdown
@@ -1084,12 +1084,12 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
 
   const screenToneClass =
     screenState.tone === "emerald"
-      ? "border-emerald-400 bg-emerald-50 text-emerald-950"
+      ? "border-emerald-300/35 bg-emerald-400/[0.09] text-emerald-50"
       : screenState.tone === "sky"
-        ? "border-sky-300 bg-sky-50 text-sky-950"
+        ? "border-sky-300/35 bg-sky-400/[0.09] text-sky-50"
         : screenState.tone === "amber"
-          ? "border-amber-300 bg-amber-50 text-amber-950"
-          : "border-zinc-300 bg-white text-zinc-950";
+          ? "border-amber-300/35 bg-amber-400/[0.09] text-amber-50"
+          : "border-white/15 bg-white/[0.045] text-white";
   const generalBackgroundInputValue = generalBackgroundDirty
     ? generalBackgroundDraft
     : persistedGeneralScreenBackgroundColor ?? DEFAULT_GENERAL_SCREEN_BACKGROUND_COLOR;
@@ -1152,13 +1152,13 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
               <span className="hidden rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-700 sm:inline-flex">
                 Groot scherm: {screenViewLabel(payload.presentation.screenView)}
               </span>
-              <span className="rounded-md border border-zinc-200 bg-white/70 px-2 py-1 text-xs font-semibold text-zinc-600">
+              <span className="rounded-md border border-white/10 bg-white/[0.055] px-2 py-1 text-xs font-semibold text-zinc-300">
                 Vragen <strong className="font-black text-zinc-900">{payload.totals.questions}</strong>
               </span>
-              <span className="rounded-md border border-zinc-200 bg-white/70 px-2 py-1 text-xs font-semibold text-zinc-600">
+              <span className="rounded-md border border-white/10 bg-white/[0.055] px-2 py-1 text-xs font-semibold text-zinc-300">
                 Antwoorden <strong className="font-black text-zinc-900">{payload.totals.answers}</strong>
               </span>
-              <span className="rounded-md border border-zinc-200 bg-white/70 px-2 py-1 text-xs font-semibold text-zinc-600">
+              <span className="rounded-md border border-white/10 bg-white/[0.055] px-2 py-1 text-xs font-semibold text-zinc-300">
                 Deelnemers <strong className="font-black text-zinc-900">{payload.totals.participants}</strong>
               </span>
             </div>
@@ -1243,7 +1243,7 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
             <div className="flex flex-col gap-3 md:gap-5">
               <article className={`rounded-lg border p-3 shadow-sm md:p-5 ${screenToneClass}`}>
                 <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-stretch">
-                  <div className="min-w-0 rounded-lg border border-black/10 bg-white/70 p-3 md:p-4">
+                  <div className="min-w-0 rounded-lg border border-white/10 bg-black/25 p-3 text-white md:p-4">
                     <p className="inline-flex items-center gap-2 text-xs font-black uppercase">
                       <span className="h-2.5 w-2.5 rounded-full bg-current" />
                       Nu op beeld
@@ -1252,17 +1252,17 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
                     <p className="mt-2 line-clamp-3 text-sm font-semibold opacity-80">{screenState.detail}</p>
 
                     <div className="mt-3 grid grid-cols-3 gap-1.5 md:mt-4 md:gap-2">
-                      <div className="rounded-lg bg-white px-2 py-2 md:px-3">
-                        <p className="text-[11px] font-black uppercase text-zinc-500">Vragen</p>
-                        <p className="text-lg font-black text-zinc-950">{payload.totals.questions}</p>
+                      <div className="rounded-lg border border-white/10 bg-white/[0.055] px-2 py-2 md:px-3">
+                        <p className="text-[11px] font-black uppercase text-zinc-400">Vragen</p>
+                        <p className="text-lg font-black text-white">{payload.totals.questions}</p>
                       </div>
-                      <div className="rounded-lg bg-white px-2 py-2 md:px-3">
-                        <p className="text-[11px] font-black uppercase text-zinc-500">Antwoorden</p>
-                        <p className="text-lg font-black text-zinc-950">{payload.totals.answers}</p>
+                      <div className="rounded-lg border border-white/10 bg-white/[0.055] px-2 py-2 md:px-3">
+                        <p className="text-[11px] font-black uppercase text-zinc-400">Antwoorden</p>
+                        <p className="text-lg font-black text-white">{payload.totals.answers}</p>
                       </div>
-                      <div className="rounded-lg bg-white px-2 py-2 md:px-3">
-                        <p className="text-[11px] font-black uppercase text-zinc-500">Deelnemers</p>
-                        <p className="text-lg font-black text-zinc-950">{payload.totals.participants}</p>
+                      <div className="rounded-lg border border-white/10 bg-white/[0.055] px-2 py-2 md:px-3">
+                        <p className="text-[11px] font-black uppercase text-zinc-400">Deelnemers</p>
+                        <p className="text-lg font-black text-white">{payload.totals.participants}</p>
                       </div>
                     </div>
 
@@ -1281,7 +1281,7 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
                                 : ""}
                           </p>
                         </div>
-                        <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/70">
+                        <div className="mt-2 h-2 overflow-hidden rounded-full bg-black/30">
                           <div
                             className={`h-full rounded-full transition-[width] duration-200 ${activeQuizTimerBarClass}`}
                             style={{ width: `${Math.round(activeQuizTimerProgress * 100)}%` }}
@@ -1292,8 +1292,8 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
                     ) : null}
                   </div>
 
-                  <div className="hidden rounded-lg border border-black/10 bg-white p-3 text-zinc-950 shadow-sm md:block md:p-4">
-                    <p className="text-xs font-black uppercase text-zinc-500">Regieknoppen</p>
+                  <div className="hidden rounded-lg border border-white/10 bg-black/25 p-3 text-white shadow-sm md:block md:p-4">
+                    <p className="text-xs font-black uppercase text-zinc-400">Regieknoppen</p>
                     <button
                       className={`mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg px-4 py-4 text-base font-black text-white disabled:opacity-50 ${
                         payload.presentation.screenView === "results"
@@ -2554,7 +2554,7 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
                             : ""}
                       </p>
                     </div>
-                    <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/70">
+                    <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-black/30">
                       <div
                         className={`h-full rounded-full transition-[width] duration-200 ${activeQuizTimerBarClass}`}
                         style={{ width: `${Math.round(activeQuizTimerProgress * 100)}%` }}

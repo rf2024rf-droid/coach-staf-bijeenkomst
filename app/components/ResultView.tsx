@@ -20,12 +20,12 @@ export function ResultView({ question, mode = "dashboard" }: ResultViewProps) {
 
   if (question.type === "slide") {
     return (
-      <section className="rounded-lg border border-zinc-200 bg-zinc-50 p-4 text-zinc-800">
-        <p className="text-sm font-black uppercase text-zinc-500">Slide zonder antwoorden</p>
+      <section className="glass-row rounded-lg p-4 text-zinc-200">
+        <p className="text-sm font-black uppercase text-zinc-400">Slide zonder antwoorden</p>
         {question.description ? (
           <p className="mt-2 whitespace-pre-line text-sm font-semibold leading-6">{question.description}</p>
         ) : (
-          <p className="mt-2 text-sm text-zinc-500">Dit onderdeel verzamelt geen reacties.</p>
+          <p className="mt-2 text-sm text-zinc-400">Dit onderdeel verzamelt geen reacties.</p>
         )}
       </section>
     );
@@ -37,7 +37,7 @@ export function ResultView({ question, mode = "dashboard" }: ResultViewProps) {
     return (
       <div className={mode === "screen" ? "space-y-5" : "space-y-3"}>
         {question.type === "quiz" ? (
-          <section className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-emerald-950">
+          <section className="rounded-lg border border-emerald-300/25 bg-emerald-400/10 p-4 text-emerald-100">
             <p className="text-sm font-black uppercase">Quizuitslag</p>
             <div className="mt-2 flex flex-wrap items-end gap-3">
               <span className="text-4xl font-black">{question.correctPercentage}% goed</span>
@@ -55,7 +55,7 @@ export function ResultView({ question, mode = "dashboard" }: ResultViewProps) {
         ) : null}
         {question.options.map((option, index) => (
           <div key={option.id} className="space-y-2">
-            <div className="flex items-center justify-between gap-4 text-sm font-semibold text-zinc-800">
+            <div className="flex items-center justify-between gap-4 text-sm font-semibold text-zinc-200">
               <span className="inline-flex items-center gap-2">
                 <span className="grid h-6 w-6 shrink-0 place-items-center rounded-md bg-zinc-900 text-xs font-black text-white">
                   {optionLetter(option.position, index)}
@@ -67,11 +67,11 @@ export function ResultView({ question, mode = "dashboard" }: ResultViewProps) {
                   </span>
                 ) : null}
               </span>
-              <span className="tabular-nums text-zinc-600">
+              <span className="tabular-nums text-zinc-400">
                 {option.count} / {option.percentage}%
               </span>
             </div>
-            <div className="h-3 overflow-hidden rounded-full bg-zinc-200">
+            <div className="h-3 overflow-hidden rounded-full bg-white/10">
               <div
                 className={`h-full rounded-full transition-all duration-500 ${
                   question.type === "quiz" && !option.isCorrect ? "bg-zinc-500" : "bg-emerald-700"
@@ -81,7 +81,7 @@ export function ResultView({ question, mode = "dashboard" }: ResultViewProps) {
             </div>
           </div>
         ))}
-        {!question.answerCount ? <p className="text-sm text-zinc-500">Nog geen antwoorden.</p> : null}
+        {!question.answerCount ? <p className="text-sm text-zinc-400">Nog geen antwoorden.</p> : null}
       </div>
     );
   }
@@ -89,7 +89,7 @@ export function ResultView({ question, mode = "dashboard" }: ResultViewProps) {
   const responses = question.responses.filter((response) => response.textAnswer);
 
   if (!responses.length) {
-    return <p className="text-sm text-zinc-500">Nog geen antwoorden.</p>;
+    return <p className="text-sm text-zinc-400">Nog geen antwoorden.</p>;
   }
 
   const responseLimit = mode === "screen" ? 42 : 16;
@@ -107,8 +107,8 @@ export function ResultView({ question, mode = "dashboard" }: ResultViewProps) {
         }
       >
         {visibleResponses.map((response) => (
-          <article key={response.id} className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm">
-            <p className={mode === "screen" ? "text-lg leading-7 text-zinc-900" : "text-sm leading-6 text-zinc-800"}>
+          <article key={response.id} className="glass-row rounded-lg p-4">
+            <p className={mode === "screen" ? "text-lg leading-7 text-white" : "text-sm leading-6 text-zinc-200"}>
               {response.textAnswer}
             </p>
           </article>
@@ -118,7 +118,7 @@ export function ResultView({ question, mode = "dashboard" }: ResultViewProps) {
       {canExpand ? (
         <button
           aria-expanded={showAllResponses}
-          className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-zinc-50 px-4 py-3 text-sm font-bold text-zinc-800 hover:bg-zinc-100"
+          className="liquid-button inline-flex w-full items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/[0.055] px-4 py-3 text-sm font-bold text-zinc-100 hover:bg-white/[0.1]"
           onClick={() => setExpandedQuestionId((current) => (current === question.id ? null : question.id))}
           type="button"
         >

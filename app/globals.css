@@ -1,8 +1,29 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f5f5f0;
-  --foreground: #141414;
+  --background: #07090d;
+  --foreground: #f7f8fa;
+  --liquid-canvas: #07090d;
+  --liquid-canvas-deep: #030406;
+  --liquid-surface: rgba(25, 28, 35, 0.78);
+  --liquid-surface-strong: rgba(20, 23, 29, 0.92);
+  --liquid-surface-soft: rgba(255, 255, 255, 0.055);
+  --liquid-surface-hover: rgba(255, 255, 255, 0.095);
+  --liquid-border: rgba(255, 255, 255, 0.14);
+  --liquid-border-strong: rgba(255, 255, 255, 0.24);
+  --liquid-highlight: rgba(255, 255, 255, 0.18);
+  --liquid-text: #f7f8fa;
+  --liquid-text-muted: #b9bec9;
+  --liquid-text-subtle: #858d9d;
+  --liquid-green: #54dc8d;
+  --liquid-green-strong: #169a54;
+  --liquid-sky: #71bdff;
+  --liquid-amber: #ffd06a;
+  --liquid-rose: #ff7c87;
+  --liquid-shadow: 0 18px 50px rgba(0, 0, 0, 0.34);
+  --liquid-shadow-soft: 0 8px 26px rgba(0, 0, 0, 0.24);
+  --liquid-blur: 20px;
+  --liquid-radius: 8px;
 }
 
 @theme inline {
@@ -14,12 +35,24 @@
   box-sizing: border-box;
 }
 
+html {
+  min-height: 100%;
+  background: var(--liquid-canvas-deep);
+  color-scheme: dark;
+}
+
 body {
-  background: var(--background);
+  min-height: 100vh;
+  margin: 0;
+  background:
+    radial-gradient(ellipse 120% 78% at 50% -28%, rgba(0, 150, 62, 0.18), transparent 60%),
+    linear-gradient(145deg, rgba(43, 108, 140, 0.09), transparent 38%),
+    var(--background);
   color: var(--foreground);
   font-family:
-    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
-    sans-serif;
+    -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", Inter,
+    ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+  letter-spacing: 0;
 }
 
 button,
@@ -39,7 +72,291 @@ button:not(:disabled) {
   cursor: pointer;
 }
 
+:focus-visible {
+  outline: 3px solid rgba(113, 189, 255, 0.72);
+  outline-offset: 3px;
+}
+
 ::selection {
-  background: #14532d;
-  color: #ffffff;
+  background: #32c779;
+  color: #03130a;
+}
+
+::-webkit-scrollbar {
+  height: 10px;
+  width: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.025);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background-clip: padding-box;
+}
+
+.liquid-app,
+.liquid-participant {
+  min-height: 100vh;
+  background:
+    radial-gradient(ellipse 115% 68% at 50% -22%, rgba(0, 150, 62, 0.16), transparent 60%),
+    linear-gradient(135deg, rgba(27, 93, 126, 0.075), transparent 44%),
+    var(--liquid-canvas);
+  color: var(--liquid-text);
+}
+
+.liquid-participant {
+  background:
+    radial-gradient(ellipse 110% 62% at 50% -25%, rgba(0, 150, 62, 0.14), transparent 64%),
+    var(--liquid-canvas-deep);
+}
+
+.liquid-stage {
+  min-height: 100vh;
+}
+
+.glass-surface,
+.glass-toolbar,
+.glass-modal {
+  border: 1px solid var(--liquid-border);
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.095), rgba(255, 255, 255, 0.045));
+  box-shadow:
+    inset 0 1px 0 var(--liquid-highlight),
+    var(--liquid-shadow);
+  -webkit-backdrop-filter: blur(var(--liquid-blur)) saturate(1.18);
+  backdrop-filter: blur(var(--liquid-blur)) saturate(1.18);
+}
+
+.glass-surface-strong {
+  border: 1px solid var(--liquid-border-strong);
+  background: linear-gradient(145deg, rgba(37, 41, 50, 0.94), rgba(17, 20, 26, 0.92));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.13),
+    var(--liquid-shadow);
+}
+
+.glass-toolbar {
+  background: rgba(15, 18, 23, 0.78);
+}
+
+.glass-row {
+  border: 1px solid var(--liquid-border);
+  background: rgba(255, 255, 255, 0.045);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.055);
+}
+
+.glass-field {
+  border: 1px solid var(--liquid-border-strong);
+  background: rgba(4, 6, 9, 0.66);
+  color: var(--liquid-text);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.055);
+}
+
+.glass-field::placeholder {
+  color: var(--liquid-text-subtle);
+}
+
+.liquid-button {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border-color: var(--liquid-border);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    0 7px 20px rgba(0, 0, 0, 0.2);
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease,
+    transform 120ms ease,
+    box-shadow 160ms ease;
+}
+
+.liquid-button:not(:disabled):hover {
+  border-color: var(--liquid-border-strong);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    0 9px 24px rgba(0, 0, 0, 0.26);
+}
+
+.liquid-button:not(:disabled):active {
+  transform: scale(0.985);
+}
+
+.liquid-app :is(input, textarea, select),
+.liquid-participant :is(input, textarea, select) {
+  border-color: var(--liquid-border-strong);
+  background-color: rgba(4, 6, 9, 0.7);
+  color: var(--liquid-text);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.055);
+  color-scheme: dark;
+}
+
+.liquid-app :is(input, textarea, select)::placeholder,
+.liquid-participant :is(input, textarea, select)::placeholder {
+  color: var(--liquid-text-subtle);
+}
+
+.liquid-app :is(input, textarea, select):focus,
+.liquid-participant :is(input, textarea, select):focus {
+  border-color: rgba(84, 220, 141, 0.78);
+  box-shadow:
+    0 0 0 3px rgba(84, 220, 141, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.liquid-app :is(input[type="checkbox"], input[type="radio"]),
+.liquid-participant :is(input[type="checkbox"], input[type="radio"]) {
+  accent-color: var(--liquid-green);
+}
+
+.liquid-app :where(.bg-white, .bg-zinc-50, .bg-zinc-100),
+.liquid-participant :where(.bg-white, .bg-zinc-50, .bg-zinc-100) {
+  background-color: var(--liquid-surface-soft);
+}
+
+.liquid-app :where(.bg-zinc-950, .bg-zinc-900),
+.liquid-participant :where(.bg-zinc-950, .bg-zinc-900) {
+  background-color: rgba(5, 7, 11, 0.74);
+}
+
+.liquid-app :where(.bg-zinc-800),
+.liquid-participant :where(.bg-zinc-800) {
+  background-color: rgba(255, 255, 255, 0.09);
+}
+
+.liquid-app :where(.border-zinc-200, .border-zinc-300, .border-zinc-400, .border-zinc-600, .border-zinc-700),
+.liquid-participant :where(.border-zinc-200, .border-zinc-300, .border-zinc-400, .border-zinc-600, .border-zinc-700) {
+  border-color: var(--liquid-border);
+}
+
+.liquid-app :where(.text-zinc-950, .text-zinc-900, .text-zinc-800) {
+  color: var(--liquid-text);
+}
+
+.liquid-app :where(.text-zinc-700, .text-zinc-600) {
+  color: var(--liquid-text-muted);
+}
+
+.liquid-app :where(.text-zinc-500, .text-zinc-400, .text-zinc-300) {
+  color: var(--liquid-text-subtle);
+}
+
+.liquid-app .bg-emerald-50,
+.liquid-app .bg-emerald-100 {
+  background-color: rgba(16, 185, 129, 0.14);
+}
+
+.liquid-app :where(.text-emerald-800, .text-emerald-900, .text-emerald-950) {
+  color: #8bf0b5;
+}
+
+.liquid-app .bg-amber-50,
+.liquid-app .bg-amber-100 {
+  background-color: rgba(245, 158, 11, 0.14);
+}
+
+.liquid-app :where(.text-amber-800, .text-amber-900, .text-amber-950) {
+  color: #ffda8a;
+}
+
+.liquid-app .bg-rose-50,
+.liquid-app .bg-rose-100 {
+  background-color: rgba(244, 63, 94, 0.14);
+}
+
+.liquid-app :where(.text-rose-800, .text-rose-900, .text-rose-950) {
+  color: #ffabb3;
+}
+
+.liquid-app .bg-sky-50,
+.liquid-app .bg-sky-100 {
+  background-color: rgba(14, 165, 233, 0.14);
+}
+
+.liquid-app :where(.text-sky-800, .text-sky-900, .text-sky-950) {
+  color: #9ad4ff;
+}
+
+.liquid-app :where(.hover\:bg-zinc-50:hover, .hover\:bg-zinc-100:hover, .hover\:bg-zinc-200:hover),
+.liquid-participant :where(.hover\:bg-zinc-50:hover, .hover\:bg-zinc-100:hover, .hover\:bg-zinc-200:hover) {
+  background-color: var(--liquid-surface-hover);
+}
+
+.liquid-app :where(.shadow-sm),
+.liquid-participant :where(.shadow-sm) {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.055),
+    var(--liquid-shadow-soft);
+}
+
+.liquid-app :is(button, a[class*="rounded"]),
+.liquid-participant :is(button, a[class*="rounded"]) {
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease,
+    opacity 160ms ease,
+    transform 120ms ease,
+    box-shadow 160ms ease;
+}
+
+.liquid-app :is(button, a[class*="rounded"]):not(:disabled):active,
+.liquid-participant :is(button, a[class*="rounded"]):not(:disabled):active {
+  transform: scale(0.985);
+}
+
+.liquid-stage .stage-glass {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.085), rgba(255, 255, 255, 0.035));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 20px 60px rgba(0, 0, 0, 0.32);
+}
+
+@supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  .glass-surface,
+  .glass-toolbar,
+  .glass-modal {
+    background: rgba(20, 23, 29, 0.97);
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .glass-surface,
+  .glass-toolbar,
+  .glass-modal {
+    background: rgba(20, 23, 29, 0.98);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+@media (prefers-contrast: more) {
+  :root {
+    --liquid-border: rgba(255, 255, 255, 0.34);
+    --liquid-border-strong: rgba(255, 255, 255, 0.52);
+    --liquid-text-muted: #e1e4e9;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+@media (max-width: 640px) {
+  :root {
+    --liquid-blur: 14px;
+    --liquid-shadow: 0 12px 34px rgba(0, 0, 0, 0.3);
+  }
 }

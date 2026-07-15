@@ -423,7 +423,7 @@ export default function ParticipantPage({ code }: ParticipantPageProps) {
 
   if (loading && !session) {
     return (
-      <main className="grid min-h-screen place-items-center bg-zinc-950 px-5 text-zinc-100">
+      <main className="liquid-participant grid min-h-screen place-items-center px-5 text-zinc-100">
         <div className="flex items-center gap-3">
           <Loader2 aria-hidden className="h-5 w-5 animate-spin" />
           Laden...
@@ -434,7 +434,7 @@ export default function ParticipantPage({ code }: ParticipantPageProps) {
 
   if (!session) {
     return (
-      <main className="grid min-h-screen place-items-center bg-zinc-950 px-5 text-center text-white">
+      <main className="liquid-participant grid min-h-screen place-items-center px-5 text-center text-white">
         <div className="w-full max-w-md rounded-lg border border-zinc-700 bg-zinc-900 p-6 shadow-sm">
           <h1 className="text-xl font-black">Sessie niet gevonden</h1>
           <p className="mt-3 text-sm font-semibold text-rose-200">{error || "Controleer de code op het scherm."}</p>
@@ -445,9 +445,9 @@ export default function ParticipantPage({ code }: ParticipantPageProps) {
 
   if (showIdentityForm) {
     return (
-      <main className="min-h-screen bg-zinc-950 px-4 py-5 text-white">
+      <main className="liquid-participant min-h-screen px-4 py-5 text-white">
         <div className="mx-auto flex w-full max-w-2xl flex-col gap-5">
-          <header className="rounded-lg border border-zinc-700 bg-zinc-900 p-4 shadow-sm">
+          <header className="glass-surface rounded-lg p-4">
             <p className="text-sm font-semibold uppercase text-emerald-300">Sessie Interactief</p>
             <h1 className="mt-1 text-2xl font-black">{session.presentation.title}</h1>
             <div className="mt-3 flex flex-wrap gap-2">
@@ -459,7 +459,7 @@ export default function ParticipantPage({ code }: ParticipantPageProps) {
 
           {error ? <p className="rounded-lg border border-rose-700 bg-rose-950 px-4 py-3 text-sm font-semibold text-rose-100">{error}</p> : null}
 
-          <form className="rounded-lg border border-zinc-700 bg-zinc-900 p-5 shadow-sm" onSubmit={registerIdentity}>
+          <form className="glass-surface rounded-lg p-5" onSubmit={registerIdentity}>
             <div className="mb-5">
               <span className="rounded-md bg-emerald-300 px-2 py-1 text-xs font-black uppercase text-emerald-950">
                 {isEditingIdentityForm ? "Profiel" : "Meedoen"}
@@ -559,14 +559,14 @@ export default function ParticipantPage({ code }: ParticipantPageProps) {
   }
 
   return (
-    <main className="min-h-screen bg-zinc-950 px-3 py-3 text-white">
+    <main className="liquid-participant min-h-screen px-3 py-3 text-white">
       <div
         className={`mx-auto flex w-full max-w-xl flex-col gap-3 ${
           centerQuizFeedback ? "min-h-[calc(100vh-1.5rem)] justify-center" : ""
         }`}
       >
         {showSessionHeader ? (
-          <header className="rounded-lg border border-zinc-700 bg-zinc-900 p-4 shadow-sm">
+          <header className="glass-surface rounded-lg p-4">
             <p className="text-sm font-semibold uppercase text-emerald-300">Sessie Interactief</p>
             <h1 className="mt-1 text-2xl font-black">{session.presentation.title}</h1>
             <div className="mt-3 flex flex-wrap gap-2">
@@ -662,12 +662,12 @@ export default function ParticipantPage({ code }: ParticipantPageProps) {
         ) : null}
 
         {!activeQuestion ? (
-          <section className="rounded-lg border border-zinc-700 bg-zinc-900 p-5 text-center shadow-sm">
+          <section className="glass-surface rounded-lg p-5 text-center">
             <h2 className="text-2xl font-black">Wachten op de volgende vraag</h2>
             <p className="mt-3 text-zinc-300">Je scherm werkt automatisch bij zodra de presentator een vraag opent.</p>
           </section>
         ) : isSlide ? (
-          <section className="rounded-lg border border-zinc-700 bg-zinc-900 p-4 shadow-sm">
+          <section className="glass-surface rounded-lg p-4">
             <div className="mb-5">
               <span className="rounded-md bg-sky-300 px-2 py-1 text-xs font-black uppercase text-sky-950">
                 {questionTypeLabel(activeQuestion.type)}
@@ -705,7 +705,7 @@ export default function ParticipantPage({ code }: ParticipantPageProps) {
             </div>
           </section>
         ) : (
-          <form className="rounded-lg border border-zinc-700 bg-zinc-900 p-4 shadow-sm" onSubmit={submit}>
+          <form className="glass-surface rounded-lg p-4" onSubmit={submit}>
             <div className="mb-3">
               <div className="flex items-center gap-2">
                 <span className="rounded-md bg-emerald-300 px-2 py-1 text-xs font-black uppercase text-emerald-950">

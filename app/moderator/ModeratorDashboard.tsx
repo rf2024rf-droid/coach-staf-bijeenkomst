@@ -150,8 +150,10 @@ function presentationTypeLabel(type: ModeratorPresentationSummary["presentationT
 }
 
 function moderatorTabClassName(active: boolean) {
-  return `rounded-lg px-3 py-3 text-left text-sm font-black transition sm:px-4 ${
-    active ? "bg-zinc-950 text-white shadow-sm" : "bg-white text-zinc-700 hover:bg-zinc-100"
+  return `liquid-button rounded-lg border px-3 py-3 text-left text-sm font-black sm:px-4 ${
+    active
+      ? "border-emerald-300/35 bg-emerald-400/15 text-emerald-100"
+      : "border-white/10 bg-white/[0.045] text-zinc-300 hover:bg-white/[0.09]"
   }`;
 }
 
@@ -567,7 +569,7 @@ export default function ModeratorDashboard({ entryMode = "users" }: ModeratorDas
 
   if (loading) {
     return (
-      <main className="grid min-h-screen place-items-center bg-[#f5f5f0] text-zinc-800">
+      <main className="liquid-app grid min-h-screen place-items-center text-zinc-200">
         <div className="flex items-center gap-3 font-bold">
           <Loader2 aria-hidden className="h-5 w-5 animate-spin" />
           Omgeving laden...
@@ -578,8 +580,8 @@ export default function ModeratorDashboard({ entryMode = "users" }: ModeratorDas
 
   if (!session?.configured) {
     return (
-      <main className="grid min-h-screen place-items-center bg-[#f5f5f0] px-5 text-zinc-950">
-        <section className="w-full max-w-xl rounded-lg border border-amber-200 bg-white p-6 shadow-sm">
+      <main className="liquid-app grid min-h-screen place-items-center px-5 text-white">
+        <section className="glass-surface w-full max-w-xl rounded-lg p-6">
           <div className="mb-4 grid h-12 w-12 place-items-center rounded-lg bg-amber-700 text-white">
             <KeyRound aria-hidden className="h-6 w-6" />
           </div>
@@ -597,8 +599,8 @@ export default function ModeratorDashboard({ entryMode = "users" }: ModeratorDas
     const availableModes: AuthMode[] = entryMode === "admin" ? ["admin"] : ["login", "signup"];
 
     return (
-      <main className="grid min-h-screen place-items-center bg-[#f5f5f0] px-4 py-6 text-zinc-950 sm:px-5 sm:py-8">
-        <section className="w-full max-w-md rounded-lg border border-zinc-300 bg-white p-5 shadow-sm sm:p-6">
+      <main className="liquid-app grid min-h-screen place-items-center px-4 py-6 text-white sm:px-5 sm:py-8">
+        <section className="glass-surface w-full max-w-md rounded-lg p-5 sm:p-6">
           <div className="mb-5 flex items-center gap-3">
             <div className="grid h-10 w-10 place-items-center rounded-lg bg-zinc-900 text-white">
               {entryMode === "admin" ? (
@@ -779,7 +781,7 @@ export default function ModeratorDashboard({ entryMode = "users" }: ModeratorDas
 
   if ((entryMode === "admin" && session.role !== "admin") || (entryMode === "users" && session.role === "admin")) {
     return (
-      <main className="grid min-h-screen place-items-center bg-[#f5f5f0] px-5 text-zinc-950">
+      <main className="liquid-app grid min-h-screen place-items-center px-5 text-white">
         <div className="flex items-center gap-3 font-bold text-zinc-700">
           <Loader2 aria-hidden className="h-5 w-5 animate-spin" />
           Dashboard openen...
@@ -789,7 +791,7 @@ export default function ModeratorDashboard({ entryMode = "users" }: ModeratorDas
   }
 
   return (
-    <main className="min-h-screen bg-[#f5f5f0] text-zinc-950">
+    <main className="liquid-app min-h-screen text-white">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-3 px-3 py-3 md:gap-4 md:px-8 md:py-5">
         <PageHeader
           actions={
@@ -846,7 +848,7 @@ export default function ModeratorDashboard({ entryMode = "users" }: ModeratorDas
         ) : null}
 
         {session.role === "admin" ? (
-          <nav className="grid grid-cols-2 gap-2 rounded-lg border border-zinc-300 bg-zinc-100 p-2">
+          <nav className="glass-toolbar grid grid-cols-2 gap-2 rounded-lg p-2">
             <button
               className={moderatorTabClassName(moderatorTab === "presentations")}
               onClick={() => setModeratorTab("presentations")}
@@ -1006,7 +1008,7 @@ export default function ModeratorDashboard({ entryMode = "users" }: ModeratorDas
                 const isEditing = editingId === presentation.id;
 
                 return (
-                  <article className="rounded-lg border border-zinc-200 bg-zinc-50 p-3 md:p-4" key={presentation.id}>
+                  <article className="glass-row rounded-lg p-3 md:p-4" key={presentation.id}>
                     <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                       <div className="min-w-0 flex-1">
                         {isEditing ? (

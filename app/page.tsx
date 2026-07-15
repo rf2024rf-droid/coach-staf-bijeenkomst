@@ -17,26 +17,26 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-screen bg-[#f5f5f0] text-zinc-950">
+    <main className="liquid-app min-h-screen text-white">
       <div className="mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-6 px-5 py-6 md:px-8">
-        <header className="flex flex-col gap-4 border-b border-zinc-300 pb-6 md:flex-row md:items-end md:justify-between">
+        <header className="flex flex-col gap-4 border-b border-white/15 pb-6 md:flex-row md:items-end md:justify-between">
           <div>
             <p className="text-sm font-semibold uppercase text-emerald-800">Sessie Interactief</p>
             <h1 className="mt-2 text-3xl font-black md:text-5xl">Startpunt voor sessies</h1>
-            <p className="mt-3 max-w-2xl leading-7 text-zinc-700">
+            <p className="mt-3 max-w-2xl leading-7 text-zinc-300">
               Gebruikers beheren presentaties met hun eigen account. Deelnemers gebruiken alleen de sessiecode of QR-code.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
             <a
-              className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-800 px-4 py-3 font-bold text-white hover:bg-emerald-900"
+              className="liquid-button inline-flex items-center justify-center gap-2 rounded-lg border border-emerald-300/50 bg-emerald-400 px-4 py-3 font-bold text-black hover:bg-emerald-300"
               href="/moderator"
             >
               <ShieldCheck aria-hidden className="h-5 w-5" />
               Gebruiker login
             </a>
             <a
-              className="inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-white px-4 py-3 font-bold text-zinc-800 hover:bg-zinc-50"
+              className="liquid-button inline-flex items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/[0.065] px-4 py-3 font-bold text-white hover:bg-white/[0.11]"
               href="/beheerder"
             >
               Beheerder login
@@ -45,7 +45,7 @@ export default function Home() {
         </header>
 
         <section className="grid flex-1 items-start gap-6 lg:grid-cols-[1fr_0.9fr]">
-          <article className="rounded-lg border border-zinc-300 bg-white p-6 shadow-sm">
+          <article className="glass-surface rounded-lg p-6">
             <div className="mb-5 flex items-center gap-3">
               <div className="grid h-11 w-11 place-items-center rounded-lg bg-emerald-800 text-white">
                 <ShieldCheck aria-hidden className="h-6 w-6" />
@@ -55,12 +55,12 @@ export default function Home() {
                 <h2 className="text-xl font-black">Eigen sessies beheren</h2>
               </div>
             </div>
-            <p className="leading-7 text-zinc-700">
+            <p className="leading-7 text-zinc-300">
               Log in om presentaties aan te maken, bestaande sessies te openen, QR-codes te
               behouden en het grote scherm te bedienen.
             </p>
             <a
-              className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-zinc-900 px-4 py-3 font-bold text-white hover:bg-zinc-700 sm:w-auto"
+              className="liquid-button mt-6 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-white/20 bg-white/[0.11] px-4 py-3 font-bold text-white hover:bg-white/[0.17] sm:w-auto"
               href="/moderator"
             >
               Open gebruikersomgeving
@@ -68,7 +68,7 @@ export default function Home() {
             </a>
           </article>
 
-          <form className="rounded-lg border border-zinc-300 bg-white p-6 shadow-sm" onSubmit={joinPresentation}>
+          <form className="glass-surface rounded-lg p-6" onSubmit={joinPresentation}>
             <div className="mb-5 flex items-center gap-3">
               <div className="grid h-11 w-11 place-items-center rounded-lg bg-sky-800 text-white">
                 <Users aria-hidden className="h-6 w-6" />
@@ -79,11 +79,11 @@ export default function Home() {
               </div>
             </div>
 
-            <label className="block text-sm font-semibold text-zinc-800" htmlFor="join-code">
+            <label className="block text-sm font-semibold text-zinc-200" htmlFor="join-code">
               Sessiecode
             </label>
             <input
-              className="mt-2 w-full rounded-lg border border-zinc-300 px-4 py-3 text-center text-2xl font-black uppercase outline-none focus:border-sky-700 focus:ring-2 focus:ring-sky-100"
+              className="glass-field mt-2 w-full rounded-lg px-4 py-3 text-center text-2xl font-black uppercase outline-none focus:border-sky-300/70 focus:ring-2 focus:ring-sky-300/15"
               id="join-code"
               maxLength={12}
               onChange={(event) => setJoinCode(event.target.value)}
@@ -91,7 +91,7 @@ export default function Home() {
               value={joinCode}
             />
             <button
-              className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-sky-800 px-4 py-3 font-bold text-white transition hover:bg-sky-900"
+              className="liquid-button mt-5 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-sky-200/50 bg-sky-300 px-4 py-3 font-bold text-black hover:bg-sky-200"
               type="submit"
             >
               <LogIn aria-hidden className="h-5 w-5" />

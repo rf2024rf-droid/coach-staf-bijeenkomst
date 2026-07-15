@@ -857,8 +857,8 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
 
   if (!loading && !payload && (!key || error.includes("Beheersleutel") || error.includes("Log eerst in"))) {
     return (
-      <main className="grid min-h-screen place-items-center bg-[#f5f5f0] px-5">
-        <form className="w-full max-w-md rounded-lg border border-zinc-300 bg-white p-6 shadow-sm" onSubmit={applyKey}>
+      <main className="liquid-app grid min-h-screen place-items-center px-5">
+        <form className="glass-surface w-full max-w-md rounded-lg p-6" onSubmit={applyKey}>
           <div className="mb-5 flex items-center gap-3">
             <div className="grid h-10 w-10 place-items-center rounded-lg bg-amber-700 text-white">
               <KeyRound aria-hidden className="h-5 w-5" />
@@ -899,13 +899,13 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
   }
 
   if (loading && !payload) {
-    return <main className="grid min-h-screen place-items-center bg-[#f5f5f0] text-zinc-700">Dashboard laden...</main>;
+    return <main className="liquid-app grid min-h-screen place-items-center text-zinc-300">Dashboard laden...</main>;
   }
 
   if (!payload) {
     return (
-      <main className="grid min-h-screen place-items-center bg-[#f5f5f0] px-5 text-center">
-        <div className="max-w-md rounded-lg border border-zinc-300 bg-white p-6 shadow-sm">
+      <main className="liquid-app grid min-h-screen place-items-center px-5 text-center">
+        <div className="glass-surface max-w-md rounded-lg p-6">
           <h1 className="text-xl font-bold">Dashboard niet beschikbaar</h1>
           <p className="mt-3 text-sm text-rose-800">{error || "Controleer de link of beheersleutel."}</p>
         </div>
@@ -1009,10 +1009,10 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
   ];
 
   function tabClassName(tab: PresenterTab) {
-    return `rounded-lg px-1.5 py-2 text-center text-[11px] font-black transition sm:px-4 sm:py-3 sm:text-left sm:text-sm ${
+    return `liquid-button rounded-lg border px-1.5 py-2 text-center text-[11px] font-black sm:px-4 sm:py-3 sm:text-left sm:text-sm ${
       presenterTab === tab
-        ? "bg-zinc-950 text-white shadow-sm"
-        : "bg-white text-zinc-700 hover:bg-zinc-100"
+        ? "border-emerald-300/35 bg-emerald-400/15 text-emerald-100"
+        : "border-white/10 bg-white/[0.045] text-zinc-300 hover:bg-white/[0.09]"
     }`;
   }
 
@@ -1119,9 +1119,9 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
     normalizeGeneralScreenFontSize(generalFontSizeInputValue) === null;
 
   return (
-    <main className={`min-h-screen bg-[#f4f4ef] text-zinc-950 ${presenterTab === "regie" ? "pb-28 md:pb-40" : activeQuestion ? "pb-56 md:pb-40" : ""}`}>
+    <main className={`liquid-app min-h-screen text-white ${presenterTab === "regie" ? "pb-28 md:pb-40" : activeQuestion ? "pb-56 md:pb-40" : ""}`}>
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-3 px-3 py-3 md:gap-5 md:px-8 md:py-5">
-        <header className="rounded-lg border border-zinc-300 bg-white p-3 shadow-sm md:p-5">
+        <header className="glass-surface rounded-lg p-3 md:p-5">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           {presenterTab === "regie" ? (
             <div className="md:hidden">
@@ -1216,7 +1216,7 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
           </div>
         ) : null}
 
-        <nav className="grid grid-cols-5 gap-1 rounded-lg border border-zinc-300 bg-zinc-100 p-1 sm:gap-2 sm:p-2">
+        <nav className="glass-toolbar grid grid-cols-5 gap-1 rounded-lg p-1 sm:gap-2 sm:p-2">
           {tabs.map((tab) => (
             <button className={tabClassName(tab.id)} key={tab.id} onClick={() => setPresenterTab(tab.id)} type="button">
               <span className="flex flex-col items-center gap-1 sm:flex-row sm:gap-3">
@@ -2365,8 +2365,8 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
       </div>
 
       {editingQuestion ? (
-        <div className="fixed inset-0 z-[60] flex justify-end bg-zinc-950/35 p-3">
-          <section className="flex h-full w-full max-w-xl flex-col overflow-y-auto rounded-lg border border-zinc-300 bg-white p-5 shadow-2xl">
+        <div className="fixed inset-0 z-[60] flex justify-end bg-black/60 p-3 backdrop-blur-sm">
+          <section className="glass-modal flex h-full w-full max-w-xl flex-col overflow-y-auto rounded-lg p-5">
             <div className="flex items-start justify-between gap-4 border-b border-zinc-200 pb-4">
               <div>
                 <p className="text-xs font-black uppercase text-emerald-800">{questionTypeLabel(editingQuestion.type)}</p>
@@ -2459,7 +2459,7 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
       {presenterTab === "regie" ? (
         <section
           aria-label="Mobiele regiebediening"
-          className="fixed inset-x-0 bottom-0 z-50 border-t border-zinc-300 bg-white/95 px-2 pb-2 pt-2 text-zinc-950 shadow-2xl backdrop-blur md:hidden"
+          className="glass-toolbar fixed inset-x-0 bottom-0 z-50 border-x-0 border-b-0 px-2 pb-2 pt-2 text-white md:hidden"
         >
           <div className="mx-auto max-w-xl">
             <div className="mb-2 flex items-center justify-between gap-3 px-1">
@@ -2522,7 +2522,7 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
       {activeQuestion ? (
         <section
           aria-label="Live commandocentrum"
-          className="fixed inset-x-2 bottom-2 z-50 mx-auto hidden max-w-6xl rounded-lg border border-zinc-700 bg-zinc-950 p-2 text-white shadow-2xl shadow-zinc-950/30 md:block md:bottom-4 md:p-3"
+          className="glass-toolbar fixed inset-x-2 bottom-2 z-50 mx-auto hidden max-w-6xl rounded-lg p-2 text-white md:block md:bottom-4 md:p-3"
         >
           <div className="grid gap-2 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
             <div className="flex min-w-0 items-center gap-2 md:gap-3">

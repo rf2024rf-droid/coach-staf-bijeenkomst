@@ -92,52 +92,52 @@ function SpotlightResults({ question }: { question: QuestionResult }) {
     if (question.type === "quiz") {
       return (
         <div className="grid items-stretch gap-6 lg:grid-cols-[0.85fr_1.15fr]">
-          <section className="flex h-full flex-col rounded-lg border border-emerald-200 bg-emerald-50 p-7 text-zinc-950">
-            <p className="text-sm font-black uppercase text-emerald-800">Quizuitslag</p>
-            <p className="mt-5 text-8xl font-black leading-none text-emerald-800 md:text-9xl">
+          <section className="stage-glass flex h-full flex-col rounded-lg border-emerald-300/30 bg-emerald-400/[0.08] p-7 text-white">
+            <p className="text-sm font-black uppercase text-emerald-200">Quizuitslag</p>
+            <p className="mt-5 text-8xl font-black leading-none text-emerald-200 md:text-9xl">
               {question.correctCount}
             </p>
-            <p className="mt-4 text-2xl font-black text-zinc-800">
+            <p className="mt-4 text-2xl font-black text-zinc-100">
               {participantLabel(question.correctCount)} {correctVerb(question.correctCount)} het goed
             </p>
-            <p className="mt-3 text-xl font-bold text-zinc-700">
+            <p className="mt-3 text-xl font-bold text-zinc-300">
               van {question.answerCount} gegeven {answerLabel(question.answerCount)}
             </p>
             {correctOption ? (
-              <div className="mt-8 rounded-lg bg-white p-6 text-center">
-                <p className="inline-flex items-center gap-2 text-sm font-black uppercase text-emerald-800">
+              <div className="mt-8 rounded-lg border border-white/10 bg-black/25 p-6 text-center">
+                <p className="inline-flex items-center gap-2 text-sm font-black uppercase text-emerald-200">
                   <CheckCircle2 aria-hidden className="h-5 w-5" />
                   Juist antwoord
                 </p>
-                <p className="mt-4 text-8xl font-black leading-none text-zinc-950 md:text-9xl">
+                <p className="mt-4 text-8xl font-black leading-none text-white md:text-9xl">
                   {optionLetter(correctOption.position, 0)}
                 </p>
-                <h3 className="mt-3 text-2xl font-black leading-tight text-zinc-800 md:text-3xl">
+                <h3 className="mt-3 text-2xl font-black leading-tight text-zinc-100 md:text-3xl">
                   {correctOption.label}
                 </h3>
               </div>
             ) : null}
           </section>
 
-          <section className="flex h-full flex-col rounded-lg border border-zinc-700 bg-zinc-100 p-4 text-zinc-950 shadow-2xl shadow-zinc-950/20 md:p-5">
-            <p className="mb-4 text-sm font-black uppercase text-zinc-600">Antwoordopties</p>
+          <section className="stage-glass flex h-full flex-col rounded-lg p-4 text-white md:p-5">
+            <p className="mb-4 text-sm font-black uppercase text-zinc-300">Antwoordopties</p>
             <div className="grid flex-1 auto-rows-fr gap-3">
               {question.options.map((option, index) => (
                 <div
                   className={`flex items-center rounded-lg border p-4 ${
                     option.isCorrect
-                      ? "border-emerald-500 bg-emerald-50 ring-4 ring-emerald-200"
-                      : "border-zinc-200 bg-white"
+                      ? "border-emerald-300 bg-emerald-400/10 ring-2 ring-emerald-300/20"
+                      : "border-white/10 bg-white/[0.055]"
                   }`}
                   key={option.id}
                 >
                   <h3 className="flex w-full items-center gap-3 text-2xl font-black leading-tight">
-                    <span className="grid h-10 w-10 shrink-0 place-items-center rounded-md bg-zinc-950 text-lg font-black text-white">
+                      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-md bg-black/55 text-lg font-black text-white ring-1 ring-white/10">
                       {optionLetter(option.position, index)}
                     </span>
                     <span className="min-w-0 flex-1">{option.label}</span>
                     {option.isCorrect ? (
-                      <span className="shrink-0 rounded-md bg-emerald-100 px-2 py-1 text-xs font-black uppercase text-emerald-800">
+                      <span className="shrink-0 rounded-md bg-emerald-400/15 px-2 py-1 text-xs font-black uppercase text-emerald-200">
                         Juist
                       </span>
                     ) : null}
@@ -152,36 +152,36 @@ function SpotlightResults({ question }: { question: QuestionResult }) {
 
     return (
       <div className="grid gap-6 lg:grid-cols-[0.8fr_1.2fr]">
-        <section className="rounded-lg border border-emerald-200 bg-emerald-50 p-7 text-zinc-950">
-          <p className="text-sm font-black uppercase text-emerald-800">Hoogste score</p>
+        <section className="stage-glass rounded-lg border-emerald-300/30 bg-emerald-400/[0.08] p-7 text-white">
+          <p className="text-sm font-black uppercase text-emerald-200">Hoogste score</p>
           <h3 className="mt-4 text-4xl font-black leading-tight md:text-5xl">
             {winner.label || "Nog geen keuze"}
           </h3>
-          <p className="mt-5 text-7xl font-black text-emerald-800">{winner.percentage}%</p>
-          <p className="mt-3 text-xl font-bold text-zinc-700">
+          <p className="mt-5 text-7xl font-black text-emerald-200">{winner.percentage}%</p>
+          <p className="mt-3 text-xl font-bold text-zinc-300">
             {winner.count} van {question.answerCount} {answerLabel(question.answerCount)}
           </p>
         </section>
 
-        <section className="rounded-lg border border-zinc-700 bg-zinc-100 p-6 text-zinc-950">
+        <section className="stage-glass rounded-lg p-6 text-white">
           <div className="space-y-5">
             {question.options.map((option, index) => (
               <div key={option.id} className="space-y-2">
                 <div className="flex items-end justify-between gap-6">
                   <h3 className="inline-flex items-center gap-3 text-2xl font-black leading-tight">
-                    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-zinc-950 text-base font-black text-white">
+                    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-black/55 text-base font-black text-white ring-1 ring-white/10">
                       {optionLetter(option.position, index)}
                     </span>
                     {option.label}
                   </h3>
                   <div className="text-right">
                     <p className="text-4xl font-black">{option.percentage}%</p>
-                    <p className="text-sm font-bold text-zinc-600">
+                    <p className="text-sm font-bold text-zinc-300">
                       {option.count} {answerLabel(option.count)}
                     </p>
                   </div>
                 </div>
-                <div className="h-7 overflow-hidden rounded-full bg-white shadow-inner">
+                <div className="h-7 overflow-hidden rounded-full bg-white/10 shadow-inner">
                   <div
                     className={`h-full rounded-full ${accents[index % accents.length]} transition-all duration-500`}
                     style={{ width: `${option.percentage}%` }}
@@ -199,17 +199,17 @@ function SpotlightResults({ question }: { question: QuestionResult }) {
   const isCompact = responses.length > 16;
   const visibleResponses = responses.slice(0, isCompact ? 54 : 24);
   const cardStyles = [
-    "border-emerald-200 bg-emerald-50",
-    "border-sky-200 bg-sky-50",
-    "border-amber-200 bg-amber-50",
-    "border-rose-200 bg-rose-50",
-    "border-violet-200 bg-violet-50",
-    "border-cyan-200 bg-cyan-50",
+    "border-emerald-300/25 bg-emerald-400/10",
+    "border-sky-300/25 bg-sky-400/10",
+    "border-amber-300/25 bg-amber-400/10",
+    "border-rose-300/25 bg-rose-400/10",
+    "border-violet-300/25 bg-violet-400/10",
+    "border-cyan-300/25 bg-cyan-400/10",
   ];
 
   if (!responses.length) {
     return (
-      <div className="rounded-lg border border-zinc-700 bg-zinc-100 p-8 text-center text-zinc-950">
+      <div className="stage-glass rounded-lg p-8 text-center text-white">
         <p className="text-3xl font-black">Nog geen antwoorden om te bespreken.</p>
       </div>
     );
@@ -225,12 +225,12 @@ function SpotlightResults({ question }: { question: QuestionResult }) {
     >
       {visibleResponses.map((response, index) => (
         <article
-          className={`rounded-lg border text-zinc-950 shadow-sm ${
+          className={`rounded-lg border text-white shadow-sm ${
             isCompact ? "p-3" : "p-5"
           } ${cardStyles[index % cardStyles.length]}`}
           key={response.id}
         >
-          <p className={isCompact ? "mb-1 text-xs font-black uppercase text-zinc-600" : "mb-3 text-sm font-black uppercase text-zinc-600"}>
+          <p className={isCompact ? "mb-1 text-xs font-black uppercase text-zinc-300" : "mb-3 text-sm font-black uppercase text-zinc-300"}>
             {response.participantName}
           </p>
           <p
@@ -261,7 +261,7 @@ function LeaderboardScreen({ session }: { session: PublicSessionPayload }) {
   const otherEntries = session.leaderboard.slice(3, 27);
 
   return (
-    <main className="min-h-screen bg-zinc-950 text-white">
+    <main className="liquid-stage min-h-screen bg-zinc-950 text-white">
       <div className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-6 px-6 py-6">
         <header className="flex flex-col gap-4 border-b border-zinc-700 pb-5 lg:flex-row lg:items-end lg:justify-between">
           <div>
@@ -289,7 +289,7 @@ function LeaderboardScreen({ session }: { session: PublicSessionPayload }) {
           </section>
         ) : (
           <section className="flex flex-1 flex-col gap-6">
-            <div className="rounded-lg border border-zinc-700 bg-zinc-900 p-6 md:p-8">
+            <div className="stage-glass rounded-lg p-6 md:p-8">
               <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
                 <div>
                   <p className="text-sm font-black uppercase text-amber-200">
@@ -310,8 +310,8 @@ function LeaderboardScreen({ session }: { session: PublicSessionPayload }) {
                 <article
                   className={`rounded-lg border p-6 shadow-2xl ${
                     entry.rank === 1
-                      ? "border-amber-300 bg-amber-100 text-amber-950"
-                      : "border-zinc-700 bg-zinc-100 text-zinc-950"
+                      ? "border-amber-300 bg-amber-300/15 text-amber-50"
+                      : "border-white/15 bg-white/[0.07] text-white"
                   }`}
                   key={entry.participantId}
                 >
@@ -326,16 +326,16 @@ function LeaderboardScreen({ session }: { session: PublicSessionPayload }) {
               ))}
             </div>
 
-            <section className="rounded-lg border border-zinc-700 bg-zinc-100 p-5 text-zinc-950">
+            <section className="stage-glass rounded-lg p-5 text-white">
               <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
                 {otherEntries.map((entry) => (
                   <div
-                    className="grid grid-cols-[64px_1fr_auto] items-center gap-3 rounded-lg bg-white px-4 py-3"
+                    className="grid grid-cols-[64px_1fr_auto] items-center gap-3 rounded-lg border border-white/10 bg-white/[0.055] px-4 py-3"
                     key={entry.participantId}
                   >
-                    <span className="text-2xl font-black text-zinc-500">#{entry.rank}</span>
+                    <span className="text-2xl font-black text-zinc-400">#{entry.rank}</span>
                     <span className="min-w-0 truncate text-lg font-black">{entry.label}</span>
-                    <span className="rounded-md bg-zinc-950 px-3 py-2 font-black text-white">
+                    <span className="rounded-md bg-black/50 px-3 py-2 font-black text-white ring-1 ring-white/10">
                       {entry.score} {pointLabel(entry.score)}
                     </span>
                   </div>
@@ -353,7 +353,7 @@ function ResponsePulse({ count, questionType }: { count: number; questionType: Q
   const label = questionType === "open" ? answerLabel(count) : voteLabel(count);
 
   return (
-    <section className="rounded-lg border border-zinc-800 bg-zinc-900/70 px-5 py-4 text-center shadow-xl shadow-black/20 md:px-6 md:py-5">
+    <section className="stage-glass rounded-lg px-5 py-4 text-center md:px-6 md:py-5">
       <div className="flex flex-col items-center justify-center gap-2 sm:flex-row sm:gap-4">
         <p className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-wide text-emerald-300/90 md:text-sm">
           <Users aria-hidden className="h-4 w-4" />
@@ -465,7 +465,7 @@ export default function ScreenPage({ code }: ScreenPageProps) {
 
   if (loading && !session) {
     return (
-      <main className="grid min-h-screen place-items-center bg-zinc-950 text-white">
+      <main className="liquid-stage grid min-h-screen place-items-center bg-zinc-950 text-white">
         <div className="flex items-center gap-3 text-xl">
           <Loader2 aria-hidden className="h-6 w-6 animate-spin" />
           Laden...
@@ -476,7 +476,7 @@ export default function ScreenPage({ code }: ScreenPageProps) {
 
   if (!session) {
     return (
-      <main className="grid min-h-screen place-items-center bg-zinc-950 px-8 text-center text-white">
+      <main className="liquid-stage grid min-h-screen place-items-center bg-zinc-950 px-8 text-center text-white">
         <div>
           <h1 className="text-4xl font-black">Sessie niet gevonden</h1>
           <p className="mt-4 text-lg text-rose-200">{error || "Controleer de code."}</p>
@@ -526,7 +526,7 @@ export default function ScreenPage({ code }: ScreenPageProps) {
 
   if (session.screenView === "qr") {
     return (
-      <main className="min-h-screen" style={generalScreenStyle}>
+      <main className="liquid-stage min-h-screen" style={generalScreenStyle}>
         <div className="mx-auto grid min-h-screen w-full max-w-7xl grid-rows-[auto_1fr] gap-6 px-6 py-6">
           <header
             className="flex flex-col gap-4 border-b pb-5 lg:flex-row lg:items-end lg:justify-between"
@@ -583,7 +583,7 @@ export default function ScreenPage({ code }: ScreenPageProps) {
 
   if (session.screenView === "results") {
     return (
-      <main className="min-h-screen bg-zinc-950 text-white">
+      <main className="liquid-stage min-h-screen bg-zinc-950 text-white">
         <div className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-6 px-6 py-6">
           <header className="flex flex-col gap-4 border-b border-zinc-700 pb-5 lg:flex-row lg:items-end lg:justify-between">
             <div>
@@ -599,7 +599,7 @@ export default function ScreenPage({ code }: ScreenPageProps) {
           {resultsQuestion ? (
             <section className="flex flex-1 flex-col gap-6">
               <div
-                className={`rounded-lg border border-zinc-700 bg-zinc-900 ${
+                className={`stage-glass rounded-lg ${
                   compactOpenResults ? "p-5" : "p-7 md:p-9"
                 }`}
               >
@@ -644,7 +644,7 @@ export default function ScreenPage({ code }: ScreenPageProps) {
 
   return (
     <main
-      className={`min-h-screen ${isGeneralQuestionScreen ? "" : "bg-zinc-950 text-white"}`}
+      className={`liquid-stage min-h-screen ${isGeneralQuestionScreen ? "" : "bg-zinc-950 text-white"}`}
       style={isGeneralQuestionScreen ? generalScreenStyle : undefined}
     >
       <div className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-6 px-6 py-6">
@@ -681,7 +681,7 @@ export default function ScreenPage({ code }: ScreenPageProps) {
           </section>
         ) : activeQuestionTiming?.isCountdown ? (
           <section className="grid flex-1 place-items-center text-center">
-            <div className="mx-auto w-full max-w-4xl rounded-lg border border-zinc-700 bg-zinc-900 p-10 md:p-14">
+            <div className="stage-glass mx-auto w-full max-w-4xl rounded-lg p-10 md:p-14">
               <p className="text-xl font-black uppercase tracking-wide text-emerald-300">Quiz start zo</p>
               <h2 className="mt-8 text-[168px] font-black leading-none text-white md:text-[240px]">
                 {activeQuestionTiming.countdownNumber}
@@ -696,7 +696,7 @@ export default function ScreenPage({ code }: ScreenPageProps) {
           </section>
         ) : activeQuestion.type === "quiz" && activeQuestionTiming?.isExpired ? (
           <section className="grid flex-1 place-items-center text-center">
-            <div className="mx-auto w-full max-w-6xl rounded-lg border border-zinc-700 bg-zinc-900 p-8 shadow-2xl shadow-black/30 md:p-12">
+            <div className="stage-glass mx-auto w-full max-w-6xl rounded-lg p-8 md:p-12">
               <p className="text-lg font-black uppercase tracking-wide text-amber-200 md:text-xl">Tijd voorbij</p>
               <h2 className="mx-auto mt-5 max-w-5xl text-4xl font-black leading-tight text-white md:text-6xl">
                 {activeQuestion.prompt}
@@ -736,7 +736,7 @@ export default function ScreenPage({ code }: ScreenPageProps) {
           >
             <div
               className={`grid min-h-[56vh] place-items-center rounded-lg border p-8 text-center md:min-h-[62vh] md:p-12 ${
-                activeQuestion.type === "slide" ? "" : "border-zinc-700 bg-zinc-900"
+                activeQuestion.type === "slide" ? "" : "stage-glass"
               }`}
               style={
                 activeQuestion.type === "slide"

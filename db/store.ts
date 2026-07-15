@@ -413,6 +413,12 @@ const schemaStatements = [
     created_at TEXT NOT NULL DEFAULT (now()::text),
     updated_at TEXT NOT NULL DEFAULT (now()::text)
   )`,
+  "ALTER TABLE presentations ENABLE ROW LEVEL SECURITY",
+  "ALTER TABLE app_accounts ENABLE ROW LEVEL SECURITY",
+  "ALTER TABLE questions ENABLE ROW LEVEL SECURITY",
+  "ALTER TABLE question_options ENABLE ROW LEVEL SECURITY",
+  "ALTER TABLE responses ENABLE ROW LEVEL SECURITY",
+  "ALTER TABLE participant_profiles ENABLE ROW LEVEL SECURITY",
   "ALTER TABLE presentations ADD COLUMN IF NOT EXISTS owner_user_id TEXT",
   "ALTER TABLE presentations ADD COLUMN IF NOT EXISTS owner_email TEXT",
   "ALTER TABLE presentations ADD COLUMN IF NOT EXISTS presentation_type TEXT NOT NULL DEFAULT 'interactive'",

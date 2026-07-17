@@ -10,7 +10,7 @@ import {
   KeyRound,
   ListChecks,
   Monitor,
-  Palette,
+  PauseCircle,
   Pencil,
   Play,
   Plus,
@@ -29,28 +29,19 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { QrCode } from "@/app/components/QrCode";
 import { ResultView } from "@/app/components/ResultView";
 import type { PresenterPayload, QuestionResult, QuestionType, ScreenView } from "@/app/types";
-import {
-  DEFAULT_GENERAL_SCREEN_BACKGROUND_COLOR,
-  DEFAULT_GENERAL_SCREEN_FONT_FAMILY,
-  DEFAULT_GENERAL_SCREEN_FONT_SIZE,
-  GENERAL_SCREEN_FONT_OPTIONS,
-  MAX_GENERAL_SCREEN_FONT_SIZE,
-  MIN_GENERAL_SCREEN_FONT_SIZE,
-  getGeneralScreenFontOption,
-  getGeneralScreenPalette,
-  normalizeGeneralScreenBackgroundColor,
-  normalizeGeneralScreenFontFamily,
-  normalizeGeneralScreenFontSize,
-  normalizeHexColor,
-  resolveGeneralScreenFontFamily,
-  resolveGeneralScreenFontSize,
-} from "@/lib/generalScreenAppearance";
+import { normalizeHexColor } from "@/lib/generalScreenAppearance";
 import { getQuestionTimingState } from "@/lib/questionTiming";
+import {
+  createScreenConfiguration,
+  normalizeScreenSettings,
+  type ScreenConfiguration,
+} from "@/lib/screenSettings";
+import { ScreenSettingsPanel } from "./ScreenSettingsPanel";
 
 type PresenterDashboardProps = {
   id: string;
@@ -217,6 +208,10 @@ function screenViewLabel(screenView: ScreenView) {
     return "stand";
   }
 
+  if (screenView === "pause") {
+    return "pauzescherm";
+  }
+
   return "live vraag";
 }
 
@@ -260,6 +255,7 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
   const [origin] = useState(() => (typeof window === "undefined" ? "" : window.location.origin));
   const [form, setForm] = useState<QuestionForm>(() => createDefaultQuestionForm());
   const [presenterTab, setPresenterTab] = useState<PresenterTab>("regie");
+  const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
   const [participantQuery, setParticipantQuery] = useState("");
   const [editingQuestionId, setEditingQuestionId] = useState("");
   const [editForm, setEditForm] = useState<QuestionEditForm>(() => ({
@@ -273,21 +269,14 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [nowMs, setNowMs] = useState(() => Date.now());
-  const [generalBackgroundDraft, setGeneralBackgroundDraft] = useState(DEFAULT_GENERAL_SCREEN_BACKGROUND_COLOR);
-  const [generalBackgroundDirty, setGeneralBackgroundDirty] = useState(false);
-  const [generalBackgroundSaving, setGeneralBackgroundSaving] = useState(false);
-  const [generalBackgroundError, setGeneralBackgroundError] = useState("");
-  const [generalTypographyDraft, setGeneralTypographyDraft] = useState({
-    fontFamily: DEFAULT_GENERAL_SCREEN_FONT_FAMILY,
-    fontSize: String(DEFAULT_GENERAL_SCREEN_FONT_SIZE),
-  });
-  const [generalTypographyDirty, setGeneralTypographyDirty] = useState(false);
-  const [generalTypographySaving, setGeneralTypographySaving] = useState(false);
-  const [generalTypographyError, setGeneralTypographyError] = useState("");
-  const persistedGeneralScreenBackgroundColor = payload?.presentation.generalScreenBackgroundColor ?? null;
-  const persistedGeneralScreenFontFamily = payload?.presentation.generalScreenFontFamily ?? null;
-  const persistedGeneralScreenFontSize = payload?.presentation.generalScreenFontSize ?? null;
-  const loadedPresentationId = payload?.presentation.id ?? "";
+  const [screenConfigurationDraft, setScreenConfigurationDraft] = useState<ScreenConfiguration>(() =>
+    createScreenConfiguration({})
+  );
+  const [screenConfigurationDirty, setScreenConfigurationDirty] = useState(false);
+  const [screenConfigurationSaving, setScreenConfigurationSaving] = useState(false);
+  const [screenConfigurationError, setScreenConfigurationError] = useState("");
+  const screenConfigurationDirtyRef = useRef(false);
+  const loadedScreenConfigurationVersionRef = useRef("");
 
   const joinLink = useMemo(() => {
     if (!origin || !payload) {
@@ -336,6 +325,14 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
         }
 
         setPayload(data);
+        const configurationVersion = `${data.presentation.id}:${data.presentation.updatedAt}`;
+        if (
+          !screenConfigurationDirtyRef.current &&
+          loadedScreenConfigurationVersionRef.current !== configurationVersion
+        ) {
+          setScreenConfigurationDraft(createScreenConfiguration(data.presentation));
+          loadedScreenConfigurationVersionRef.current = configurationVersion;
+        }
         setError("");
       } catch (caught) {
         setError(caught instanceof Error ? caught.message : "Dashboard kon niet worden geladen.");
@@ -369,140 +366,6 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
     return () => window.clearInterval(timer);
   }, []);
 
-  useEffect(() => {
-    if (!loadedPresentationId || !generalBackgroundDirty) {
-      return;
-    }
-
-    const normalized = normalizeHexColor(generalBackgroundDraft);
-    if (!normalized) {
-      return;
-    }
-
-    const nextStoredColor = normalizeGeneralScreenBackgroundColor(normalized);
-    if (nextStoredColor === persistedGeneralScreenBackgroundColor) {
-      const timer = window.setTimeout(() => setGeneralBackgroundDirty(false), 0);
-      return () => window.clearTimeout(timer);
-    }
-
-    const timer = window.setTimeout(async () => {
-      setGeneralBackgroundSaving(true);
-      setGeneralBackgroundError("");
-
-      try {
-        const response = await fetch(apiPath(`/api/presentations/${id}`), {
-          method: "PATCH",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ generalScreenBackgroundColor: nextStoredColor }),
-        });
-        const data = (await response.json()) as PresenterPayload | { error: string };
-        if (!response.ok || "error" in data) {
-          throw new Error("error" in data ? data.error : "Achtergrondkleur kon niet worden opgeslagen.");
-        }
-
-        setPayload(data);
-        setGeneralBackgroundDirty(false);
-      } catch (caught) {
-        setGeneralBackgroundError(
-          caught instanceof Error ? caught.message : "Achtergrondkleur kon niet worden opgeslagen."
-        );
-      } finally {
-        setGeneralBackgroundSaving(false);
-      }
-    }, 700);
-
-    return () => window.clearTimeout(timer);
-  }, [
-    apiPath,
-    generalBackgroundDirty,
-    generalBackgroundDraft,
-    id,
-    loadedPresentationId,
-    persistedGeneralScreenBackgroundColor,
-  ]);
-
-  useEffect(() => {
-    if (!loadedPresentationId || !generalTypographyDirty) {
-      return;
-    }
-
-    const nextFontFamily = normalizeGeneralScreenFontFamily(generalTypographyDraft.fontFamily);
-    const nextFontSize = normalizeGeneralScreenFontSize(generalTypographyDraft.fontSize);
-
-    if (
-      nextFontFamily === persistedGeneralScreenFontFamily &&
-      nextFontSize === persistedGeneralScreenFontSize
-    ) {
-      const timer = window.setTimeout(() => setGeneralTypographyDirty(false), 0);
-      return () => window.clearTimeout(timer);
-    }
-
-    const timer = window.setTimeout(async () => {
-      setGeneralTypographySaving(true);
-      setGeneralTypographyError("");
-
-      try {
-        const response = await fetch(apiPath(`/api/presentations/${id}`), {
-          method: "PATCH",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            generalScreenFontFamily: nextFontFamily,
-            generalScreenFontSize: nextFontSize,
-          }),
-        });
-        const data = (await response.json()) as PresenterPayload | { error: string };
-        if (!response.ok || "error" in data) {
-          throw new Error("error" in data ? data.error : "Lettertype kon niet worden opgeslagen.");
-        }
-
-        setPayload(data);
-        setGeneralTypographyDirty(false);
-      } catch (caught) {
-        setGeneralTypographyError(caught instanceof Error ? caught.message : "Lettertype kon niet worden opgeslagen.");
-      } finally {
-        setGeneralTypographySaving(false);
-      }
-    }, 700);
-
-    return () => window.clearTimeout(timer);
-  }, [
-    apiPath,
-    generalTypographyDirty,
-    generalTypographyDraft,
-    id,
-    loadedPresentationId,
-    persistedGeneralScreenFontFamily,
-    persistedGeneralScreenFontSize,
-  ]);
-
-  function updateGeneralBackgroundDraft(value: string) {
-    setGeneralBackgroundDraft(value.toUpperCase());
-    setGeneralBackgroundDirty(true);
-    setGeneralBackgroundError("");
-  }
-
-  function restoreDefaultGeneralBackground() {
-    setGeneralBackgroundDraft(DEFAULT_GENERAL_SCREEN_BACKGROUND_COLOR);
-    setGeneralBackgroundDirty(true);
-    setGeneralBackgroundError("");
-  }
-
-  function updateGeneralTypographyDraft(next: { fontFamily?: string; fontSize?: string }) {
-    const currentFontFamily = generalTypographyDirty
-      ? generalTypographyDraft.fontFamily
-      : persistedGeneralScreenFontFamily ?? DEFAULT_GENERAL_SCREEN_FONT_FAMILY;
-    const currentFontSize = generalTypographyDirty
-      ? generalTypographyDraft.fontSize
-      : String(persistedGeneralScreenFontSize ?? DEFAULT_GENERAL_SCREEN_FONT_SIZE);
-
-    setGeneralTypographyDraft({
-      fontFamily: next.fontFamily ?? currentFontFamily,
-      fontSize: next.fontSize ?? currentFontSize,
-    });
-    setGeneralTypographyDirty(true);
-    setGeneralTypographyError("");
-  }
-
   function applyKey(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const nextKey = keyInput.trim();
@@ -517,6 +380,95 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
 
     await navigator.clipboard.writeText(value);
     setNotice(`${label} gekopieerd`);
+    window.setTimeout(() => setNotice(""), 1800);
+  }
+
+  function updateScreenConfigurationDraft(next: ScreenConfiguration) {
+    setScreenConfigurationDraft(next);
+    setScreenConfigurationDirty(true);
+    screenConfigurationDirtyRef.current = true;
+    setScreenConfigurationError("");
+  }
+
+  function discardScreenConfigurationDraft() {
+    if (!payload) {
+      return;
+    }
+
+    setScreenConfigurationDraft(createScreenConfiguration(payload.presentation));
+    setScreenConfigurationDirty(false);
+    screenConfigurationDirtyRef.current = false;
+    setScreenConfigurationError("");
+  }
+
+  async function saveScreenConfiguration() {
+    const generalBackground = normalizeHexColor(screenConfigurationDraft.generalScreenBackgroundColor);
+    const gradientColor = normalizeHexColor(screenConfigurationDraft.screenSettings.general.gradientColor);
+    const questionBackground = normalizeHexColor(
+      screenConfigurationDraft.screenSettings.question.backgroundColor
+    );
+    const resultsAccent = normalizeHexColor(screenConfigurationDraft.screenSettings.results.accentColor);
+
+    if (!generalBackground || !gradientColor || !questionBackground || !resultsAccent) {
+      setScreenConfigurationError("Corrigeer eerst de ongeldige HEX-kleur.");
+      return;
+    }
+
+    const screenSettings = normalizeScreenSettings({
+      ...screenConfigurationDraft.screenSettings,
+      general: {
+        ...screenConfigurationDraft.screenSettings.general,
+        gradientColor,
+      },
+      question: {
+        ...screenConfigurationDraft.screenSettings.question,
+        backgroundColor: questionBackground,
+      },
+      results: {
+        ...screenConfigurationDraft.screenSettings.results,
+        accentColor: resultsAccent,
+      },
+    });
+
+    setScreenConfigurationSaving(true);
+    setScreenConfigurationError("");
+    try {
+      const response = await fetch(apiPath(`/api/presentations/${id}`), {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          idleScreenText: screenConfigurationDraft.idleScreenText,
+          generalScreenBackgroundColor: generalBackground,
+          generalScreenFontFamily: screenConfigurationDraft.generalScreenFontFamily,
+          generalScreenFontSize: screenConfigurationDraft.generalScreenFontSize,
+          screenSettings,
+        }),
+      });
+      const data = (await response.json()) as PresenterPayload | { error: string };
+      if (!response.ok || "error" in data) {
+        throw new Error("error" in data ? data.error : "Scherminstellingen konden niet worden opgeslagen.");
+      }
+
+      const nextConfiguration = createScreenConfiguration(data.presentation);
+      setPayload(data);
+      setScreenConfigurationDraft(nextConfiguration);
+      setScreenConfigurationDirty(false);
+      screenConfigurationDirtyRef.current = false;
+      loadedScreenConfigurationVersionRef.current = `${data.presentation.id}:${data.presentation.updatedAt}`;
+      setNotice("Scherminstellingen opgeslagen");
+      window.setTimeout(() => setNotice(""), 1800);
+    } catch (caught) {
+      setScreenConfigurationError(
+        caught instanceof Error ? caught.message : "Scherminstellingen konden niet worden opgeslagen."
+      );
+    } finally {
+      setScreenConfigurationSaving(false);
+    }
+  }
+
+  function refreshScreenConnection() {
+    void load(true);
+    setNotice("Verbindingsstatus vernieuwd");
     window.setTimeout(() => setNotice(""), 1800);
   }
 
@@ -723,28 +675,11 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
       ? "QR-code staat groot op het scherm"
       : screenView === "ranking"
         ? "Stand staat op het grote scherm"
-      : screenView === "results"
-        ? "Resultaten staan groot op het scherm"
-        : "Groot scherm toont de live vraag");
-  }
-
-  async function saveIdleScreenText(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const formData = new FormData(event.currentTarget);
-    const idleScreenText = String(formData.get("idleScreenText") ?? "");
-
-    await mutate(async () => {
-      const response = await fetch(apiPath(`/api/presentations/${id}`), {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ idleScreenText }),
-      });
-      const data = (await response.json()) as PresenterPayload | { error: string };
-      if (!response.ok || "error" in data) {
-        throw new Error("error" in data ? data.error : "Schermtekst kon niet worden opgeslagen.");
-      }
-      return data;
-    }, "Schermtekst opgeslagen");
+        : screenView === "pause"
+          ? "Pauzescherm staat op het grote scherm"
+          : screenView === "results"
+            ? "Resultaten staan groot op het scherm"
+            : "Groot scherm toont de live vraag");
   }
 
   async function toggleResults(questionId: string) {
@@ -757,6 +692,10 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
 
   async function toggleRanking() {
     await updateScreenView(payload?.presentation.screenView === "ranking" ? "question" : "ranking");
+  }
+
+  async function togglePauseScreen() {
+    await updateScreenView(payload?.presentation.screenView === "pause" ? "question" : "pause");
   }
 
   async function reset(questionId: string | null) {
@@ -1067,6 +1006,16 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
       };
     }
 
+    if (payload.presentation.screenView === "pause") {
+      return {
+        label: "Pauzescherm staat live",
+        detail: payload.presentation.screenSettings.pause.showMessage
+          ? payload.presentation.screenSettings.pause.message
+          : "Het grote scherm is zwart.",
+        tone: "zinc",
+      };
+    }
+
     if (activeQuestion) {
       return {
         label: "Vraag staat live op het grote scherm",
@@ -1090,33 +1039,10 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
         : screenState.tone === "amber"
           ? "border-amber-300/35 bg-amber-400/[0.09] text-amber-50"
           : "border-white/15 bg-white/[0.045] text-white";
-  const generalBackgroundInputValue = generalBackgroundDirty
-    ? generalBackgroundDraft
-    : persistedGeneralScreenBackgroundColor ?? DEFAULT_GENERAL_SCREEN_BACKGROUND_COLOR;
-  const normalizedGeneralBackgroundDraft = normalizeHexColor(generalBackgroundInputValue);
-  const generalBackgroundPreviewColor =
-    normalizedGeneralBackgroundDraft ?? DEFAULT_GENERAL_SCREEN_BACKGROUND_COLOR;
-  const generalBackgroundPalette = getGeneralScreenPalette(generalBackgroundPreviewColor);
-  const generalBackgroundInvalid = Boolean(generalBackgroundInputValue.trim() && !normalizedGeneralBackgroundDraft);
-  const generalBackgroundDefault =
-    Boolean(normalizedGeneralBackgroundDraft) &&
-    normalizeGeneralScreenBackgroundColor(normalizedGeneralBackgroundDraft) === null;
-  const generalFontFamilyInputValue = resolveGeneralScreenFontFamily(
-    generalTypographyDirty
-      ? generalTypographyDraft.fontFamily
-      : persistedGeneralScreenFontFamily ?? DEFAULT_GENERAL_SCREEN_FONT_FAMILY
-  );
-  const generalFontSizeInputValue = resolveGeneralScreenFontSize(
-    generalTypographyDirty
-      ? generalTypographyDraft.fontSize
-      : persistedGeneralScreenFontSize ?? DEFAULT_GENERAL_SCREEN_FONT_SIZE
-  );
-  const generalFontOption = getGeneralScreenFontOption(generalFontFamilyInputValue);
-  const generalPreviewHeadingSize = Math.max(18, Math.round(generalFontSizeInputValue / 4));
-  const generalPreviewMetaSize = Math.max(10, Math.round(generalFontSizeInputValue / 10));
-  const generalTypographyDefault =
-    normalizeGeneralScreenFontFamily(generalFontFamilyInputValue) === null &&
-    normalizeGeneralScreenFontSize(generalFontSizeInputValue) === null;
+  const screenLastSeenMs = payload.presentation.screenLastSeenAt
+    ? Date.parse(payload.presentation.screenLastSeenAt)
+    : Number.NaN;
+  const screenConnected = Number.isFinite(screenLastSeenMs) && nowMs - screenLastSeenMs < 25_000;
 
   return (
     <main className={`liquid-app min-h-screen text-white ${presenterTab === "regie" ? "pb-28 md:pb-40" : activeQuestion ? "pb-56 md:pb-40" : ""}`}>
@@ -1376,6 +1302,19 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
                         <Trophy aria-hidden className="h-4 w-4" />
                         {payload.presentation.screenView === "ranking" ? "Sluit stand" : rankingLabel}
                       </button>
+                      <button
+                        className={`col-span-2 inline-flex items-center justify-center gap-2 rounded-lg border px-3 py-3 text-sm font-bold disabled:opacity-60 ${
+                          payload.presentation.screenView === "pause"
+                            ? "border-white/25 bg-white text-zinc-950 hover:bg-zinc-100"
+                            : "border-zinc-600 bg-zinc-900 text-white hover:bg-zinc-800"
+                        }`}
+                        disabled={saving}
+                        onClick={togglePauseScreen}
+                        type="button"
+                      >
+                        <PauseCircle aria-hidden className="h-4 w-4" />
+                        {payload.presentation.screenView === "pause" ? "Sluit pauzescherm" : "Pauzescherm"}
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -1503,6 +1442,10 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
                     <p className="mt-1 text-sm font-semibold text-zinc-400">
                       Zelfde beeld als in de zaal
                     </p>
+                    <p className={`mt-2 inline-flex items-center gap-2 text-xs font-black ${screenConnected ? "text-emerald-200" : "text-amber-200"}`}>
+                      <span className={`h-2 w-2 rounded-full ${screenConnected ? "bg-emerald-300" : "bg-amber-300"}`} />
+                      {screenConnected ? "Scherm verbonden" : "Open het scherm om te verbinden"}
+                    </p>
                   </div>
                   <a
                     className="inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm font-bold text-white hover:bg-zinc-800"
@@ -1519,7 +1462,7 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
                     <iframe
                       className="pointer-events-none absolute left-0 top-0 h-[400%] w-[400%] origin-top-left border-0"
                       key={payload.presentation.code}
-                      src={screenLink}
+                      src={`${screenLink}?embedded=1`}
                       style={{ transform: "scale(0.25)" }}
                       title="Live preview van het grote scherm"
                     />
@@ -1756,275 +1699,24 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
               </div>
             </article>
 
-            <article className={`${presenterTab === "instellingen" ? "" : "hidden"} rounded-lg border border-zinc-300 bg-white p-5 shadow-sm`}>
-              <h2 className="mb-2 text-lg font-bold">Groot scherm bediening</h2>
-              <p className="mb-4 text-sm text-zinc-600">
-                Open deze vaste URL op de laptop bij de beamer en stuur de inhoud vanaf hier.
-              </p>
-              <div className="mb-4 rounded-lg bg-zinc-100 px-3 py-2 text-sm text-zinc-700">
-                <span className="block font-semibold">Scherm-URL</span>
-                <span className="block break-all font-mono text-xs">{screenLink}</span>
-              </div>
-              <div className="grid gap-2">
-                <button
-                  className={`inline-flex w-full items-center justify-center gap-2 rounded-lg px-4 py-3 font-bold transition disabled:opacity-60 ${
-                    payload.presentation.screenView === "question"
-                      ? "bg-zinc-900 text-white hover:bg-zinc-700"
-                      : "border border-zinc-300 bg-white text-zinc-950 hover:bg-zinc-50"
-                  }`}
-                  disabled={saving}
-                  onClick={() => updateScreenView("question")}
-                  type="button"
-                >
-                  <Monitor aria-hidden className="h-5 w-5" />
-                  Toon live vraag
-                </button>
-                <button
-                  className={`inline-flex w-full items-center justify-center gap-2 rounded-lg px-4 py-3 font-bold transition disabled:opacity-60 ${
-                    payload.presentation.screenView === "qr"
-                      ? "bg-zinc-900 text-white hover:bg-zinc-700"
-                      : "bg-emerald-800 text-white hover:bg-emerald-900"
-                  }`}
-                  disabled={saving}
-                  onClick={() => updateScreenView("qr")}
-                  type="button"
-                >
-                  <QrCodeIcon aria-hidden className="h-5 w-5" />
-                  Toon QR groot
-                </button>
-                <button
-                  className={`inline-flex w-full items-center justify-center gap-2 rounded-lg px-4 py-3 font-bold transition disabled:opacity-60 ${
-                    payload.presentation.screenView === "ranking"
-                      ? "bg-zinc-900 text-white hover:bg-zinc-700"
-                      : "bg-amber-600 text-white hover:bg-amber-700"
-                  }`}
-                  disabled={saving || !payload.quizTotals.finalized}
-                  onClick={toggleRanking}
-                  type="button"
-                >
-                  <Trophy aria-hidden className="h-5 w-5" />
-                  {payload.presentation.screenView === "ranking" ? "Sluit stand" : rankingLabel}
-                </button>
-                <button
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-white px-4 py-3 font-bold hover:bg-zinc-50"
-                  onClick={() => copy(screenLink, "Groot-scherm-URL")}
-                  type="button"
-                >
-                  <Copy aria-hidden className="h-5 w-5" />
-                  Kopieer scherm-URL
-                </button>
-              </div>
-            </article>
+            {presenterTab === "instellingen" ? (
+              <ScreenSettingsPanel
+                code={payload.presentation.code}
+                configuration={screenConfigurationDraft}
+                dirty={screenConfigurationDirty}
+                error={screenConfigurationError}
+                lastSeenAt={payload.presentation.screenLastSeenAt}
+                onChange={updateScreenConfigurationDraft}
+                onDiscard={discardScreenConfigurationDraft}
+                onRefreshConnection={refreshScreenConnection}
+                onSave={saveScreenConfiguration}
+                presentationTitle={payload.presentation.title}
+                saving={screenConfigurationSaving}
+                screenConnected={screenConnected}
+                screenLink={screenLink}
+              />
+            ) : null}
 
-            <article className={`${presenterTab === "instellingen" ? "" : "hidden"} rounded-lg border border-zinc-300 bg-white p-5 shadow-sm`}>
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div>
-                  <p className="inline-flex items-center gap-2 text-xs font-black uppercase text-emerald-800">
-                    <Palette aria-hidden className="h-4 w-4" />
-                    Vormgeving
-                  </p>
-                  <h2 className="mt-1 text-lg font-black">Algemeen scherm</h2>
-                  <p className="mt-2 max-w-2xl text-sm font-semibold text-zinc-600">
-                    Deze kleur wordt gebruikt op het algemene scherm, zoals de lobby en het wachtenscherm.
-                  </p>
-                </div>
-                <span className="rounded-md bg-zinc-100 px-3 py-2 font-mono text-sm font-black text-zinc-800">
-                  {generalBackgroundPreviewColor}
-                </span>
-              </div>
-
-              <form className="mt-4 rounded-lg border border-zinc-200 bg-zinc-50 p-4" onSubmit={saveIdleScreenText}>
-                <label className="block text-sm font-black text-zinc-800" htmlFor="idle-screen-text">
-                  Naam op algemeen scherm
-                </label>
-                <p className="mt-1 text-sm font-semibold text-zinc-600">
-                  Deze tekst staat op het algemene scherm wanneer er geen vraag live is.
-                </p>
-                <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-                  <input
-                    className="min-w-0 flex-1 rounded-lg border border-zinc-300 bg-white px-3 py-3 text-sm font-bold outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
-                    defaultValue={payload.presentation.idleScreenText}
-                    id="idle-screen-text"
-                    key={payload.presentation.idleScreenText}
-                    maxLength={90}
-                    name="idleScreenText"
-                  />
-                  <button
-                    className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-800 px-3 py-3 text-sm font-bold text-white hover:bg-emerald-900 disabled:opacity-60"
-                    disabled={saving}
-                    type="submit"
-                  >
-                    <Save aria-hidden className="h-4 w-4" />
-                    Opslaan
-                  </button>
-                </div>
-              </form>
-
-              <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_320px]">
-                <section className="grid gap-4 rounded-lg border border-zinc-200 bg-zinc-50 p-4">
-                  <label className="text-sm font-black text-zinc-800" htmlFor="general-screen-background">
-                    Achtergrondkleur
-                  </label>
-                  <div className="mt-3 grid gap-3 sm:grid-cols-[72px_1fr_auto] sm:items-end">
-                    <input
-                      aria-label="Kies achtergrondkleur"
-                      className="h-12 w-full cursor-pointer rounded-lg border border-zinc-300 bg-white p-1"
-                      id="general-screen-background"
-                      onChange={(event) => updateGeneralBackgroundDraft(event.target.value)}
-                      type="color"
-                      value={generalBackgroundPreviewColor}
-                    />
-                    <label className="min-w-0 text-sm font-bold text-zinc-700" htmlFor="general-screen-background-hex">
-                      HEX
-                      <input
-                        aria-invalid={generalBackgroundInvalid}
-                        className={`mt-1 w-full rounded-lg border bg-white px-3 py-3 font-mono text-sm font-black outline-none focus:ring-2 ${
-                          generalBackgroundInvalid
-                            ? "border-rose-300 text-rose-800 focus:border-rose-600 focus:ring-rose-100"
-                            : "border-zinc-300 text-zinc-950 focus:border-emerald-700 focus:ring-emerald-100"
-                        }`}
-                        id="general-screen-background-hex"
-                        maxLength={7}
-                        onChange={(event) => updateGeneralBackgroundDraft(event.target.value)}
-                        placeholder="#09090B"
-                        spellCheck={false}
-                        value={generalBackgroundInputValue}
-                      />
-                    </label>
-                    <div
-                      aria-label={`Kleurpreview ${generalBackgroundPreviewColor}`}
-                      className="h-12 rounded-lg border border-zinc-300 shadow-inner sm:w-16"
-                      style={{ backgroundColor: generalBackgroundPreviewColor }}
-                    />
-                  </div>
-
-                  <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <p
-                      className={`text-sm font-semibold ${
-                        generalBackgroundError || generalBackgroundInvalid ? "text-rose-700" : "text-zinc-600"
-                      }`}
-                    >
-                      {generalBackgroundError ||
-                        (generalBackgroundInvalid
-                          ? "Gebruik een geldige HEX-kleur, bijvoorbeeld #00963E."
-                          : generalBackgroundSaving
-                            ? "Achtergrondkleur opslaan..."
-                            : generalBackgroundDefault
-                              ? `Standaardkleur actief (${DEFAULT_GENERAL_SCREEN_BACKGROUND_COLOR})`
-                              : "Achtergrondkleur opgeslagen.")}
-                    </p>
-                    <button
-                      className="inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-bold hover:bg-zinc-50 disabled:opacity-50"
-                      disabled={generalBackgroundSaving}
-                      onClick={restoreDefaultGeneralBackground}
-                      type="button"
-                    >
-                      <RotateCcw aria-hidden className="h-4 w-4" />
-                      Standaard herstellen
-                    </button>
-                  </div>
-
-                  <div className="border-t border-zinc-200 pt-4">
-                    <label className="text-sm font-black text-zinc-800" htmlFor="general-screen-font-family">
-                      Lettertype
-                    </label>
-                    <select
-                      className="mt-2 w-full rounded-lg border border-zinc-300 bg-white px-3 py-3 text-sm font-bold outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
-                      id="general-screen-font-family"
-                      onChange={(event) => updateGeneralTypographyDraft({ fontFamily: event.target.value })}
-                      value={generalFontFamilyInputValue}
-                    >
-                      {GENERAL_SCREEN_FONT_OPTIONS.map((option) => (
-                        <option key={option.id} value={option.id}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <div className="flex items-center justify-between gap-3">
-                      <label className="text-sm font-black text-zinc-800" htmlFor="general-screen-font-size">
-                        Lettergrootte
-                      </label>
-                      <span className="rounded-md bg-white px-2 py-1 font-mono text-xs font-black text-zinc-700">
-                        {generalFontSizeInputValue}px
-                      </span>
-                    </div>
-                    <input
-                      className="mt-3 w-full accent-emerald-800"
-                      id="general-screen-font-size"
-                      max={MAX_GENERAL_SCREEN_FONT_SIZE}
-                      min={MIN_GENERAL_SCREEN_FONT_SIZE}
-                      onChange={(event) => updateGeneralTypographyDraft({ fontSize: event.target.value })}
-                      step={4}
-                      type="range"
-                      value={generalFontSizeInputValue}
-                    />
-                    <div className="mt-1 flex justify-between text-xs font-bold text-zinc-500">
-                      <span>Kleiner</span>
-                      <span>Groter</span>
-                    </div>
-                    <p className="mt-3 text-sm font-semibold text-zinc-600">
-                      {generalTypographyError ||
-                        (generalTypographySaving
-                          ? "Lettertype opslaan..."
-                          : generalTypographyDefault
-                            ? "Standaard lettertype en grootte actief."
-                            : "Lettertype opgeslagen.")}
-                    </p>
-                  </div>
-                </section>
-
-                <section className="rounded-lg border border-zinc-200 bg-white p-3">
-                  <p className="text-xs font-black uppercase text-zinc-500">Preview algemeen scherm</p>
-                  <div
-                    className="mt-3 grid aspect-video place-items-center rounded-lg border p-5 text-center"
-                    style={{
-                      backgroundColor: generalBackgroundPalette.background,
-                      borderColor: generalBackgroundPalette.border,
-                      color: generalBackgroundPalette.foreground,
-                      fontFamily: generalFontOption.css,
-                    }}
-                  >
-                    <div>
-                      <p
-                        className="font-black uppercase"
-                        style={{
-                          color: generalBackgroundPalette.subtle,
-                          fontSize: `${generalPreviewMetaSize}px`,
-                        }}
-                      >
-                        Sessie Interactief
-                      </p>
-                      <h3
-                        className="mt-2 font-black leading-tight"
-                        style={{ fontSize: `${generalPreviewHeadingSize}px` }}
-                      >
-                        {payload.presentation.idleScreenText || payload.presentation.title}
-                      </h3>
-                      <p
-                        className="mt-2 font-semibold"
-                        style={{
-                          color: generalBackgroundPalette.muted,
-                          fontSize: `${generalPreviewMetaSize}px`,
-                        }}
-                      >
-                        {payload.presentation.code}
-                      </p>
-                    </div>
-                  </div>
-                </section>
-              </div>
-            </article>
-
-            <article className={`${presenterTab === "instellingen" ? "" : "hidden"} rounded-lg border border-zinc-300 bg-white p-5 shadow-sm`}>
-              <h2 className="mb-4 text-lg font-bold">QR voor deelnemers</h2>
-              <QrCode label={joinLink || payload.presentation.code} value={joinLink || payload.presentation.code} />
-              <div className="mt-4 rounded-lg bg-zinc-100 px-3 py-2 font-mono text-lg font-black">
-                {payload.presentation.code}
-              </div>
-            </article>
 
             <form className={`${presenterTab === "vragen" ? "" : "hidden"} rounded-lg border border-zinc-300 bg-white p-5 shadow-sm`} onSubmit={createQuestion}>
               <h2 className="mb-4 text-lg font-bold">Vraag toevoegen</h2>
@@ -2462,6 +2154,70 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
           className="glass-toolbar fixed inset-x-0 bottom-0 z-50 border-x-0 border-b-0 px-2 pb-2 pt-2 text-white md:hidden"
         >
           <div className="mx-auto max-w-xl">
+            {mobileMoreOpen ? (
+              <div className="mb-2 grid grid-cols-3 gap-1.5 rounded-lg border border-white/10 bg-zinc-950/95 p-2 shadow-2xl backdrop-blur-xl">
+                <button
+                  className="inline-flex min-h-12 flex-col items-center justify-center gap-1 rounded-lg bg-white/[0.07] px-2 py-2 text-[11px] font-black text-white"
+                  onClick={() => {
+                    setMobileMoreOpen(false);
+                    void showGeneralScreen();
+                  }}
+                  type="button"
+                >
+                  <Monitor aria-hidden className="h-4 w-4" />
+                  Algemeen
+                </button>
+                <button
+                  className="inline-flex min-h-12 flex-col items-center justify-center gap-1 rounded-lg bg-white/[0.07] px-2 py-2 text-[11px] font-black text-white"
+                  onClick={() => {
+                    setMobileMoreOpen(false);
+                    void updateScreenView("qr");
+                  }}
+                  type="button"
+                >
+                  <QrCodeIcon aria-hidden className="h-4 w-4" />
+                  QR-code
+                </button>
+                <button
+                  className={`inline-flex min-h-12 flex-col items-center justify-center gap-1 rounded-lg px-2 py-2 text-[11px] font-black ${
+                    payload.presentation.screenView === "pause"
+                      ? "bg-white text-zinc-950"
+                      : "bg-white/[0.07] text-white"
+                  }`}
+                  onClick={() => {
+                    setMobileMoreOpen(false);
+                    void togglePauseScreen();
+                  }}
+                  type="button"
+                >
+                  <PauseCircle aria-hidden className="h-4 w-4" />
+                  Pauze
+                </button>
+                <button
+                  className="inline-flex min-h-12 flex-col items-center justify-center gap-1 rounded-lg bg-white/[0.07] px-2 py-2 text-[11px] font-black text-white disabled:opacity-40"
+                  disabled={!payload.quizTotals.finalized}
+                  onClick={() => {
+                    setMobileMoreOpen(false);
+                    void toggleRanking();
+                  }}
+                  type="button"
+                >
+                  <Trophy aria-hidden className="h-4 w-4" />
+                  Stand
+                </button>
+                <button
+                  className="col-span-2 inline-flex min-h-12 items-center justify-center gap-2 rounded-lg bg-white/[0.07] px-3 py-2 text-xs font-black text-white"
+                  onClick={() => {
+                    setMobileMoreOpen(false);
+                    setPresenterTab("instellingen");
+                  }}
+                  type="button"
+                >
+                  <Settings aria-hidden className="h-4 w-4" />
+                  Scherminstellingen
+                </button>
+              </div>
+            ) : null}
             <div className="mb-2 flex items-center justify-between gap-3 px-1">
               <p className="min-w-0 truncate text-xs font-black uppercase text-zinc-600">
                 {activeQuestion ? "Live vraag" : screenViewLabel(payload.presentation.screenView)}
@@ -2507,8 +2263,13 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
                 Volgende
               </button>
               <button
-                className="inline-flex min-h-12 flex-col items-center justify-center gap-1 rounded-lg border border-zinc-300 bg-white px-2 py-2 text-[11px] font-black text-zinc-800"
-                onClick={() => setPresenterTab("instellingen")}
+                aria-expanded={mobileMoreOpen}
+                className={`inline-flex min-h-12 flex-col items-center justify-center gap-1 rounded-lg border px-2 py-2 text-[11px] font-black ${
+                  mobileMoreOpen
+                    ? "border-white bg-white text-zinc-950"
+                    : "border-zinc-300 bg-white text-zinc-800"
+                }`}
+                onClick={() => setMobileMoreOpen((current) => !current)}
                 type="button"
               >
                 <Settings aria-hidden className="h-4 w-4" />
@@ -2605,6 +2366,19 @@ export default function PresenterDashboard({ id }: PresenterDashboardProps) {
               >
                 <Monitor aria-hidden className="h-4 w-4" />
                 Algemeen
+              </button>
+              <button
+                className={`inline-flex items-center justify-center gap-1.5 rounded-lg border px-2 py-2 text-xs font-bold disabled:opacity-60 md:text-sm ${
+                  payload.presentation.screenView === "pause"
+                    ? "border-white bg-white text-zinc-950"
+                    : "border-zinc-700 bg-zinc-900 text-white hover:bg-zinc-800"
+                }`}
+                disabled={saving}
+                onClick={togglePauseScreen}
+                type="button"
+              >
+                <PauseCircle aria-hidden className="h-4 w-4" />
+                Pauze
               </button>
               <button
                 className={`inline-flex items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-xs font-bold disabled:opacity-60 md:text-sm ${

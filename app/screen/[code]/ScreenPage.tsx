@@ -10,10 +10,80 @@ import {
   resolveGeneralScreenFontSize,
 } from "@/lib/generalScreenAppearance";
 import { getQuestionTimingState } from "@/lib/questionTiming";
+import {
+  createScreenConfiguration,
+  hexToRgba,
+  type PresentationScreenSettings,
+  type ScreenConfiguration,
+  type ScreenPreviewView,
+} from "@/lib/screenSettings";
 
 type ScreenPageProps = {
   code: string;
+  disableHeartbeat: boolean;
+  preview: {
+    view: ScreenPreviewView;
+    configuration: ScreenConfiguration | null;
+    title: string;
+  } | null;
 };
+
+function previewQuestion(): QuestionResult {
+  return {
+    id: "preview-question",
+    type: "multiple",
+    kind: "question",
+    prompt: "Hoe ervaar je deze bijeenkomst?",
+    description: "",
+    content: {},
+    status: "open",
+    position: 1,
+    finalized: false,
+    answerCount: 18,
+    correctCount: 0,
+    correctPercentage: 0,
+    options: [
+      { id: "preview-a", label: "Heel waardevol", position: 1, isCorrect: false, count: 10, percentage: 56 },
+      { id: "preview-b", label: "Goed", position: 2, isCorrect: false, count: 6, percentage: 33 },
+      { id: "preview-c", label: "Kan beter", position: 3, isCorrect: false, count: 2, percentage: 11 },
+    ],
+    responses: [],
+  };
+}
+
+function createPreviewSession(
+  code: string,
+  title: string,
+  configurationInput: ScreenConfiguration | null
+): PublicSessionPayload {
+  const configuration =
+    configurationInput ?? createScreenConfiguration({ idleScreenText: title, title });
+
+  return {
+    stateVersion: "preview",
+    statusVersion: "preview",
+    presentation: {
+      id: "preview",
+      title: title || "Sessie Interactief",
+      code,
+      presentationType: "interactive",
+      workflowStatus: "published",
+      idleScreenText: configuration.idleScreenText,
+      generalScreenBackgroundColor: configuration.generalScreenBackgroundColor,
+      generalScreenFontFamily: configuration.generalScreenFontFamily,
+      generalScreenFontSize: configuration.generalScreenFontSize,
+      screenSettings: configuration.screenSettings,
+    },
+    screenView: "question",
+    activeQuestion: null,
+    screenQuestion: null,
+    participantLabel: null,
+    participantResult: null,
+    leaderboard: [],
+    quizTotals: { total: 6, finalized: 4, participants: 5 },
+    totals: { questions: 6, answers: 18 },
+  };
+}
 
 function optionLetter(position: number, fallbackIndex: number) {
   const index = Math.max((position || fallbackIndex + 1) - 1, 0);
@@ -71,7 +141,15 @@ function screenPollDelayMs(session: PublicSessionPayload | null) {
   return 3000;
 }
 
-function SpotlightResults({ question }: { question: QuestionResult }) {
+function SpotlightResults({
+  question,
+  settings,
+}: {
+  question: QuestionResult;
+  settings: PresentationScreenSettings["results"];
+}) {
+  const compactDensity = settings.density === "compact";
+
   if (question.type === "multiple" || question.type === "quiz") {
     const winner = question.options.reduce(
       (top, option) => (option.count > top.count ? option : top),
@@ -92,9 +170,15 @@ function SpotlightResults({ question }: { question: QuestionResult }) {
     if (question.type === "quiz") {
       return (
         <div className="grid items-stretch gap-6 lg:grid-cols-[0.85fr_1.15fr]">
-          <section className="stage-glass flex h-full flex-col rounded-lg border-emerald-300/30 bg-emerald-400/[0.08] p-7 text-white">
-            <p className="text-sm font-black uppercase text-emerald-200">Quizuitslag</p>
-            <p className="mt-5 text-8xl font-black leading-none text-emerald-200 md:text-9xl">
+          <section
+            className={`stage-glass flex h-full flex-col rounded-lg text-white ${compactDensity ? "p-5" : "p-7"}`}
+            style={{
+              borderColor: hexToRgba(settings.accentColor, 0.48),
+              backgroundColor: hexToRgba(settings.accentColor, 0.1),
+            }}
+          >
+            <p className="text-sm font-black uppercase" style={{ color: settings.accentColor }}>Quizuitslag</p>
+            <p className="mt-5 text-8xl font-black leading-none md:text-9xl" style={{ color: settings.accentColor }}>
               {question.correctCount}
             </p>
             <p className="mt-4 text-2xl font-black text-zinc-100">
@@ -126,7 +210,9 @@ function SpotlightResults({ question }: { question: QuestionResult }) {
                 <div
                   className={`flex items-center rounded-lg border p-4 ${
                     option.isCorrect
-                      ? "border-emerald-300 bg-emerald-400/10 ring-2 ring-emerald-300/20"
+                      ? settings.highlightCorrectAnswer
+                        ? "border-emerald-300 bg-emerald-400/10 ring-2 ring-emerald-300/20"
+                        : "border-white/10 bg-white/[0.055]"
                       : "border-white/10 bg-white/[0.055]"
                   }`}
                   key={option.id}
@@ -136,7 +222,7 @@ function SpotlightResults({ question }: { question: QuestionResult }) {
                       {optionLetter(option.position, index)}
                     </span>
                     <span className="min-w-0 flex-1">{option.label}</span>
-                    {option.isCorrect ? (
+                    {option.isCorrect && settings.highlightCorrectAnswer ? (
                       <span className="shrink-0 rounded-md bg-emerald-400/15 px-2 py-1 text-xs font-black uppercase text-emerald-200">
                         Juist
                       </span>
@@ -151,40 +237,49 @@ function SpotlightResults({ question }: { question: QuestionResult }) {
     }
 
     return (
-      <div className="grid gap-6 lg:grid-cols-[0.8fr_1.2fr]">
-        <section className="stage-glass rounded-lg border-emerald-300/30 bg-emerald-400/[0.08] p-7 text-white">
-          <p className="text-sm font-black uppercase text-emerald-200">Hoogste score</p>
-          <h3 className="mt-4 text-4xl font-black leading-tight md:text-5xl">
+      <div className="grid gap-4 lg:grid-cols-[0.8fr_1.2fr]">
+        <section
+          className="stage-glass rounded-lg p-5 text-white"
+          style={{
+            borderColor: hexToRgba(settings.accentColor, 0.48),
+            backgroundColor: hexToRgba(settings.accentColor, 0.1),
+          }}
+        >
+          <p className="text-sm font-black uppercase" style={{ color: settings.accentColor }}>Hoogste score</p>
+          <h3 className="mt-3 text-3xl font-black leading-tight md:text-4xl">
             {winner.label || "Nog geen keuze"}
           </h3>
-          <p className="mt-5 text-7xl font-black text-emerald-200">{winner.percentage}%</p>
-          <p className="mt-3 text-xl font-bold text-zinc-300">
+          <p className="mt-4 text-6xl font-black" style={{ color: settings.accentColor }}>{winner.percentage}%</p>
+          <p className="mt-2 text-lg font-bold text-zinc-300">
             {winner.count} van {question.answerCount} {answerLabel(question.answerCount)}
           </p>
         </section>
 
-        <section className="stage-glass rounded-lg p-6 text-white">
-          <div className="space-y-5">
+        <section className="stage-glass rounded-lg p-4 text-white">
+          <div className="space-y-3">
             {question.options.map((option, index) => (
               <div key={option.id} className="space-y-2">
                 <div className="flex items-end justify-between gap-6">
-                  <h3 className="inline-flex items-center gap-3 text-2xl font-black leading-tight">
+                  <h3 className="inline-flex items-center gap-3 text-xl font-black leading-tight">
                     <span className="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-black/55 text-base font-black text-white ring-1 ring-white/10">
                       {optionLetter(option.position, index)}
                     </span>
                     {option.label}
                   </h3>
                   <div className="text-right">
-                    <p className="text-4xl font-black">{option.percentage}%</p>
+                    <p className="text-3xl font-black">{option.percentage}%</p>
                     <p className="text-sm font-bold text-zinc-300">
                       {option.count} {answerLabel(option.count)}
                     </p>
                   </div>
                 </div>
-                <div className="h-7 overflow-hidden rounded-full bg-white/10 shadow-inner">
+                <div className="h-5 overflow-hidden rounded-full bg-white/10 shadow-inner">
                   <div
                     className={`h-full rounded-full ${accents[index % accents.length]} transition-all duration-500`}
-                    style={{ width: `${option.percentage}%` }}
+                    style={{
+                      backgroundColor: settings.accentColor,
+                      width: `${option.percentage}%`,
+                    }}
                   />
                 </div>
               </div>
@@ -196,7 +291,7 @@ function SpotlightResults({ question }: { question: QuestionResult }) {
   }
 
   const responses = question.responses.filter((response) => response.textAnswer);
-  const isCompact = responses.length > 16;
+  const isCompact = compactDensity || responses.length > 16;
   const visibleResponses = responses.slice(0, isCompact ? 54 : 24);
   const cardStyles = [
     "border-emerald-300/25 bg-emerald-400/10",
@@ -229,6 +324,7 @@ function SpotlightResults({ question }: { question: QuestionResult }) {
             isCompact ? "p-3" : "p-5"
           } ${cardStyles[index % cardStyles.length]}`}
           key={response.id}
+          style={{ borderColor: hexToRgba(settings.accentColor, 0.32) }}
         >
           <p className={isCompact ? "mb-1 text-xs font-black uppercase text-zinc-300" : "mb-3 text-sm font-black uppercase text-zinc-300"}>
             {response.participantName}
@@ -254,16 +350,36 @@ function SpotlightResults({ question }: { question: QuestionResult }) {
   );
 }
 
-function LeaderboardScreen({ session }: { session: PublicSessionPayload }) {
+function LeaderboardScreen({
+  session,
+  settings,
+  preview,
+}: {
+  session: PublicSessionPayload;
+  settings: PresentationScreenSettings["ranking"];
+  preview: boolean;
+}) {
   const isFinal =
     session.quizTotals.total > 0 && session.quizTotals.finalized >= session.quizTotals.total;
-  const topEntries = session.leaderboard.slice(0, 3);
-  const otherEntries = session.leaderboard.slice(3, 27);
+  const previewEntries = [
+    { participantId: "preview-1", label: "Sophie", rank: 1, score: 4, answered: 4 },
+    { participantId: "preview-2", label: "Deelnemer 8", rank: 2, score: 3, answered: 4 },
+    { participantId: "preview-3", label: "David", rank: 3, score: 3, answered: 4 },
+    { participantId: "preview-4", label: "Deelnemer 3", rank: 4, score: 2, answered: 4 },
+    { participantId: "preview-5", label: "Noor", rank: 5, score: 2, answered: 4 },
+  ];
+  const entries = (session.leaderboard.length ? session.leaderboard : preview ? previewEntries : []).slice(
+    0,
+    settings.visibleEntries
+  );
+  const topEntries = settings.emphasizeTopThree ? entries.slice(0, 3) : [];
+  const otherEntries = settings.emphasizeTopThree ? entries.slice(3) : entries;
+  const hasScores = preview || session.quizTotals.finalized > 0;
 
   return (
     <main className="liquid-stage min-h-screen bg-zinc-950 text-white">
-      <div className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-6 px-6 py-6">
-        <header className="flex flex-col gap-4 border-b border-zinc-700 pb-5 lg:flex-row lg:items-end lg:justify-between">
+      <div className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-4 px-5 py-4">
+        <header className="flex flex-col gap-3 border-b border-zinc-700 pb-3 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="text-sm font-bold uppercase text-emerald-300">Sessie Interactief</p>
             <h1 className="mt-2 text-3xl font-black md:text-5xl">{session.presentation.title}</h1>
@@ -274,7 +390,7 @@ function LeaderboardScreen({ session }: { session: PublicSessionPayload }) {
           </span>
         </header>
 
-        {!session.quizTotals.finalized || !session.leaderboard.length ? (
+        {!hasScores || !entries.length ? (
           <section className="grid flex-1 place-items-center text-center">
             <div>
               <p className="text-xl font-bold text-amber-200">
@@ -288,27 +404,28 @@ function LeaderboardScreen({ session }: { session: PublicSessionPayload }) {
             </div>
           </section>
         ) : (
-          <section className="flex flex-1 flex-col gap-6">
-            <div className="stage-glass rounded-lg p-6 md:p-8">
+          <section className="flex flex-1 flex-col gap-4">
+            <div className="stage-glass rounded-lg p-4 md:p-5">
               <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
                 <div>
                   <p className="text-sm font-black uppercase text-amber-200">
                     {session.quizTotals.finalized} van {session.quizTotals.total} quizvragen afgesloten
                   </p>
-                  <h2 className="mt-2 text-4xl font-black leading-tight md:text-6xl">
+                  <h2 className="mt-2 text-3xl font-black leading-tight md:text-5xl">
                     {isFinal ? "Eindstand" : "Stand na de laatste quizvraag"}
                   </h2>
                 </div>
-                <p className="text-2xl font-black text-zinc-300">
+                <p className="text-xl font-black text-zinc-300">
                   {session.quizTotals.participants} {participantLabel(session.quizTotals.participants)}
                 </p>
               </div>
             </div>
 
-            <div className="grid gap-4 lg:grid-cols-3">
-              {topEntries.map((entry) => (
+            {topEntries.length ? (
+              <div className="grid gap-4 lg:grid-cols-3">
+                {topEntries.map((entry) => (
                 <article
-                  className={`rounded-lg border p-6 shadow-2xl ${
+                  className={`rounded-lg border p-4 shadow-2xl ${
                     entry.rank === 1
                       ? "border-amber-300 bg-amber-300/15 text-amber-50"
                       : "border-white/15 bg-white/[0.07] text-white"
@@ -316,32 +433,43 @@ function LeaderboardScreen({ session }: { session: PublicSessionPayload }) {
                   key={entry.participantId}
                 >
                   <p className="text-sm font-black uppercase">Plaats {entry.rank}</p>
-                  <h3 className="mt-3 text-3xl font-black">{entry.label}</h3>
-                  <p className="mt-5 text-6xl font-black leading-none">{entry.score}</p>
-                  <p className="mt-2 text-xl font-black">{pointLabel(entry.score)}</p>
-                  <p className="mt-4 text-sm font-bold opacity-75">
+                  <h3 className="mt-2 text-2xl font-black">{entry.label}</h3>
+                  {settings.showScores ? (
+                    <>
+                      <p className="mt-3 text-5xl font-black leading-none">{entry.score}</p>
+                      <p className="mt-1 text-lg font-black">{pointLabel(entry.score)}</p>
+                    </>
+                  ) : null}
+                  <p className="mt-3 text-sm font-bold opacity-75">
                     {entry.answered} van {session.quizTotals.finalized} beantwoord
                   </p>
                 </article>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : null}
 
-            <section className="stage-glass rounded-lg p-5 text-white">
-              <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-                {otherEntries.map((entry) => (
+            {otherEntries.length ? (
+              <section className="stage-glass rounded-lg p-3 text-white">
+                <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+                  {otherEntries.map((entry) => (
                   <div
-                    className="grid grid-cols-[64px_1fr_auto] items-center gap-3 rounded-lg border border-white/10 bg-white/[0.055] px-4 py-3"
+                    className="grid grid-cols-[56px_1fr_auto] items-center gap-3 rounded-lg border border-white/10 bg-white/[0.055] px-3 py-2"
                     key={entry.participantId}
                   >
                     <span className="text-2xl font-black text-zinc-400">#{entry.rank}</span>
                     <span className="min-w-0 truncate text-lg font-black">{entry.label}</span>
-                    <span className="rounded-md bg-black/50 px-3 py-2 font-black text-white ring-1 ring-white/10">
-                      {entry.score} {pointLabel(entry.score)}
-                    </span>
+                    {settings.showScores ? (
+                      <span className="rounded-md bg-black/50 px-3 py-2 font-black text-white ring-1 ring-white/10">
+                        {entry.score} {pointLabel(entry.score)}
+                      </span>
+                    ) : (
+                      <span />
+                    )}
                   </div>
-                ))}
-              </div>
-            </section>
+                  ))}
+                </div>
+              </section>
+            ) : null}
           </section>
         )}
       </div>
@@ -368,11 +496,13 @@ function ResponsePulse({ count, questionType }: { count: number; questionType: Q
   );
 }
 
-export default function ScreenPage({ code }: ScreenPageProps) {
+export default function ScreenPage({ code, disableHeartbeat, preview }: ScreenPageProps) {
   const normalizedCode = useMemo(() => code.replace(/[^a-z0-9]/gi, "").toUpperCase(), [code]);
-  const [session, setSession] = useState<PublicSessionPayload | null>(null);
+  const [session, setSession] = useState<PublicSessionPayload | null>(() =>
+    preview ? createPreviewSession(normalizedCode, preview.title, preview.configuration) : null
+  );
   const [origin] = useState(() => (typeof window === "undefined" ? "" : window.location.origin));
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => !preview);
   const [error, setError] = useState("");
   const [nowMs, setNowMs] = useState(() => Date.now());
   const lastStatusVersionRef = useRef("");
@@ -430,14 +560,22 @@ export default function ScreenPage({ code }: ScreenPageProps) {
   }, [load, normalizedCode]);
 
   useEffect(() => {
+    if (preview) {
+      return;
+    }
+
     const timer = window.setTimeout(() => {
       void load();
     }, 0);
 
     return () => window.clearTimeout(timer);
-  }, [load]);
+  }, [load, preview]);
 
   useEffect(() => {
+    if (preview) {
+      return;
+    }
+
     let cancelled = false;
     let timer: number | undefined;
 
@@ -456,12 +594,28 @@ export default function ScreenPage({ code }: ScreenPageProps) {
         window.clearTimeout(timer);
       }
     };
-  }, [checkForUpdates]);
+  }, [checkForUpdates, preview]);
 
   useEffect(() => {
     const timer = window.setInterval(() => setNowMs(Date.now()), 200);
     return () => window.clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    if (preview || disableHeartbeat) {
+      return;
+    }
+
+    const sendHeartbeat = () => {
+      void fetch(`/api/session/${normalizedCode}/screen-heartbeat`, {
+        method: "POST",
+        keepalive: true,
+      }).catch(() => undefined);
+    };
+    sendHeartbeat();
+    const timer = window.setInterval(sendHeartbeat, 10_000);
+    return () => window.clearInterval(timer);
+  }, [disableHeartbeat, normalizedCode, preview]);
 
   if (loading && !session) {
     return (
@@ -485,9 +639,30 @@ export default function ScreenPage({ code }: ScreenPageProps) {
     );
   }
 
-  const activeQuestion = session.activeQuestion;
-  const resultsQuestion = session.screenQuestion ?? activeQuestion;
-  const idleScreenText = session.presentation.idleScreenText || "Sessie Interactief";
+  const configuration =
+    preview?.configuration ??
+    createScreenConfiguration({
+      ...session.presentation,
+      screenSettings: session.presentation.screenSettings,
+    });
+  const screenSettings = configuration.screenSettings;
+  const screenView = preview
+    ? preview.view === "general"
+      ? "question"
+      : preview.view
+    : session.screenView;
+  const placeholderQuestion = previewQuestion();
+  const activeQuestion = preview
+    ? preview.view === "question"
+      ? session.activeQuestion ?? placeholderQuestion
+      : preview.view === "general"
+        ? null
+        : session.activeQuestion
+    : session.activeQuestion;
+  const resultsQuestion = preview?.view === "results"
+    ? session.screenQuestion ?? session.activeQuestion ?? placeholderQuestion
+    : session.screenQuestion ?? activeQuestion;
+  const idleScreenText = configuration.idleScreenText || "Sessie Interactief";
   const activeQuestionTiming =
     activeQuestion?.type === "quiz" ? getQuestionTimingState(activeQuestion.content, "quiz", nowMs) : null;
   const showActiveQuizTimerBar = Boolean(
@@ -500,16 +675,21 @@ export default function ScreenPage({ code }: ScreenPageProps) {
   const activeCorrectOption =
     activeQuestion?.type === "quiz" ? activeQuestion.options.find((option) => option.isCorrect) ?? null : null;
   const compactOpenResults =
-    resultsQuestion?.type === "open" &&
-    resultsQuestion.responses.filter((response) => response.textAnswer).length > 16;
-  const generalScreenPalette = getGeneralScreenPalette(session.presentation.generalScreenBackgroundColor);
-  const generalScreenFont = getGeneralScreenFontOption(session.presentation.generalScreenFontFamily);
-  const generalScreenFontSize = resolveGeneralScreenFontSize(session.presentation.generalScreenFontSize);
+    screenSettings.results.density === "compact" ||
+    (resultsQuestion?.type === "open" &&
+      resultsQuestion.responses.filter((response) => response.textAnswer).length > 16);
+  const generalScreenPalette = getGeneralScreenPalette(configuration.generalScreenBackgroundColor);
+  const generalScreenFont = getGeneralScreenFontOption(configuration.generalScreenFontFamily);
+  const generalScreenFontSize = resolveGeneralScreenFontSize(configuration.generalScreenFontSize);
   const generalScreenStyle = {
     backgroundColor: generalScreenPalette.background,
+    backgroundImage: screenSettings.general.useGradient
+      ? `radial-gradient(circle at 22% 28%, ${hexToRgba(screenSettings.general.gradientColor, 0.68)} 0%, transparent 38%), radial-gradient(circle at 78% 72%, ${hexToRgba(screenSettings.general.gradientColor, 0.48)} 0%, transparent 42%)`
+      : undefined,
     color: generalScreenPalette.foreground,
     fontFamily: generalScreenFont.css,
   };
+  const questionScreenPalette = getGeneralScreenPalette(screenSettings.question.backgroundColor);
   const generalBorderStyle = { borderColor: generalScreenPalette.border };
   const generalScreenHeadingStyle = {
     color: generalScreenPalette.foreground,
@@ -524,27 +704,48 @@ export default function ScreenPage({ code }: ScreenPageProps) {
     fontSize: `${Math.max(44, Math.round(generalScreenFontSize * 0.78))}px`,
   };
 
-  if (session.screenView === "qr") {
+  if (screenView === "pause") {
+    return (
+      <main className="liquid-stage grid min-h-screen place-items-center bg-black px-8 text-center text-white">
+        {screenSettings.pause.showMessage ? (
+          <div>
+            <p className="text-sm font-black uppercase text-emerald-300">Sessie Interactief</p>
+            <h1 className="mt-5 max-w-5xl text-6xl font-black leading-tight md:text-8xl">
+              {screenSettings.pause.message || "Even pauze"}
+            </h1>
+          </div>
+        ) : null}
+      </main>
+    );
+  }
+
+  if (screenView === "qr") {
     return (
       <main className="liquid-stage min-h-screen" style={generalScreenStyle}>
         <div className="mx-auto grid min-h-screen w-full max-w-7xl grid-rows-[auto_1fr] gap-6 px-6 py-6">
-          <header
-            className="flex flex-col gap-4 border-b pb-5 lg:flex-row lg:items-end lg:justify-between"
-            style={generalBorderStyle}
-          >
-            <div>
-              <p className="text-sm font-bold uppercase" style={{ color: generalScreenPalette.subtle }}>
-                Sessie Interactief
-              </p>
-              <h1 className="mt-2 font-black" style={generalScreenTitleStyle}>
-                {session.presentation.title}
-              </h1>
-            </div>
-            <span className="inline-flex items-center gap-2 rounded-lg bg-white px-5 py-3 font-mono text-3xl font-black text-zinc-950">
-              <QrCodeIcon aria-hidden className="h-7 w-7" />
-              {session.presentation.code}
-            </span>
-          </header>
+          {screenSettings.qr.showTitle || screenSettings.qr.showSessionCode ? (
+            <header
+              className="flex flex-col gap-4 border-b pb-5 lg:flex-row lg:items-end lg:justify-between"
+              style={generalBorderStyle}
+            >
+              {screenSettings.qr.showTitle ? (
+                <div>
+                  <p className="text-sm font-bold uppercase" style={{ color: generalScreenPalette.subtle }}>
+                    Sessie Interactief
+                  </p>
+                  <h1 className="mt-2 font-black" style={generalScreenTitleStyle}>
+                    {session.presentation.title}
+                  </h1>
+                </div>
+              ) : <span />}
+              {screenSettings.qr.showSessionCode ? (
+                <span className="inline-flex items-center gap-2 rounded-lg bg-white px-5 py-3 font-mono text-3xl font-black text-zinc-950">
+                  <QrCodeIcon aria-hidden className="h-7 w-7" />
+                  {session.presentation.code}
+                </span>
+              ) : null}
+            </header>
+          ) : <div />}
 
           <section className="grid items-center gap-8 lg:grid-cols-[1fr_560px]">
             <div>
@@ -555,21 +756,28 @@ export default function ScreenPage({ code }: ScreenPageProps) {
                 className="mt-5 max-w-4xl font-black leading-tight"
                 style={generalScreenHeadingStyle}
               >
-                Scan de QR-code
+                {screenSettings.qr.welcomeText || "Scan de QR-code"}
               </h2>
               <p
                 className="mt-6 max-w-3xl text-2xl font-semibold leading-9"
                 style={{ color: generalScreenPalette.muted }}
               >
-                Of ga naar de deelnemerslink en gebruik code{" "}
-                <span className="font-mono" style={{ color: generalScreenPalette.subtle }}>
-                  {session.presentation.code}
-                </span>
-                .
+                {screenSettings.qr.showSessionCode ? (
+                  <>
+                    Of ga naar de deelnemerslink en gebruik code{" "}
+                    <span className="font-mono" style={{ color: generalScreenPalette.subtle }}>
+                      {session.presentation.code}
+                    </span>
+                    .
+                  </>
+                ) : "Open de deelnemerslink om mee te doen."}
               </p>
             </div>
             <div className="justify-self-center lg:justify-self-end">
-              <QrCode label={joinLink || session.presentation.code} size={520} value={joinLink || session.presentation.code} />
+              <QrCode
+                size={screenSettings.qr.size === "large" ? 460 : 360}
+                value={joinLink || session.presentation.code}
+              />
             </div>
           </section>
         </div>
@@ -577,15 +785,15 @@ export default function ScreenPage({ code }: ScreenPageProps) {
     );
   }
 
-  if (session.screenView === "ranking") {
-    return <LeaderboardScreen session={session} />;
+  if (screenView === "ranking") {
+    return <LeaderboardScreen preview={Boolean(preview)} session={session} settings={screenSettings.ranking} />;
   }
 
-  if (session.screenView === "results") {
+  if (screenView === "results") {
     return (
       <main className="liquid-stage min-h-screen bg-zinc-950 text-white">
-        <div className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-6 px-6 py-6">
-          <header className="flex flex-col gap-4 border-b border-zinc-700 pb-5 lg:flex-row lg:items-end lg:justify-between">
+        <div className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-4 px-5 py-4">
+          <header className="flex flex-col gap-3 border-b border-zinc-700 pb-3 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <p className="text-sm font-bold uppercase text-emerald-300">Sessie Interactief</p>
               <h1 className="mt-2 text-3xl font-black md:text-5xl">{session.presentation.title}</h1>
@@ -597,33 +805,36 @@ export default function ScreenPage({ code }: ScreenPageProps) {
           </header>
 
           {resultsQuestion ? (
-            <section className="flex flex-1 flex-col gap-6">
+            <section className="flex flex-1 flex-col gap-4">
               <div
                 className={`stage-glass rounded-lg ${
-                  compactOpenResults ? "p-5" : "p-7 md:p-9"
+                  compactOpenResults ? "p-4" : "p-4 md:p-5"
                 }`}
               >
                 <div className="mx-auto max-w-6xl">
-                  <span className="rounded-md bg-sky-300 px-2 py-1 text-xs font-black uppercase text-sky-950">
+                  <span
+                    className="rounded-md px-2 py-1 text-xs font-black uppercase text-zinc-950"
+                    style={{ backgroundColor: screenSettings.results.accentColor }}
+                  >
                     Bespreekmoment
                   </span>
                   <h2
                     className={
                       compactOpenResults
-                        ? "mt-3 text-3xl font-black leading-tight md:text-4xl"
-                        : "mt-5 text-4xl font-black leading-tight md:text-6xl"
+                        ? "mt-2 text-3xl font-black leading-tight md:text-4xl"
+                        : "mt-3 text-3xl font-black leading-tight md:text-4xl"
                     }
                   >
                     {resultsQuestion.prompt}
                   </h2>
                   <p
-                    className={`${compactOpenResults ? "mt-2 text-base" : "mt-4 text-xl"} font-bold text-zinc-300`}
+                    className="mt-2 text-base font-bold text-zinc-300"
                   >
                     {resultsQuestion.answerCount} {answerLabel(resultsQuestion.answerCount)} verzameld
                   </p>
                 </div>
               </div>
-              <SpotlightResults question={resultsQuestion} />
+              <SpotlightResults question={resultsQuestion} settings={screenSettings.results} />
             </section>
           ) : (
             <section className="grid flex-1 place-items-center text-center">
@@ -644,25 +855,36 @@ export default function ScreenPage({ code }: ScreenPageProps) {
 
   return (
     <main
-      className={`liquid-stage min-h-screen ${isGeneralQuestionScreen ? "" : "bg-zinc-950 text-white"}`}
-      style={isGeneralQuestionScreen ? generalScreenStyle : undefined}
+      className="liquid-stage min-h-screen"
+      style={
+        isGeneralQuestionScreen
+          ? generalScreenStyle
+          : {
+              backgroundColor: questionScreenPalette.background,
+              color: questionScreenPalette.foreground,
+            }
+      }
     >
       <div className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-6 px-6 py-6">
         {activeQuestion ? (
           <header
-            className={`border-b pb-5 ${isGeneralQuestionScreen ? "" : "border-zinc-700"}`}
-            style={isGeneralQuestionScreen ? generalBorderStyle : undefined}
+            className="border-b pb-5"
+            style={{ borderColor: isGeneralQuestionScreen ? generalScreenPalette.border : questionScreenPalette.border }}
           >
             <div>
               <p
-                className={`text-sm font-bold uppercase ${isGeneralQuestionScreen ? "" : "text-emerald-300"}`}
-                style={isGeneralQuestionScreen ? { color: generalScreenPalette.subtle } : undefined}
+                className="text-sm font-bold uppercase"
+                style={{ color: isGeneralQuestionScreen ? generalScreenPalette.subtle : questionScreenPalette.subtle }}
               >
                 Sessie Interactief
               </p>
               <h1
                 className={`mt-2 font-black ${isGeneralQuestionScreen ? "" : "text-3xl md:text-5xl"}`}
-                style={isGeneralQuestionScreen ? generalScreenTitleStyle : undefined}
+                style={
+                  isGeneralQuestionScreen
+                    ? generalScreenTitleStyle
+                    : { color: questionScreenPalette.foreground }
+                }
               >
                 {session.presentation.title}
               </h1>
@@ -671,13 +893,19 @@ export default function ScreenPage({ code }: ScreenPageProps) {
         ) : null}
 
         {!activeQuestion ? (
-          <section className="grid flex-1 place-items-center text-center">
-            <h2
-              className="max-w-5xl break-words font-black leading-tight"
-              style={generalScreenHeadingStyle}
-            >
-              {idleScreenText}
-            </h2>
+          <section
+            className={`grid flex-1 place-items-center ${screenSettings.general.alignment === "left" ? "text-left" : "text-center"}`}
+          >
+            <div className="w-full max-w-5xl">
+              <h2 className="break-words font-black leading-tight" style={generalScreenHeadingStyle}>
+                {idleScreenText}
+              </h2>
+              {screenSettings.general.showSessionCode ? (
+                <p className="mt-8 font-mono text-3xl font-black" style={{ color: generalScreenPalette.subtle }}>
+                  {session.presentation.code}
+                </p>
+              ) : null}
+            </div>
           </section>
         ) : activeQuestionTiming?.isCountdown ? (
           <section className="grid flex-1 place-items-center text-center">
@@ -735,7 +963,11 @@ export default function ScreenPage({ code }: ScreenPageProps) {
             }
           >
             <div
-              className={`grid min-h-[56vh] place-items-center rounded-lg border p-8 text-center md:min-h-[62vh] md:p-12 ${
+              className={`grid min-h-[56vh] place-items-center rounded-lg border p-8 md:min-h-[62vh] md:p-12 ${
+                activeQuestion.type !== "slide" && screenSettings.question.alignment === "left"
+                  ? "text-left"
+                  : "text-center"
+              } ${
                 activeQuestion.type === "slide" ? "" : "stage-glass"
               }`}
               style={
@@ -748,7 +980,11 @@ export default function ScreenPage({ code }: ScreenPageProps) {
                   : undefined
               }
             >
-              <div className="mx-auto max-w-6xl">
+              <div
+                className={`w-full ${
+                  screenSettings.question.contentWidth === "wide" ? "max-w-none" : "max-w-6xl"
+                } ${screenSettings.question.alignment === "center" ? "mx-auto" : ""}`}
+              >
                 <span
                   className={`rounded-md px-2 py-1 text-xs font-black uppercase ${
                     activeQuestion.type === "slide" ? "" : "bg-emerald-300 text-emerald-950"
@@ -774,7 +1010,9 @@ export default function ScreenPage({ code }: ScreenPageProps) {
                 </h2>
                 {activeQuestion.description ? (
                   <p
-                    className={`mx-auto mt-6 max-w-4xl whitespace-pre-line text-2xl font-semibold leading-10 ${
+                    className={`mt-6 max-w-4xl whitespace-pre-line text-2xl font-semibold leading-10 ${
+                      screenSettings.question.alignment === "center" ? "mx-auto" : ""
+                    } ${
                       activeQuestion.type === "slide" ? "" : "text-zinc-200"
                     }`}
                     style={activeQuestion.type === "slide" ? { color: generalScreenPalette.muted } : undefined}
@@ -797,7 +1035,7 @@ export default function ScreenPage({ code }: ScreenPageProps) {
                 />
               </div>
             ) : null}
-            {activeQuestion.type === "slide" ? null : (
+            {activeQuestion.type === "slide" || !screenSettings.question.showResponseCount ? null : (
               <ResponsePulse count={activeQuestion.answerCount} questionType={activeQuestion.type} />
             )}
           </section>

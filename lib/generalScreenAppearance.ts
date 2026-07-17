@@ -187,3 +187,18 @@ export function getGeneralScreenPalette(backgroundColorInput: unknown) {
     badgeForeground: useDarkText ? "#FFFFFF" : "#111827",
   };
 }
+
+export function getGeneralScreenContrastInfo(backgroundColorInput: unknown) {
+  const background = resolveGeneralScreenBackgroundColor(backgroundColorInput);
+  const luminance = relativeLuminance(background);
+  const whiteContrast = contrastRatio(1, luminance);
+  const darkContrast = contrastRatio(0.01, luminance);
+  const useDarkText = darkContrast >= whiteContrast;
+
+  return {
+    background,
+    foreground: useDarkText ? "#111827" : "#FFFFFF",
+    ratio: Math.max(whiteContrast, darkContrast),
+    passesAA: Math.max(whiteContrast, darkContrast) >= 4.5,
+  };
+}

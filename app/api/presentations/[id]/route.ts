@@ -26,6 +26,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       generalScreenBackgroundColor?: unknown;
       generalScreenFontFamily?: unknown;
       generalScreenFontSize?: unknown;
+      screenSettings?: unknown;
       title?: unknown;
       presentationType?: unknown;
       workflowStatus?: unknown;

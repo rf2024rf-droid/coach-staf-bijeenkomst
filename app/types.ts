@@ -1,5 +1,7 @@
+import type { PresentationScreenSettings } from "@/lib/screenSettings";
+
 export type QuestionType = "open" | "multiple" | "quiz" | "slide";
-export type ScreenView = "question" | "qr" | "results" | "ranking";
+export type ScreenView = "question" | "qr" | "results" | "ranking" | "pause";
 export type ModeratorRole = "admin" | "tester";
 export type AppAccountStatus = "pending" | "active" | "deactivated" | "deleted";
 export type PresentationKind = "quiz" | "interactive" | "combined";
@@ -86,6 +88,8 @@ export type PresenterPayload = {
     generalScreenBackgroundColor: string | null;
     generalScreenFontFamily: GeneralScreenFontFamily | null;
     generalScreenFontSize: number | null;
+    screenSettings: PresentationScreenSettings;
+    screenLastSeenAt: string | null;
     participantGroupStartedAt: string | null;
     participantGroupStartedCount: number | null;
     activeQuestionId: string | null;
@@ -119,6 +123,7 @@ export type PublicSessionPayload = {
     generalScreenBackgroundColor: string | null;
     generalScreenFontFamily: GeneralScreenFontFamily | null;
     generalScreenFontSize: number | null;
+    screenSettings: PresentationScreenSettings;
   };
   screenView: ScreenView;
   activeQuestion: QuestionResult | null;

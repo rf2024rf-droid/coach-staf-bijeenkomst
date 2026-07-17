@@ -14,7 +14,10 @@ export async function PATCH(request: Request, context: RouteContext) {
       questionId?: unknown;
     };
     const screenView =
-      payload.screenView === "qr" || payload.screenView === "results" || payload.screenView === "ranking"
+      payload.screenView === "qr" ||
+      payload.screenView === "results" ||
+      payload.screenView === "ranking" ||
+      payload.screenView === "pause"
         ? payload.screenView
         : "question";
     const questionId = typeof payload.questionId === "string" ? payload.questionId : null;

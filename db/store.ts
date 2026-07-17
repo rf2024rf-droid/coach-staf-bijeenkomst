@@ -8,6 +8,10 @@ import {
   resolveGeneralScreenFontFamily,
 } from "@/lib/generalScreenAppearance";
 import {
+  normalizeScreenSettings,
+  type PresentationScreenSettings,
+} from "@/lib/screenSettings";
+import {
   QUIZ_LATE_SUBMISSION_GRACE_MS,
   QUIZ_SELECTION_DEADLINE_TOLERANCE_MS,
   buildLiveQuestionContent,
@@ -16,7 +20,7 @@ import {
 
 export type QuestionType = "open" | "multiple" | "quiz" | "slide";
 export type QuestionStatus = "open" | "closed";
-export type ScreenView = "question" | "qr" | "results" | "ranking";
+export type ScreenView = "question" | "qr" | "results" | "ranking" | "pause";
 export type ModeratorRole = "admin" | "tester";
 export type AppAccountStatus = "pending" | "active" | "deactivated" | "deleted";
 export type PresentationKind = "quiz" | "interactive" | "combined";
@@ -36,6 +40,8 @@ export type PresentationRow = {
   general_screen_background_color: string | null;
   general_screen_font_family: string | null;
   general_screen_font_size: number | null;
+  screen_settings_json: string | null;
+  screen_last_seen_at: string | null;
   participant_group_started_at: string | null;
   participant_group_started_count: number | null;
   active_question_id: string | null;
@@ -180,6 +186,8 @@ export type PresenterPayload = {
     generalScreenBackgroundColor: string | null;
     generalScreenFontFamily: ReturnType<typeof resolveGeneralScreenFontFamily> | null;
     generalScreenFontSize: number | null;
+    screenSettings: PresentationScreenSettings;
+    screenLastSeenAt: string | null;
     participantGroupStartedAt: string | null;
     participantGroupStartedCount: number | null;
     activeQuestionId: string | null;
@@ -213,6 +221,7 @@ export type PublicSessionPayload = {
     generalScreenBackgroundColor: string | null;
     generalScreenFontFamily: ReturnType<typeof resolveGeneralScreenFontFamily> | null;
     generalScreenFontSize: number | null;
+    screenSettings: PresentationScreenSettings;
   };
   screenView: ScreenView;
   activeQuestion: QuestionResult | null;
@@ -353,6 +362,8 @@ const schemaStatements = [
     general_screen_background_color TEXT,
     general_screen_font_family TEXT,
     general_screen_font_size INTEGER,
+    screen_settings_json TEXT,
+    screen_last_seen_at TEXT,
     participant_group_started_at TEXT,
     participant_group_started_count INTEGER,
     active_question_id TEXT,
@@ -428,6 +439,8 @@ const schemaStatements = [
   "ALTER TABLE presentations ADD COLUMN IF NOT EXISTS general_screen_background_color TEXT",
   "ALTER TABLE presentations ADD COLUMN IF NOT EXISTS general_screen_font_family TEXT",
   "ALTER TABLE presentations ADD COLUMN IF NOT EXISTS general_screen_font_size INTEGER",
+  "ALTER TABLE presentations ADD COLUMN IF NOT EXISTS screen_settings_json TEXT",
+  "ALTER TABLE presentations ADD COLUMN IF NOT EXISTS screen_last_seen_at TEXT",
   "ALTER TABLE presentations ADD COLUMN IF NOT EXISTS participant_group_started_at TEXT",
   "ALTER TABLE presentations ADD COLUMN IF NOT EXISTS participant_group_started_count INTEGER",
   "ALTER TABLE presentations ADD COLUMN IF NOT EXISTS screen_view TEXT NOT NULL DEFAULT 'question'",
@@ -826,6 +839,8 @@ function mapPresentation(row: PresentationRow) {
     generalScreenBackgroundColor: normalizeHexColor(row.general_screen_background_color),
     generalScreenFontFamily: normalizeGeneralScreenFontFamily(row.general_screen_font_family),
     generalScreenFontSize: normalizeGeneralScreenFontSize(row.general_screen_font_size),
+    screenSettings: normalizeScreenSettings(row.screen_settings_json),
+    screenLastSeenAt: row.screen_last_seen_at,
     participantGroupStartedAt: row.participant_group_started_at,
     participantGroupStartedCount:
       row.participant_group_started_count === null || row.participant_group_started_count === undefined
@@ -1911,6 +1926,7 @@ export async function updatePresentationSettings(
     generalScreenBackgroundColor?: unknown;
     generalScreenFontFamily?: unknown;
     generalScreenFontSize?: unknown;
+    screenSettings?: unknown;
     title?: unknown;
     presentationType?: unknown;
     workflowStatus?: unknown;
@@ -1958,6 +1974,10 @@ export async function updatePresentationSettings(
   if (!isValidGeneralScreenFontSize(payload.generalScreenFontSize)) {
     throw new AppError(400, "Kies een geldige lettergrootte.");
   }
+  const screenSettings =
+    payload.screenSettings === undefined
+      ? normalizeScreenSettings(presentation.screen_settings_json)
+      : normalizeScreenSettings(payload.screenSettings);
   const presentationType =
     payload.presentationType === undefined
       ? presentation.presentation_type ?? "interactive"
@@ -1981,6 +2001,7 @@ export async function updatePresentationSettings(
       general_screen_background_color = ${generalScreenBackgroundColor},
       general_screen_font_family = ${generalScreenFontFamily},
       general_screen_font_size = ${generalScreenFontSize},
+      screen_settings_json = ${JSON.stringify(screenSettings)},
       presentation_type = ${presentationType},
       workflow_status = ${workflowStatus},
       published_at = ${publishedAt},
@@ -2355,7 +2376,13 @@ export async function setScreenView(
 ) {
   const presentation = await assertPresenter(presentationId, presenterKey);
 
-  if (screenView !== "question" && screenView !== "qr" && screenView !== "results" && screenView !== "ranking") {
+  if (
+    screenView !== "question" &&
+    screenView !== "qr" &&
+    screenView !== "results" &&
+    screenView !== "ranking" &&
+    screenView !== "pause"
+  ) {
     throw new AppError(400, "Ongeldige schermweergave.");
   }
 
@@ -2599,6 +2626,24 @@ export async function getPublicSessionStatus(codeInput: string): Promise<PublicS
   };
 }
 
+export async function touchScreenHeartbeat(codeInput: string) {
+  await ensureSchema();
+  const code = normalizeCode(codeInput);
+  const timestamp = nowIso();
+  const rows = await getSql()<Array<{ code: string }>>`
+    UPDATE presentations
+    SET screen_last_seen_at = ${timestamp}
+    WHERE code = ${code}
+    RETURNING code
+  `;
+
+  if (!first(rows)) {
+    throw new AppError(404, "Sessie niet gevonden.");
+  }
+
+  return { ok: true, seenAt: timestamp };
+}
+
 async function loadPublicSessionBase(codeInput: string): Promise<PublicSessionBase> {
   await ensureSchema();
 
@@ -2760,6 +2805,7 @@ export async function getPublicSession(codeInput: string, participantIdInput?: u
       generalScreenBackgroundColor: normalizeHexColor(presentation.general_screen_background_color),
       generalScreenFontFamily: normalizeGeneralScreenFontFamily(presentation.general_screen_font_family),
       generalScreenFontSize: normalizeGeneralScreenFontSize(presentation.general_screen_font_size),
+      screenSettings: normalizeScreenSettings(presentation.screen_settings_json),
     },
     screenView: presentation.screen_view ?? "question",
     activeQuestion: hideCorrectAnswers(activeQuestion),
@@ -3168,6 +3214,7 @@ export async function duplicatePresentation(
         general_screen_background_color,
         general_screen_font_family,
         general_screen_font_size,
+        screen_settings_json,
         active_question_id,
         screen_question_id,
         screen_view,
@@ -3188,6 +3235,7 @@ export async function duplicatePresentation(
         ${normalizeHexColor(original.general_screen_background_color)},
         ${normalizeGeneralScreenFontFamily(original.general_screen_font_family)},
         ${normalizeGeneralScreenFontSize(original.general_screen_font_size)},
+        ${JSON.stringify(normalizeScreenSettings(original.screen_settings_json))},
         NULL,
         NULL,
         'question',
